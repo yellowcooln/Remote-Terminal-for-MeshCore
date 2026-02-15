@@ -23,6 +23,7 @@ from app.routers import (
     radio,
     read_state,
     settings,
+    statistics,
     ws,
 )
 
@@ -83,6 +84,7 @@ app.include_router(messages.router, prefix="/api")
 app.include_router(packets.router, prefix="/api")
 app.include_router(read_state.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(statistics.router, prefix="/api")
 app.include_router(ws.router, prefix="/api")
 
 # Serve frontend static files in production

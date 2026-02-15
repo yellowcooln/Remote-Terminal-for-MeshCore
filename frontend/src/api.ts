@@ -12,6 +12,7 @@ import type {
   MigratePreferencesResponse,
   RadioConfig,
   RadioConfigUpdate,
+  StatisticsResponse,
   TelemetryResponse,
   TraceResponse,
   UnreadCounts,
@@ -216,4 +217,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(request),
     }),
+
+  // Statistics
+  getStatistics: () => fetchJson<StatisticsResponse>('/statistics'),
 };

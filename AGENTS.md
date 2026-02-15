@@ -278,6 +278,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | PATCH | `/api/settings` | Update app settings |
 | POST | `/api/settings/favorites/toggle` | Toggle favorite status |
 | POST | `/api/settings/migrate` | One-time migration from frontend localStorage |
+| GET | `/api/statistics` | Aggregated mesh network statistics |
 | WS | `/api/ws` | Real-time updates |
 
 ## Key Concepts

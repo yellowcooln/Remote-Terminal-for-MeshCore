@@ -211,3 +211,30 @@ export interface UnreadCounts {
   mentions: Record<string, boolean>;
   last_message_times: Record<string, number>;
 }
+
+export interface BusyChannel {
+  channel_key: string;
+  channel_name: string;
+  message_count: number;
+}
+
+export interface ContactActivityCounts {
+  last_hour: number;
+  last_24_hours: number;
+  last_week: number;
+}
+
+export interface StatisticsResponse {
+  busiest_channels_24h: BusyChannel[];
+  contact_count: number;
+  repeater_count: number;
+  channel_count: number;
+  total_packets: number;
+  decrypted_packets: number;
+  undecrypted_packets: number;
+  total_dms: number;
+  total_channel_messages: number;
+  total_outgoing: number;
+  contacts_heard: ContactActivityCounts;
+  repeaters_heard: ContactActivityCounts;
+}

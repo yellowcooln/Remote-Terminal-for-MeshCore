@@ -296,3 +296,30 @@ class AppSettings(BaseModel):
         default_factory=list,
         description="List of bot configurations",
     )
+
+
+class BusyChannel(BaseModel):
+    channel_key: str
+    channel_name: str
+    message_count: int
+
+
+class ContactActivityCounts(BaseModel):
+    last_hour: int
+    last_24_hours: int
+    last_week: int
+
+
+class StatisticsResponse(BaseModel):
+    busiest_channels_24h: list[BusyChannel]
+    contact_count: int
+    repeater_count: int
+    channel_count: int
+    total_packets: int
+    decrypted_packets: int
+    undecrypted_packets: int
+    total_dms: int
+    total_channel_messages: int
+    total_outgoing: int
+    contacts_heard: ContactActivityCounts
+    repeaters_heard: ContactActivityCounts

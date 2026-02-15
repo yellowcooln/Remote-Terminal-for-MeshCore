@@ -8,6 +8,7 @@ import type {
   HealthStatus,
   RadioConfig,
   RadioConfigUpdate,
+  StatisticsResponse,
 } from '../types';
 import type { SettingsSection } from '../components/SettingsModal';
 
@@ -288,5 +289,56 @@ describe('SettingsModal', () => {
       expect(onReboot).toHaveBeenCalledTimes(2);
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('renders statistics section with fetched data', async () => {
+    const mockStats: StatisticsResponse = {
+      busiest_channels_24h: [
+        { channel_key: 'AA'.repeat(16), channel_name: 'general', message_count: 42 },
+      ],
+      contact_count: 10,
+      repeater_count: 3,
+      channel_count: 5,
+      total_packets: 200,
+      decrypted_packets: 150,
+      undecrypted_packets: 50,
+      total_dms: 25,
+      total_channel_messages: 80,
+      total_outgoing: 30,
+      contacts_heard: { last_hour: 2, last_24_hours: 7, last_week: 10 },
+      repeaters_heard: { last_hour: 1, last_24_hours: 3, last_week: 3 },
+    };
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(mockStats), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    renderModal({
+      externalSidebarNav: true,
+      desktopSection: 'statistics',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Network')).toBeInTheDocument();
+    });
+
+    // Verify key labels are present
+    expect(screen.getByText('Contacts')).toBeInTheDocument();
+    expect(screen.getByText('Repeaters')).toBeInTheDocument();
+    expect(screen.getByText('Direct Messages')).toBeInTheDocument();
+    expect(screen.getByText('Channel Messages')).toBeInTheDocument();
+    expect(screen.getByText('Sent (Outgoing)')).toBeInTheDocument();
+    expect(screen.getByText('Total stored')).toBeInTheDocument();
+    expect(screen.getByText('Decrypted')).toBeInTheDocument();
+    expect(screen.getByText('Undecrypted')).toBeInTheDocument();
+    expect(screen.getByText('Contacts heard')).toBeInTheDocument();
+    expect(screen.getByText('Repeaters heard')).toBeInTheDocument();
+
+    // Busiest channels
+    expect(screen.getByText('general')).toBeInTheDocument();
+    expect(screen.getByText('42 msgs')).toBeInTheDocument();
   });
 });

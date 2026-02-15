@@ -40,6 +40,7 @@ app/
     ├── packets.py
     ├── read_state.py
     ├── settings.py
+    ├── statistics.py
     └── ws.py
 ```
 
@@ -137,6 +138,9 @@ app/
 - `PATCH /settings`
 - `POST /settings/favorites/toggle`
 - `POST /settings/migrate`
+
+### Statistics
+- `GET /statistics` — aggregated mesh network stats (entity counts, message/packet splits, activity windows, busiest channels)
 
 ### WebSocket
 - `WS /ws`

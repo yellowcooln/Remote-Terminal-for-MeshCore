@@ -1,4 +1,10 @@
-export type SettingsSection = 'radio' | 'identity' | 'connectivity' | 'database' | 'bot';
+export type SettingsSection =
+  | 'radio'
+  | 'identity'
+  | 'connectivity'
+  | 'database'
+  | 'bot'
+  | 'statistics';
 
 export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
   'radio',
@@ -6,6 +12,7 @@ export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
   'connectivity',
   'database',
   'bot',
+  'statistics',
 ];
 
 export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
@@ -14,4 +21,5 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   connectivity: '📡 Connectivity',
   database: '🗄️ Database',
   bot: '🤖 Bot',
+  statistics: '📊 Statistics',
 };

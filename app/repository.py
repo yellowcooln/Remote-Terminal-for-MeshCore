@@ -20,6 +20,11 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 
+SECONDS_1H = 3600
+SECONDS_24H = 86400
+SECONDS_7D = 604800
+
+
 class AmbiguousPublicKeyPrefixError(ValueError):
     """Raised when a public key prefix matches multiple contacts."""
 
@@ -1013,3 +1018,123 @@ class AppSettingsRepository:
         )
 
         return settings, True
+
+
+class StatisticsRepository:
+    @staticmethod
+    async def _activity_counts(type_condition: str) -> dict[str, int]:
+        """Get time-windowed counts for contacts/repeaters heard."""
+        now = int(time.time())
+        cursor = await db.conn.execute(
+            f"""
+            SELECT
+                SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS last_hour,
+                SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS last_24_hours,
+                SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS last_week
+            FROM contacts
+            WHERE {type_condition} AND last_seen IS NOT NULL
+            """,
+            (now - SECONDS_1H, now - SECONDS_24H, now - SECONDS_7D),
+        )
+        row = await cursor.fetchone()
+        assert row is not None  # Aggregate query always returns a row
+        return {
+            "last_hour": row["last_hour"] or 0,
+            "last_24_hours": row["last_24_hours"] or 0,
+            "last_week": row["last_week"] or 0,
+        }
+
+    @staticmethod
+    async def get_all() -> dict:
+        """Aggregate all statistics from existing tables."""
+        now = int(time.time())
+
+        # Top 5 busiest channels in last 24h
+        cursor = await db.conn.execute(
+            """
+            SELECT m.conversation_key, COALESCE(c.name, m.conversation_key) AS channel_name,
+                   COUNT(*) AS message_count
+            FROM messages m
+            LEFT JOIN channels c ON m.conversation_key = c.key
+            WHERE m.type = 'CHAN' AND m.received_at >= ?
+            GROUP BY m.conversation_key
+            ORDER BY COUNT(*) DESC
+            LIMIT 5
+            """,
+            (now - SECONDS_24H,),
+        )
+        rows = await cursor.fetchall()
+        busiest_channels_24h = [
+            {
+                "channel_key": row["conversation_key"],
+                "channel_name": row["channel_name"],
+                "message_count": row["message_count"],
+            }
+            for row in rows
+        ]
+
+        # Entity counts
+        cursor = await db.conn.execute("SELECT COUNT(*) AS cnt FROM contacts WHERE type != 2")
+        row = await cursor.fetchone()
+        assert row is not None
+        contact_count: int = row["cnt"]
+
+        cursor = await db.conn.execute("SELECT COUNT(*) AS cnt FROM contacts WHERE type = 2")
+        row = await cursor.fetchone()
+        assert row is not None
+        repeater_count: int = row["cnt"]
+
+        cursor = await db.conn.execute("SELECT COUNT(*) AS cnt FROM channels")
+        row = await cursor.fetchone()
+        assert row is not None
+        channel_count: int = row["cnt"]
+
+        # Packet split
+        cursor = await db.conn.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN message_id IS NOT NULL THEN 1 ELSE 0 END) AS decrypted
+            FROM raw_packets
+            """
+        )
+        pkt_row = await cursor.fetchone()
+        assert pkt_row is not None
+        total_packets = pkt_row["total"] or 0
+        decrypted_packets = pkt_row["decrypted"] or 0
+        undecrypted_packets = total_packets - decrypted_packets
+
+        # Message type counts
+        cursor = await db.conn.execute("SELECT COUNT(*) AS cnt FROM messages WHERE type = 'PRIV'")
+        row = await cursor.fetchone()
+        assert row is not None
+        total_dms: int = row["cnt"]
+
+        cursor = await db.conn.execute("SELECT COUNT(*) AS cnt FROM messages WHERE type = 'CHAN'")
+        row = await cursor.fetchone()
+        assert row is not None
+        total_channel_messages: int = row["cnt"]
+
+        # Outgoing count
+        cursor = await db.conn.execute("SELECT COUNT(*) AS cnt FROM messages WHERE outgoing = 1")
+        row = await cursor.fetchone()
+        assert row is not None
+        total_outgoing: int = row["cnt"]
+
+        # Activity windows
+        contacts_heard = await StatisticsRepository._activity_counts("type != 2")
+        repeaters_heard = await StatisticsRepository._activity_counts("type = 2")
+
+        return {
+            "busiest_channels_24h": busiest_channels_24h,
+            "contact_count": contact_count,
+            "repeater_count": repeater_count,
+            "channel_count": channel_count,
+            "total_packets": total_packets,
+            "decrypted_packets": decrypted_packets,
+            "undecrypted_packets": undecrypted_packets,
+            "total_dms": total_dms,
+            "total_channel_messages": total_channel_messages,
+            "total_outgoing": total_outgoing,
+            "contacts_heard": contacts_heard,
+            "repeaters_heard": repeaters_heard,
+        }
