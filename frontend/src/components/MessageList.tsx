@@ -160,6 +160,8 @@ export function MessageList({
   const [resendableIds, setResendableIds] = useState<Set<number>>(new Set());
   const resendTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const activeBurstsRef = useRef<Map<number, ReturnType<typeof setTimeout>[]>>(new Map());
+  const onResendRef = useRef(onResendChannelMessage);
+  onResendRef.current = onResendChannelMessage;
 
   // Capture scroll state in the scroll handler BEFORE any state updates
   const scrollStateRef = useRef({
@@ -527,15 +529,16 @@ export function MessageList({
                           // Burst resend: 5 times, 2 seconds apart
                           if (activeBurstsRef.current.has(msg.id)) return;
                           onResendChannelMessage(msg.id); // first send (immediate)
+                          const msgId = msg.id;
                           const timers: ReturnType<typeof setTimeout>[] = [];
                           for (let i = 1; i <= 4; i++) {
                             const timer = setTimeout(() => {
-                              onResendChannelMessage(msg.id);
-                              if (i === 4) activeBurstsRef.current.delete(msg.id);
-                            }, i * 2000);
+                              onResendRef.current?.(msgId);
+                              if (i === 4) activeBurstsRef.current.delete(msgId);
+                            }, i * 3000);
                             timers.push(timer);
                           }
-                          activeBurstsRef.current.set(msg.id, timers);
+                          activeBurstsRef.current.set(msgId, timers);
                         } else {
                           onResendChannelMessage(msg.id);
                         }
