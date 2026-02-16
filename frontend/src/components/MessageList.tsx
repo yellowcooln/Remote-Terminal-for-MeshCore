@@ -159,6 +159,7 @@ export function MessageList({
   } | null>(null);
   const [resendableIds, setResendableIds] = useState<Set<number>>(new Set());
   const resendTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const activeBurstsRef = useRef<Map<number, ReturnType<typeof setTimeout>[]>>(new Map());
 
   // Capture scroll state in the scroll handler BEFORE any state updates
   const scrollStateRef = useRef({
@@ -258,6 +259,17 @@ export function MessageList({
       timers.clear();
     };
   }, [messages, onResendChannelMessage]);
+
+  // Clean up burst timers on unmount
+  useEffect(() => {
+    const bursts = activeBurstsRef.current;
+    return () => {
+      for (const timers of bursts.values()) {
+        for (const t of timers) clearTimeout(t);
+      }
+      bursts.clear();
+    };
+  }, []);
 
   // Handle scroll - capture state and detect when user is near top/bottom
   const handleScroll = useCallback(() => {
@@ -511,7 +523,22 @@ export function MessageList({
                       className="text-muted-foreground hover:text-primary ml-1 text-xs cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onResendChannelMessage(msg.id);
+                        if (e.altKey) {
+                          // Burst resend: 5 times, 2 seconds apart
+                          if (activeBurstsRef.current.has(msg.id)) return;
+                          onResendChannelMessage(msg.id); // first send (immediate)
+                          const timers: ReturnType<typeof setTimeout>[] = [];
+                          for (let i = 1; i <= 4; i++) {
+                            const timer = setTimeout(() => {
+                              onResendChannelMessage(msg.id);
+                              if (i === 4) activeBurstsRef.current.delete(msg.id);
+                            }, i * 2000);
+                            timers.push(timer);
+                          }
+                          activeBurstsRef.current.set(msg.id, timers);
+                        } else {
+                          onResendChannelMessage(msg.id);
+                        }
                       }}
                       title="Resend message"
                     >
