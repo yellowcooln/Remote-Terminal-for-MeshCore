@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import type { Contact, RawPacket, RadioConfig } from '../types';
 import { PacketVisualizer3D } from './PacketVisualizer3D';
 import { RawPacketList } from './RawPacketList';
@@ -13,12 +14,40 @@ interface VisualizerViewProps {
 
 export function VisualizerView({ packets, contacts, config }: VisualizerViewProps) {
   const [fullScreen, setFullScreen] = useState(false);
+  const [paneFullScreen, setPaneFullScreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Sync state when browser exits fullscreen (Escape, F11, etc.)
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setPaneFullScreen(false);
+    };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  const toggleFullScreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen();
+      setPaneFullScreen(true);
+    } else {
+      document.exitFullscreen();
+      // State synced via fullscreenchange handler
+    }
+  }, []);
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={containerRef} className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="flex justify-between items-center px-4 py-3 border-b border-border font-medium text-lg">
         <span>Mesh Visualizer</span>
+        <button
+          className="hidden md:inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          onClick={toggleFullScreen}
+          title={paneFullScreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {paneFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+        </button>
       </div>
 
       {/* Mobile: Tabbed interface */}
