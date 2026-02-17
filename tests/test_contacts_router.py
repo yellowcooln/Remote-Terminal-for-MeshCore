@@ -14,7 +14,7 @@ import pytest
 from meshcore import EventType
 
 from app.database import Database
-from app.repository import ContactRepository
+from app.repository import ContactRepository, MessageRepository
 
 # Sample 64-char hex public keys for testing
 KEY_A = "aa" * 32  # aaaa...aa
@@ -300,6 +300,36 @@ class TestSyncContacts:
             response = await client.post("/api/contacts/sync")
 
         assert response.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_sync_claims_prefix_messages(self, test_db, client):
+        """Syncing contacts promotes prefix-stored DM messages to the full key."""
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="hello from prefix",
+            received_at=1700000000,
+            conversation_key=KEY_A[:12],
+            sender_timestamp=1700000000,
+        )
+
+        mock_mc = MagicMock()
+        mock_result = MagicMock()
+        mock_result.type = EventType.OK
+        mock_result.payload = {KEY_A: {"adv_name": "Alice", "type": 1, "flags": 0}}
+        mock_mc.commands.get_contacts = AsyncMock(return_value=mock_result)
+
+        with patch("app.dependencies.radio_manager") as mock_dep_rm:
+            mock_dep_rm.is_connected = True
+            mock_dep_rm.meshcore = mock_mc
+
+            response = await client.post("/api/contacts/sync")
+
+        assert response.status_code == 200
+        assert response.json()["synced"] == 1
+
+        messages = await MessageRepository.get_all(conversation_key=KEY_A)
+        assert len(messages) == 1
+        assert messages[0].conversation_key == KEY_A.lower()
 
 
 class TestAddRemoveRadio:

@@ -193,9 +193,11 @@ async def sync_contacts_from_radio() -> dict:
     count = 0
 
     for public_key, contact_data in contacts.items():
-        await ContactRepository.upsert(
-            Contact.from_radio_dict(public_key, contact_data, on_radio=True)
-        )
+        lower_key = public_key.lower()
+        await ContactRepository.upsert(Contact.from_radio_dict(lower_key, contact_data, on_radio=True))
+        claimed = await MessageRepository.claim_prefix_messages(lower_key)
+        if claimed > 0:
+            logger.info("Claimed %d prefix DM message(s) for contact %s", claimed, public_key[:12])
         count += 1
 
     logger.info("Synced %d contacts from radio", count)
