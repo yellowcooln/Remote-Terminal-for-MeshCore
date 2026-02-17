@@ -125,7 +125,8 @@ async def set_private_key(update: PrivateKeyUpdate) -> dict:
         raise HTTPException(status_code=400, detail="Invalid hex string for private key") from None
 
     logger.info("Importing private key")
-    result = await mc.commands.import_private_key(key_bytes)
+    async with radio_manager.radio_operation("import_private_key", meshcore=mc):
+        result = await mc.commands.import_private_key(key_bytes)
 
     if result.type == EventType.ERROR:
         raise HTTPException(
@@ -149,7 +150,8 @@ async def send_advertisement() -> dict:
     require_connected()
 
     logger.info("Sending flood advertisement")
-    success = await do_send_advertisement(force=True)
+    async with radio_manager.radio_operation("manual_advertisement"):
+        success = await do_send_advertisement(force=True)
 
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send advertisement")
@@ -167,7 +169,11 @@ async def reboot_radio() -> dict:
     # If connected, send reboot command
     if radio_manager.is_connected and radio_manager.meshcore:
         logger.info("Rebooting radio")
-        await radio_manager.meshcore.commands.reboot()
+        async with radio_manager.radio_operation(
+            "reboot_radio",
+            meshcore=radio_manager.meshcore,
+        ):
+            await radio_manager.meshcore.commands.reboot()
         return {
             "status": "ok",
             "message": "Reboot command sent. Radio will reconnect automatically.",

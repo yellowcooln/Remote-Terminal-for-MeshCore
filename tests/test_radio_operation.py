@@ -49,6 +49,40 @@ class TestRadioOperationLock:
         await holder_task
 
     @pytest.mark.asyncio
+    async def test_blocking_waits_and_acquires_after_release(self):
+        holder_entered = asyncio.Event()
+        holder_release = asyncio.Event()
+        contender_entered = asyncio.Event()
+        order: list[str] = []
+
+        async def holder():
+            async with radio_manager.radio_operation("holder"):
+                order.append("holder_enter")
+                holder_entered.set()
+                await holder_release.wait()
+                order.append("holder_exit")
+
+        async def contender():
+            await holder_entered.wait()
+            async with radio_manager.radio_operation("contender"):
+                order.append("contender_enter")
+                contender_entered.set()
+
+        holder_task = asyncio.create_task(holder())
+        contender_task = asyncio.create_task(contender())
+
+        await holder_entered.wait()
+        await asyncio.sleep(0.02)
+        assert not contender_entered.is_set()
+
+        holder_release.set()
+        await asyncio.wait_for(contender_entered.wait(), timeout=1.0)
+
+        await holder_task
+        await contender_task
+        assert order == ["holder_enter", "holder_exit", "contender_enter"]
+
+    @pytest.mark.asyncio
     async def test_suspend_auto_fetch_stops_and_restarts(self):
         mc = MagicMock()
         mc.stop_auto_message_fetching = AsyncMock()

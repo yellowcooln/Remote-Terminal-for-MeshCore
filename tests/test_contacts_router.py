@@ -6,6 +6,7 @@ and add/remove from radio operations.
 Uses httpx.AsyncClient with real in-memory SQLite database.
 """
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -19,6 +20,11 @@ from app.repository import ContactRepository
 KEY_A = "aa" * 32  # aaaa...aa
 KEY_B = "bb" * 32  # bbbb...bb
 KEY_C = "cc" * 32  # cccc...cc
+
+
+@asynccontextmanager
+async def _noop_radio_operation(*_args, **_kwargs):
+    yield
 
 
 @pytest.fixture
@@ -219,6 +225,7 @@ class TestDeleteContact:
         with patch("app.routers.contacts.radio_manager") as mock_rm:
             mock_rm.is_connected = False
             mock_rm.meshcore = None
+            mock_rm.radio_operation = _noop_radio_operation
 
             response = await client.delete(f"/api/contacts/{KEY_A}")
 
@@ -248,6 +255,7 @@ class TestDeleteContact:
         with patch("app.routers.contacts.radio_manager") as mock_rm:
             mock_rm.is_connected = True
             mock_rm.meshcore = mock_mc
+            mock_rm.radio_operation = _noop_radio_operation
 
             response = await client.delete(f"/api/contacts/{KEY_A}")
 

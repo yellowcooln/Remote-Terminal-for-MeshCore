@@ -183,7 +183,8 @@ async def sync_contacts_from_radio() -> dict:
 
     logger.info("Syncing contacts from radio")
 
-    result = await mc.commands.get_contacts()
+    async with radio_manager.radio_operation("sync_contacts_from_radio", meshcore=mc):
+        result = await mc.commands.get_contacts()
 
     if result.type == EventType.ERROR:
         raise HTTPException(status_code=500, detail=f"Failed to get contacts: {result.payload}")
@@ -208,19 +209,20 @@ async def remove_contact_from_radio(public_key: str) -> dict:
 
     contact = await _resolve_contact_or_404(public_key)
 
-    # Get the contact from radio
-    radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
-    if not radio_contact:
-        # Already not on radio
-        await ContactRepository.set_on_radio(contact.public_key, False)
-        return {"status": "ok", "message": "Contact was not on radio"}
+    async with radio_manager.radio_operation("remove_contact_from_radio", meshcore=mc):
+        # Get the contact from radio
+        radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
+        if not radio_contact:
+            # Already not on radio
+            await ContactRepository.set_on_radio(contact.public_key, False)
+            return {"status": "ok", "message": "Contact was not on radio"}
 
-    logger.info("Removing contact %s from radio", contact.public_key[:12])
+        logger.info("Removing contact %s from radio", contact.public_key[:12])
 
-    result = await mc.commands.remove_contact(radio_contact)
+        result = await mc.commands.remove_contact(radio_contact)
 
-    if result.type == EventType.ERROR:
-        raise HTTPException(status_code=500, detail=f"Failed to remove contact: {result.payload}")
+        if result.type == EventType.ERROR:
+            raise HTTPException(status_code=500, detail=f"Failed to remove contact: {result.payload}")
 
     await ContactRepository.set_on_radio(contact.public_key, False)
     return {"status": "ok"}
@@ -233,17 +235,18 @@ async def add_contact_to_radio(public_key: str) -> dict:
 
     contact = await _resolve_contact_or_404(public_key, "Contact not found in database")
 
-    # Check if already on radio
-    radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
-    if radio_contact:
-        return {"status": "ok", "message": "Contact already on radio"}
+    async with radio_manager.radio_operation("add_contact_to_radio", meshcore=mc):
+        # Check if already on radio
+        radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
+        if radio_contact:
+            return {"status": "ok", "message": "Contact already on radio"}
 
-    logger.info("Adding contact %s to radio", contact.public_key[:12])
+        logger.info("Adding contact %s to radio", contact.public_key[:12])
 
-    result = await mc.commands.add_contact(contact.to_radio_dict())
+        result = await mc.commands.add_contact(contact.to_radio_dict())
 
-    if result.type == EventType.ERROR:
-        raise HTTPException(status_code=500, detail=f"Failed to add contact: {result.payload}")
+        if result.type == EventType.ERROR:
+            raise HTTPException(status_code=500, detail=f"Failed to add contact: {result.payload}")
 
     await ContactRepository.set_on_radio(contact.public_key, True)
     return {"status": "ok"}
@@ -269,10 +272,11 @@ async def delete_contact(public_key: str) -> dict:
     # Remove from radio if connected and contact is on radio
     if radio_manager.is_connected and radio_manager.meshcore:
         mc = radio_manager.meshcore
-        radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
-        if radio_contact:
-            logger.info("Removing contact %s from radio before deletion", contact.public_key[:12])
-            await mc.commands.remove_contact(radio_contact)
+        async with radio_manager.radio_operation("delete_contact_from_radio", meshcore=mc):
+            radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
+            if radio_contact:
+                logger.info("Removing contact %s from radio before deletion", contact.public_key[:12])
+                await mc.commands.remove_contact(radio_contact)
 
     # Delete from database
     await ContactRepository.delete(contact.public_key)
