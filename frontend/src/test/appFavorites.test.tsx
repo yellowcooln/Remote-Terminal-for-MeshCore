@@ -52,34 +52,38 @@ vi.mock('../useWebSocket', () => ({
   useWebSocket: vi.fn(),
 }));
 
-vi.mock('../hooks', () => ({
-  useConversationMessages: () => ({
-    messages: [],
-    messagesLoading: false,
-    loadingOlder: false,
-    hasOlderMessages: false,
-    setMessages: mocks.hookFns.setMessages,
-    fetchMessages: mocks.hookFns.fetchMessages,
-    fetchOlderMessages: mocks.hookFns.fetchOlderMessages,
-    addMessageIfNew: mocks.hookFns.addMessageIfNew,
-    updateMessageAck: mocks.hookFns.updateMessageAck,
-  }),
-  useUnreadCounts: () => ({
-    unreadCounts: {},
-    mentions: {},
-    lastMessageTimes: {},
-    incrementUnread: mocks.hookFns.incrementUnread,
-    markAllRead: mocks.hookFns.markAllRead,
-    trackNewMessage: mocks.hookFns.trackNewMessage,
-  }),
-  useRepeaterMode: () => ({
-    repeaterLoggedIn: false,
-    activeContactIsRepeater: false,
-    handleTelemetryRequest: mocks.hookFns.handleTelemetryRequest,
-    handleRepeaterCommand: mocks.hookFns.handleRepeaterCommand,
-  }),
-  getMessageContentKey: () => 'content-key',
-}));
+vi.mock('../hooks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks')>();
+  return {
+    ...actual,
+    useConversationMessages: () => ({
+      messages: [],
+      messagesLoading: false,
+      loadingOlder: false,
+      hasOlderMessages: false,
+      setMessages: mocks.hookFns.setMessages,
+      fetchMessages: mocks.hookFns.fetchMessages,
+      fetchOlderMessages: mocks.hookFns.fetchOlderMessages,
+      addMessageIfNew: mocks.hookFns.addMessageIfNew,
+      updateMessageAck: mocks.hookFns.updateMessageAck,
+    }),
+    useUnreadCounts: () => ({
+      unreadCounts: {},
+      mentions: {},
+      lastMessageTimes: {},
+      incrementUnread: mocks.hookFns.incrementUnread,
+      markAllRead: mocks.hookFns.markAllRead,
+      trackNewMessage: mocks.hookFns.trackNewMessage,
+    }),
+    useRepeaterMode: () => ({
+      repeaterLoggedIn: false,
+      activeContactIsRepeater: false,
+      handleTelemetryRequest: mocks.hookFns.handleTelemetryRequest,
+      handleRepeaterCommand: mocks.hookFns.handleRepeaterCommand,
+    }),
+    getMessageContentKey: () => 'content-key',
+  };
+});
 
 vi.mock('../messageCache', () => ({
   addMessage: vi.fn(),

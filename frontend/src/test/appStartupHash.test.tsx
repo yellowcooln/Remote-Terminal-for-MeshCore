@@ -21,34 +21,38 @@ vi.mock('../useWebSocket', () => ({
   useWebSocket: vi.fn(),
 }));
 
-vi.mock('../hooks', () => ({
-  useConversationMessages: () => ({
-    messages: [],
-    messagesLoading: false,
-    loadingOlder: false,
-    hasOlderMessages: false,
-    setMessages: vi.fn(),
-    fetchMessages: vi.fn(async () => {}),
-    fetchOlderMessages: vi.fn(async () => {}),
-    addMessageIfNew: vi.fn(),
-    updateMessageAck: vi.fn(),
-  }),
-  useUnreadCounts: () => ({
-    unreadCounts: {},
-    mentions: {},
-    lastMessageTimes: {},
-    incrementUnread: vi.fn(),
-    markAllRead: vi.fn(),
-    trackNewMessage: vi.fn(),
-  }),
-  useRepeaterMode: () => ({
-    repeaterLoggedIn: false,
-    activeContactIsRepeater: false,
-    handleTelemetryRequest: vi.fn(),
-    handleRepeaterCommand: vi.fn(),
-  }),
-  getMessageContentKey: () => 'content-key',
-}));
+vi.mock('../hooks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks')>();
+  return {
+    ...actual,
+    useConversationMessages: () => ({
+      messages: [],
+      messagesLoading: false,
+      loadingOlder: false,
+      hasOlderMessages: false,
+      setMessages: vi.fn(),
+      fetchMessages: vi.fn(async () => {}),
+      fetchOlderMessages: vi.fn(async () => {}),
+      addMessageIfNew: vi.fn(),
+      updateMessageAck: vi.fn(),
+    }),
+    useUnreadCounts: () => ({
+      unreadCounts: {},
+      mentions: {},
+      lastMessageTimes: {},
+      incrementUnread: vi.fn(),
+      markAllRead: vi.fn(),
+      trackNewMessage: vi.fn(),
+    }),
+    useRepeaterMode: () => ({
+      repeaterLoggedIn: false,
+      activeContactIsRepeater: false,
+      handleTelemetryRequest: vi.fn(),
+      handleRepeaterCommand: vi.fn(),
+    }),
+    getMessageContentKey: () => 'content-key',
+  };
+});
 
 vi.mock('../messageCache', () => ({
   addMessage: vi.fn(),

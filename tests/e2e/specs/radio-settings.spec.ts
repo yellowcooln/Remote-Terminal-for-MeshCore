@@ -26,7 +26,7 @@ test.describe('Radio settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     // --- Step 1: Change the name via settings UI ---
-    await page.getByText('Radio & Config').click();
+    await page.getByText('Settings').click();
     await page.getByRole('button', { name: /Identity/i }).click();
 
     const nameInput = page.locator('#name');
@@ -47,7 +47,7 @@ test.describe('Radio settings', () => {
     await page.reload();
     await expect(page.getByText('Connected')).toBeVisible({ timeout: 15_000 });
 
-    await page.getByText('Radio & Config').click();
+    await page.getByText('Settings').click();
     await page.getByRole('button', { name: /Identity/i }).click();
     await expect(page.locator('#name')).toHaveValue(testName, { timeout: 10_000 });
   });

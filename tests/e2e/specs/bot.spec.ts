@@ -43,7 +43,7 @@ test.describe('Bot functionality', () => {
     await page.goto('/');
     await expect(page.getByText('Connected')).toBeVisible();
 
-    await page.getByText('Radio & Config').click();
+    await page.getByText('Settings').click();
     await page.getByRole('button', { name: /Bot/i }).click();
 
     // The bot name should be visible in the bot list
