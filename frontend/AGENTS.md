@@ -91,6 +91,10 @@ Specialized logic is delegated to hooks:
 - WebSocket: realtime deltas/events.
 - On WS connect, backend sends `health` only; contacts/channels still come from REST.
 
+### New Message modal
+
+`NewMessageModal` intentionally preserves form state (tab, inputs, checkboxes) when closed and reopened. The component instance persists across open/close cycles. This is by design so users don't lose in-progress input if they accidentally dismiss the dialog.
+
 ### Message behavior
 
 - Outgoing sends are optimistic in UI and persisted server-side.

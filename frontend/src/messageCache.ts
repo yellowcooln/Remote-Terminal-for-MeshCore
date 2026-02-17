@@ -70,11 +70,13 @@ export function updateAck(messageId: number, ackCount: number, paths?: MessagePa
   for (const entry of cache.values()) {
     const idx = entry.messages.findIndex((m) => m.id === messageId);
     if (idx >= 0) {
+      const current = entry.messages[idx];
       const updated = [...entry.messages];
       updated[idx] = {
-        ...entry.messages[idx],
-        acked: ackCount,
-        ...(paths !== undefined && { paths }),
+        ...current,
+        acked: Math.max(current.acked, ackCount),
+        ...(paths !== undefined &&
+          paths.length >= (current.paths?.length ?? 0) && { paths }),
       };
       entry.messages = updated;
       return; // Message IDs are unique, stop after first match
