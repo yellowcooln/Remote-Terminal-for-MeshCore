@@ -1500,7 +1500,7 @@ export function PacketVisualizer3D({
       )}
 
       {/* Options */}
-      <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10">
+      <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10">
         <div className="flex flex-col gap-2">
           {!hideUI && (
             <>
@@ -1662,8 +1662,8 @@ export function PacketVisualizer3D({
       </div>
 
       {/* Hovered/pinned node tooltip */}
-      {(pinnedNodeId ?? hoveredNodeId) && !hideUI && (
-        <div className="absolute bottom-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10 max-w-72">
+      {(pinnedNodeId ?? hoveredNodeId) && (
+        <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10 max-w-72">
           {(() => {
             const tooltipNodeId = pinnedNodeId ?? hoveredNodeId;
             const node = tooltipNodeId ? data.nodes.get(tooltipNodeId) : null;
