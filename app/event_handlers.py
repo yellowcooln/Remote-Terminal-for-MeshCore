@@ -216,7 +216,7 @@ async def on_new_contact(event: "Event") -> None:
     logger.debug("New contact: %s", public_key[:12])
 
     contact_data = {
-        **Contact.from_radio_dict(public_key, payload, on_radio=True),
+        **Contact.from_radio_dict(public_key.lower(), payload, on_radio=True),
         "last_seen": int(time.time()),
     }
     await ContactRepository.upsert(contact_data)
