@@ -102,6 +102,7 @@ export function SettingsModal(props: SettingsModalProps) {
   };
 
   const [isMobileLayout, setIsMobileLayout] = useState(getIsMobileLayout);
+  const externalDesktopSidebarMode = externalSidebarNav && !isMobileLayout;
   const [expandedSections, setExpandedSections] = useState<Record<SettingsSection, boolean>>(() => {
     const isMobile = getIsMobileLayout();
     return {
@@ -245,8 +246,16 @@ export function SettingsModal(props: SettingsModalProps) {
     setSectionError(null);
   }, [externalSidebarNav, desktopSection]);
 
+  // On mobile with external sidebar nav, auto-expand the selected section
+  useEffect(() => {
+    if (!externalSidebarNav || !isMobileLayout || !desktopSection) return;
+    setExpandedSections((prev) =>
+      prev[desktopSection] ? prev : { ...prev, [desktopSection]: true }
+    );
+  }, [externalSidebarNav, isMobileLayout, desktopSection]);
+
   // Fetch statistics when the section becomes visible
-  const statisticsVisible = externalSidebarNav
+  const statisticsVisible = externalDesktopSidebarMode
     ? desktopSection === 'statistics'
     : expandedSections.statistics;
 
@@ -595,8 +604,6 @@ export function SettingsModal(props: SettingsModalProps) {
     }));
     setSectionError(null);
   };
-
-  const externalDesktopSidebarMode = externalSidebarNav && !isMobileLayout;
 
   const isSectionVisible = (section: SettingsSection) =>
     externalDesktopSidebarMode ? desktopSection === section : expandedSections[section];
