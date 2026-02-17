@@ -116,6 +116,7 @@ interface UseVisualizerData3DOptions {
   letEmDrift: boolean;
   particleSpeedMultiplier: number;
   observationWindowSec: number;
+  pruneStaleNodes: boolean;
 }
 
 interface VisualizerData3D {
@@ -138,6 +139,7 @@ function useVisualizerData3D({
   letEmDrift,
   particleSpeedMultiplier,
   observationWindowSec,
+  pruneStaleNodes,
 }: UseVisualizerData3DOptions): VisualizerData3D {
   const nodesRef = useRef<Map<string, GraphNode>>(new Map());
   const linksRef = useRef<Map<string, GraphLink>>(new Map());
@@ -790,6 +792,40 @@ function useVisualizerData3D({
     };
   }, []);
 
+  // Prune nodes with no activity in the last 5 minutes
+  useEffect(() => {
+    if (!pruneStaleNodes) return;
+
+    const STALE_MS = 5 * 60 * 1000;
+    const PRUNE_INTERVAL_MS = 10_000;
+
+    const interval = setInterval(() => {
+      const cutoff = Date.now() - STALE_MS;
+      let pruned = false;
+
+      for (const [id, node] of nodesRef.current) {
+        if (id === 'self') continue;
+        if (node.lastActivity < cutoff) {
+          nodesRef.current.delete(id);
+          pruned = true;
+        }
+      }
+
+      if (pruned) {
+        // Remove links that reference pruned nodes
+        for (const [key, link] of linksRef.current) {
+          const { sourceId, targetId } = getLinkId(link);
+          if (!nodesRef.current.has(sourceId) || !nodesRef.current.has(targetId)) {
+            linksRef.current.delete(key);
+          }
+        }
+        syncSimulation();
+      }
+    }, PRUNE_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [pruneStaleNodes, syncSimulation]);
+
   return useMemo(
     () => ({
       nodes: nodesRef.current,
@@ -863,6 +899,7 @@ export function PacketVisualizer3D({
   const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(2);
   const [hideUI, setHideUI] = useState(false);
   const [autoOrbit, setAutoOrbit] = useState(false);
+  const [pruneStaleNodes, setPruneStaleNodes] = useState(false);
 
   // Hover & click-to-pin
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -884,6 +921,7 @@ export function PacketVisualizer3D({
     letEmDrift,
     particleSpeedMultiplier,
     observationWindowSec,
+    pruneStaleNodes,
   });
   const dataRef = useRef(data);
   useEffect(() => {
@@ -1534,6 +1572,15 @@ export function PacketVisualizer3D({
                   <span className="text-muted-foreground">sec</span>
                 </div>
                 <div className="border-t border-border pt-2 mt-1 flex flex-col gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={pruneStaleNodes}
+                      onCheckedChange={(c) => setPruneStaleNodes(c === true)}
+                    />
+                    <span title="Automatically remove nodes with no traffic in the last 5 minutes to keep the mesh manageable">
+                      Only show last 5 min of activity
+                    </span>
+                  </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={letEmDrift}
