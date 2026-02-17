@@ -123,7 +123,6 @@ interface VisualizerData3D {
   links: Map<string, GraphLink>;
   particles: Particle[];
   stats: { processed: number; animated: number; nodes: number; links: number };
-  randomizePositions: () => void;
   expandContract: () => void;
   clearAndReset: () => void;
 }
@@ -660,32 +659,6 @@ function useVisualizerData3D({
     }
   }, [packets, config, buildPath, addLink, syncSimulation, publishPacket]);
 
-  const randomizePositions = useCallback(() => {
-    const sim = simulationRef.current;
-    if (!sim) return;
-
-    const radius = 200;
-    for (const node of nodesRef.current.values()) {
-      if (node.id === 'self') {
-        node.x = 0;
-        node.y = 0;
-        node.z = 0;
-      } else {
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
-        const r = Math.random() * radius;
-        node.x = r * Math.sin(phi) * Math.cos(theta);
-        node.y = r * Math.sin(phi) * Math.sin(theta);
-        node.z = r * Math.cos(phi);
-      }
-      node.vx = 0;
-      node.vy = 0;
-      node.vz = 0;
-    }
-
-    sim.alpha(1).restart();
-  }, []);
-
   const expandContract = useCallback(() => {
     const sim = simulationRef.current;
     if (!sim) return;
@@ -823,11 +796,10 @@ function useVisualizerData3D({
       links: linksRef.current,
       particles: particlesRef.current,
       stats,
-      randomizePositions,
       expandContract,
       clearAndReset,
     }),
-    [stats, randomizePositions, expandContract, clearAndReset]
+    [stats, expandContract, clearAndReset]
   );
 }
 
@@ -1605,13 +1577,6 @@ export function PacketVisualizer3D({
                     />
                   </div>
                 </div>
-                <button
-                  onClick={data.randomizePositions}
-                  className="mt-2 px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary rounded text-xs transition-colors"
-                  title="Randomize node positions and let the simulation settle into a new layout"
-                >
-                  Shuffle layout
-                </button>
                 <button
                   onClick={data.expandContract}
                   className="mt-1 px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary rounded text-xs transition-colors"
