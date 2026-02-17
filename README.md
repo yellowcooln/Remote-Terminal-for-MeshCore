@@ -2,26 +2,28 @@
 
 Backend server + browser interface for MeshCore mesh radio networks. Connect your radio over Serial, TCP, or BLE, and then you can:
 
-* Send and receive DMs and GroupTexts
+* Send and receive DMs and channel messages
 * Cache all received packets, decrypting as you gain keys
+* Run multiple Python bots that can analyze messages and respond to DMs and channels
 * Monitor unlimited contacts and channels (radio limits don't apply -- packets are decrypted server-side)
 * Access your radio remotely over your network or VPN
-* Brute force hashtag room names for GroupTexts you don't have keys for yet
+* Search for hashtag room names for channels you don't have keys for yet
+* Visualize the mesh as a map or node set, view repeater stats, and more!
 
-**Warning:** This app has no auth, and is for trusted environments only. _Do not put this on an untrusted network, or open it to the public._ The bots can execute arbitrary Python code which means anyone on your network can, too. If you need access control, consider using a reverse proxy like Nginx, or extending FastAPI.
+**Warning:** This app has no auth, and is for trusted environments only. _Do not put this on an untrusted network, or open it to the public._ The bots can execute arbitrary Python code which means anyone on your network can, too. If you need access control, consider using a reverse proxy like Nginx, or extending FastAPI; access control and user management are outside the scope of this app.
 
 ![Screenshot of the application's web interface](screenshot.png)
 
 ## Disclaimer
 
-This is entirely vibecoded slop -- no warranty of fitness for any purpose. It's been lovingly guided by an engineer with a passion for clean code and good tests, but it's still mostly LLM output, so you may find some bugs.
+This is developed with very heavy agentic assistance -- there is no warranty of fitness for any purpose. It's been lovingly guided by an engineer with a passion for clean code and good tests, but it's still mostly LLM output, so you may find some bugs.
 
 If extending, have your LLM read the three `AGENTS.md` files: `./AGENTS.md`, `./frontend/AGENTS.md`, and `./app/AGENTS.md`.
 
 ## Requirements
 
 - Python 3.10+
-- Node.js 18+ (for frontend development only)
+- Node.js 18+
 - [UV](https://astral.sh/uv) package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - MeshCore radio connected via USB serial, TCP, or BLE
 
@@ -44,14 +46,11 @@ ls /dev/cu.usbserial-* /dev/cu.usbmodem*
 ######
 # Run this in an elevated PowerShell (not WSL) window
 winget install usbipd
-
 # restart console
-
-# find device ID (e.g. 3-8)
+# then find device ID
 usbipd list
-
 # attach device to WSL
-usbipd bind --busid 3-8
+usbipd bind --busid 3-8 # (or whatever the right ID is)
 ```
 </details>
 
@@ -177,7 +176,7 @@ Only one transport may be active at a time. If multiple are set, the server will
 ## Additional Setup
 
 <details>
-<summary>HTTPS (Required for WebGPU Cracking outside localhost)</summary>
+<summary>HTTPS (Required for WebGPU room-finding outside localhost)</summary>
 
 WebGPU requires a secure context. When not on `localhost`, serve over HTTPS:
 
@@ -245,14 +244,26 @@ Edit `/etc/systemd/system/remoteterm.service` to set `MESHCORE_SERIAL_PORT` if n
 <summary>Testing</summary>
 
 **Backend:**
+
 ```bash
 PYTHONPATH=. uv run pytest tests/ -v
 ```
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm run test:run
+```
+
+**E2#:**
+
+Warning: these tests are only guaranteed to run correctly in a narrow subset of environments; they require a busy mesh with messages arriving constantly. E2E tests are generally not necessary to run for normal development work.
+
+```bash
+cd tests/e2e
+npx playwright test # headless
+npx playwright test --headed # show the browser window
 ```
 </details>
 
