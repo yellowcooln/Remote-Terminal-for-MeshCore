@@ -206,6 +206,8 @@ export function useConversationMessages(
     )
       return;
 
+    const conversationId = activeConversation.id;
+
     // Get the true oldest message as cursor for the next page
     const oldestMessage = messages.reduce(
       (oldest, msg) => {
@@ -222,11 +224,15 @@ export function useConversationMessages(
     try {
       const data = await api.getMessages({
         type: activeConversation.type === 'channel' ? 'CHAN' : 'PRIV',
-        conversation_key: activeConversation.id,
+        conversation_key: conversationId,
         limit: MESSAGE_PAGE_SIZE,
         before: oldestMessage.received_at,
         before_id: oldestMessage.id,
       });
+
+      // Guard against stale response if the user switched conversations mid-request
+      if (fetchingConversationIdRef.current !== conversationId) return;
+
       const dataWithPendingAck = data.map((msg) => applyPendingAck(msg));
 
       if (dataWithPendingAck.length > 0) {
