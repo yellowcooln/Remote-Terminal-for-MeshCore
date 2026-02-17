@@ -543,12 +543,7 @@ export function App() {
                     </div>
                   }
                 >
-                  <VisualizerView
-                    packets={rawPackets}
-                    contacts={contacts}
-                    config={config}
-                    onClearPackets={() => setRawPackets([])}
-                  />
+                  <VisualizerView packets={rawPackets} contacts={contacts} config={config} />
                 </Suspense>
               ) : activeConversation.type === 'raw' ? (
                 <>

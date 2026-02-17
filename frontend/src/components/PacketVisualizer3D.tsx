@@ -859,7 +859,6 @@ interface PacketVisualizer3DProps {
   config: RadioConfig | null;
   fullScreen?: boolean;
   onFullScreenChange?: (fullScreen: boolean) => void;
-  onClearPackets?: () => void;
 }
 
 export function PacketVisualizer3D({
@@ -868,7 +867,6 @@ export function PacketVisualizer3D({
   config,
   fullScreen,
   onFullScreenChange,
-  onClearPackets,
 }: PacketVisualizer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -1641,21 +1639,23 @@ export function PacketVisualizer3D({
                   Oooh Big Stretch!
                 </button>
                 <button
-                  onClick={() => {
-                    data.clearAndReset();
-                    onClearPackets?.();
-                  }}
+                  onClick={() => data.clearAndReset()}
                   className="mt-1 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-500 rounded text-xs transition-colors"
-                  title="Clear all nodes, links, and packets - reset to initial state"
+                  title="Clear all nodes and links from the visualization - packets are preserved"
                 >
                   Clear &amp; Reset
                 </button>
               </div>
             </>
           )}
-          <div className={!showControls ? '' : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'}>
+          <div
+            className={!showControls ? '' : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'}
+          >
             <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={showControls} onCheckedChange={(c) => setShowControls(c === true)} />
+              <Checkbox
+                checked={showControls}
+                onCheckedChange={(c) => setShowControls(c === true)}
+              />
               <span title="Toggle legends and controls visibility">Show controls</span>
             </label>
             {onFullScreenChange && (
