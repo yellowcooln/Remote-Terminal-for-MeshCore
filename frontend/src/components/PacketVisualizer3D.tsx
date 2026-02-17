@@ -1516,7 +1516,7 @@ export function PacketVisualizer3D({
                     className="text-muted-foreground"
                     title="How long to wait for duplicate packets via different paths before animating"
                   >
-                    Observation window:
+                    Ack/echo listen window:
                   </label>
                   <input
                     id="observation-window-3d"
