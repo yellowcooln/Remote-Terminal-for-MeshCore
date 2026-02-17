@@ -214,13 +214,17 @@ async def on_path_update(event: "Event") -> None:
     path = payload.get("path")
     path_len = payload.get("path_len")
     if path is None or path_len is None:
-        logger.debug("PATH_UPDATE for %s has no path payload, skipping DB update", contact.public_key[:12])
+        logger.debug(
+            "PATH_UPDATE for %s has no path payload, skipping DB update", contact.public_key[:12]
+        )
         return
 
     try:
         normalized_path_len = int(path_len)
     except (TypeError, ValueError):
-        logger.warning("Invalid path_len in PATH_UPDATE for %s: %r", contact.public_key[:12], path_len)
+        logger.warning(
+            "Invalid path_len in PATH_UPDATE for %s: %r", contact.public_key[:12], path_len
+        )
         return
 
     await ContactRepository.update_path(contact.public_key, str(path), normalized_path_len)

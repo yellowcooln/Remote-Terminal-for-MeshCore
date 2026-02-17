@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 from meshcore import EventType
 
+from app.radio import RadioManager
 from app.routers.radio import (
     PrivateKeyUpdate,
     RadioConfigResponse,
@@ -20,7 +21,6 @@ from app.routers.radio import (
     set_private_key,
     update_radio_config,
 )
-from app.radio import RadioManager
 
 
 def _radio_result(event_type=EventType.OK, payload=None):

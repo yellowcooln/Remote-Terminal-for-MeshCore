@@ -75,8 +75,7 @@ export function updateAck(messageId: number, ackCount: number, paths?: MessagePa
       updated[idx] = {
         ...current,
         acked: Math.max(current.acked, ackCount),
-        ...(paths !== undefined &&
-          paths.length >= (current.paths?.length ?? 0) && { paths }),
+        ...(paths !== undefined && paths.length >= (current.paths?.length ?? 0) && { paths }),
       };
       entry.messages = updated;
       return; // Message IDs are unique, stop after first match

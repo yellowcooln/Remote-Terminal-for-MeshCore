@@ -194,7 +194,9 @@ async def sync_contacts_from_radio() -> dict:
 
     for public_key, contact_data in contacts.items():
         lower_key = public_key.lower()
-        await ContactRepository.upsert(Contact.from_radio_dict(lower_key, contact_data, on_radio=True))
+        await ContactRepository.upsert(
+            Contact.from_radio_dict(lower_key, contact_data, on_radio=True)
+        )
         claimed = await MessageRepository.claim_prefix_messages(lower_key)
         if claimed > 0:
             logger.info("Claimed %d prefix DM message(s) for contact %s", claimed, public_key[:12])
@@ -224,7 +226,9 @@ async def remove_contact_from_radio(public_key: str) -> dict:
         result = await mc.commands.remove_contact(radio_contact)
 
         if result.type == EventType.ERROR:
-            raise HTTPException(status_code=500, detail=f"Failed to remove contact: {result.payload}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to remove contact: {result.payload}"
+            )
 
     await ContactRepository.set_on_radio(contact.public_key, False)
     return {"status": "ok"}
@@ -277,7 +281,9 @@ async def delete_contact(public_key: str) -> dict:
         async with radio_manager.radio_operation("delete_contact_from_radio", meshcore=mc):
             radio_contact = mc.get_contact_by_key_prefix(contact.public_key[:12])
             if radio_contact:
-                logger.info("Removing contact %s from radio before deletion", contact.public_key[:12])
+                logger.info(
+                    "Removing contact %s from radio before deletion", contact.public_key[:12]
+                )
                 await mc.commands.remove_contact(radio_contact)
 
     # Delete from database
