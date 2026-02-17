@@ -131,7 +131,7 @@ async def on_contact_message(event: "Event") -> None:
             "type": "PRIV",
             "conversation_key": sender_pubkey,
             "text": payload.get("text", ""),
-            "sender_timestamp": payload.get("sender_timestamp"),
+            "sender_timestamp": payload.get("sender_timestamp") or received_at,
             "received_at": received_at,
             "paths": paths,
             "txt_type": txt_type,
