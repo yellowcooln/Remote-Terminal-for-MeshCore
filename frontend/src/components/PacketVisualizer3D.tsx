@@ -1651,7 +1651,7 @@ export function PacketVisualizer3D({
             </>
           )}
           <div
-            className={!showControls ? '' : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'}
+            className={!showControls ? 'flex flex-col gap-2' : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'}
           >
             <label className="flex items-center gap-2 cursor-pointer">
               <Checkbox
