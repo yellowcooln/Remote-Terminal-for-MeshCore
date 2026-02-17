@@ -107,6 +107,7 @@ Specialized logic is delegated to hooks:
 - `VisualizerView.tsx` hosts `PacketVisualizer3D.tsx` (desktop split-pane and mobile tabs).
 - `PacketVisualizer3D` uses persistent Three.js geometries for links/highlights/particles and updates typed-array buffers in-place per frame.
 - Packet repeat aggregation keys prefer decoder `messageHash` (path-insensitive), with hash fallback for malformed packets.
+- Keep packet repeats that add distinct path observations; only drop truly identical duplicate observations.
 
 ## WebSocket (`useWebSocket.ts`)
 

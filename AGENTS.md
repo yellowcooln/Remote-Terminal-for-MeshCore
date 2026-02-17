@@ -102,6 +102,12 @@ The following are **deliberate design choices**, not bugs. They are documented i
 2. **No authentication or authorization**: There is no login, no API keys, no session management. The app is designed for trusted networks (home LAN, VPN). The README warns users not to expose it to untrusted networks.
 3. **Arbitrary bot code execution**: The bot system (`app/bot.py`) executes user-provided Python via `exec()` with full `__builtins__`. This is intentional — bots are a power-user feature for automation. The README explicitly warns that anyone on the network can execute arbitrary code through this.
 
+## Intentional Packet Handling Decision
+
+Raw packet deduplication is path-aware by design:
+- Keep repeats that represent the same payload arriving via different mesh paths (this path diversity is useful).
+- Drop packets that are truly identical observations (same payload and same effective pathing observation) to avoid redundant noise.
+
 ## Data Flow
 
 ### Incoming Messages

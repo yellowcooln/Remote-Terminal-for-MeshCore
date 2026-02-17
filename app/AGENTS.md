@@ -78,6 +78,11 @@ app/
 - Message uniqueness: `(type, conversation_key, text, sender_timestamp)`.
 - Duplicate insert is treated as an echo/repeat; ACK count/path list is updated.
 
+### Raw packet dedup policy
+
+- Path diversity is meaningful: same payload observed across different paths should be retained/represented.
+- Only truly identical packet observations should be dropped as duplicates.
+
 ### Periodic advertisement
 
 - Controlled by `app_settings.advert_interval` (seconds).
