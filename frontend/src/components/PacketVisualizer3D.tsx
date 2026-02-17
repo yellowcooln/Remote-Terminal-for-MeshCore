@@ -802,15 +802,18 @@ function useVisualizerData3D({
   }, []);
 
   useEffect(() => {
+    const stretchRaf = stretchRafRef;
+    const timers = timersRef.current;
+    const pending = pendingRef.current;
     return () => {
-      if (stretchRafRef.current !== null) {
-        cancelAnimationFrame(stretchRafRef.current);
+      if (stretchRaf.current !== null) {
+        cancelAnimationFrame(stretchRaf.current);
       }
-      for (const timer of timersRef.current.values()) {
+      for (const timer of timers.values()) {
         clearTimeout(timer);
       }
-      timersRef.current.clear();
-      pendingRef.current.clear();
+      timers.clear();
+      pending.clear();
     };
   }, []);
 
@@ -887,6 +890,7 @@ export function PacketVisualizer3D({
   const [letEmDrift, setLetEmDrift] = useState(true);
   const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(2);
   const [hideUI, setHideUI] = useState(false);
+  const [autoOrbit, setAutoOrbit] = useState(false);
 
   // Hover & click-to-pin
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -1034,6 +1038,7 @@ export function PacketVisualizer3D({
     });
     observer.observe(container);
 
+    const nodeMeshes = nodeMeshesRef.current;
     return () => {
       observer.disconnect();
       controls.dispose();
@@ -1046,14 +1051,14 @@ export function PacketVisualizer3D({
         cssRenderer.domElement.parentNode.removeChild(cssRenderer.domElement);
       }
       // Clean up node meshes and their CSS2D label DOM elements
-      for (const nd of nodeMeshesRef.current.values()) {
+      for (const nd of nodeMeshes.values()) {
         nd.mesh.remove(nd.label);
         nd.labelDiv.remove();
         scene.remove(nd.mesh);
         nd.mesh.geometry.dispose();
         (nd.mesh.material as THREE.Material).dispose();
       }
-      nodeMeshesRef.current.clear();
+      nodeMeshes.clear();
       raycastTargetsRef.current = [];
 
       if (linkLineRef.current) {
@@ -1087,6 +1092,14 @@ export function PacketVisualizer3D({
       controlsRef.current = null;
     };
   }, []);
+
+  // Sync auto-orbit with OrbitControls
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    controls.autoRotate = autoOrbit;
+    controls.autoRotateSpeed = -0.5; // negative = clockwise from above
+  }, [autoOrbit]);
 
   // Mouse handlers for raycasting and click-to-pin
   useEffect(() => {
@@ -1605,6 +1618,17 @@ export function PacketVisualizer3D({
                   title="Expand nodes apart then contract back - can help untangle the graph"
                 >
                   Oooh Big Stretch!
+                </button>
+                <button
+                  onClick={() => setAutoOrbit((v) => !v)}
+                  className={`mt-1 px-3 py-1.5 rounded text-xs transition-colors ${
+                    autoOrbit
+                      ? 'bg-primary/40 text-primary'
+                      : 'bg-primary/20 hover:bg-primary/30 text-primary'
+                  }`}
+                  title="Automatically orbit the camera around the scene"
+                >
+                  {autoOrbit ? 'Stop orbit' : 'Auto orbit'}
                 </button>
                 <button
                   onClick={() => {
