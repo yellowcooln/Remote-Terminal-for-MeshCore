@@ -897,7 +897,7 @@ export function PacketVisualizer3D({
   const [observationWindowSec, setObservationWindowSec] = useState(DEFAULT_OBSERVATION_WINDOW_SEC);
   const [letEmDrift, setLetEmDrift] = useState(true);
   const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(2);
-  const [hideUI, setHideUI] = useState(false);
+  const [showControls, setShowControls] = useState(true);
   const [autoOrbit, setAutoOrbit] = useState(false);
   const [pruneStaleNodes, setPruneStaleNodes] = useState(false);
 
@@ -1472,7 +1472,7 @@ export function PacketVisualizer3D({
   return (
     <div ref={containerRef} className="w-full h-full bg-background relative overflow-hidden">
       {/* Legend */}
-      {!hideUI && (
+      {showControls && (
         <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10">
           <div className="flex gap-6">
             <div className="flex flex-col gap-1.5">
@@ -1512,7 +1512,7 @@ export function PacketVisualizer3D({
       {/* Options */}
       <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10">
         <div className="flex flex-col gap-2">
-          {!hideUI && (
+          {showControls && (
             <>
               <div>Nodes: {data.stats.nodes}</div>
               <div>Links: {data.stats.links}</div>
@@ -1578,7 +1578,7 @@ export function PacketVisualizer3D({
                       onCheckedChange={(c) => setPruneStaleNodes(c === true)}
                     />
                     <span title="Automatically remove nodes with no traffic in the last 5 minutes to keep the mesh manageable">
-                      Only show repeaters/nodes active in last 5min
+                      Only show nodes heard/pathed in last 5min
                     </span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1653,18 +1653,18 @@ export function PacketVisualizer3D({
               </div>
             </>
           )}
-          <div className={hideUI ? '' : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'}>
+          <div className={!showControls ? '' : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'}>
             <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={hideUI} onCheckedChange={(c) => setHideUI(c === true)} />
-              <span title="Hide legends and controls for a cleaner view">Hide UI</span>
+              <Checkbox checked={showControls} onCheckedChange={(c) => setShowControls(c === true)} />
+              <span title="Toggle legends and controls visibility">Show controls</span>
             </label>
             {onFullScreenChange && (
               <label className="flex items-center gap-2 cursor-pointer">
                 <Checkbox
-                  checked={fullScreen}
-                  onCheckedChange={(c) => onFullScreenChange(c === true)}
+                  checked={!fullScreen}
+                  onCheckedChange={(c) => onFullScreenChange(c !== true)}
                 />
-                <span title="Hide the packet feed panel">Full screen</span>
+                <span title="Show or hide the packet feed sidebar">Show packet feed sidebar</span>
               </label>
             )}
           </div>
