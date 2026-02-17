@@ -189,15 +189,41 @@ async def on_rx_log_data(event: "Event") -> None:
 async def on_path_update(event: "Event") -> None:
     """Handle path update events."""
     payload = event.payload
-    logger.debug("Path update for %s", payload.get("pubkey_prefix"))
+    public_key = str(payload.get("public_key", "")).lower()
+    pubkey_prefix = str(payload.get("pubkey_prefix", "")).lower()
 
-    pubkey_prefix = payload.get("pubkey_prefix", "")
-    path = payload.get("path", "")
-    path_len = payload.get("path_len", -1)
+    contact: Contact | None = None
+    if public_key:
+        logger.debug("Path update for %s", public_key[:12])
+        contact = await ContactRepository.get_by_key(public_key)
+    elif pubkey_prefix:
+        # Legacy compatibility: older payloads may only include a prefix.
+        logger.debug("Path update for prefix %s", pubkey_prefix)
+        contact = await ContactRepository.get_by_key_prefix(pubkey_prefix)
+    else:
+        logger.debug("PATH_UPDATE missing public_key/pubkey_prefix, skipping")
+        return
 
-    existing = await ContactRepository.get_by_key_prefix(pubkey_prefix)
-    if existing:
-        await ContactRepository.update_path(existing.public_key, path, path_len)
+    if not contact:
+        return
+
+    # PATH_UPDATE is a serial control push event from firmware (not an RF packet).
+    # Current meshcore payloads only include public_key for this event.
+    # RF route/path bytes are handled via RX_LOG_DATA -> process_raw_packet,
+    # so if path fields are absent here we treat this as informational only.
+    path = payload.get("path")
+    path_len = payload.get("path_len")
+    if path is None or path_len is None:
+        logger.debug("PATH_UPDATE for %s has no path payload, skipping DB update", contact.public_key[:12])
+        return
+
+    try:
+        normalized_path_len = int(path_len)
+    except (TypeError, ValueError):
+        logger.warning("Invalid path_len in PATH_UPDATE for %s: %r", contact.public_key[:12], path_len)
+        return
+
+    await ContactRepository.update_path(contact.public_key, str(path), normalized_path_len)
 
 
 async def on_new_contact(event: "Event") -> None:

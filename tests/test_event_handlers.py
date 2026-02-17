@@ -455,7 +455,7 @@ class TestOnPathUpdate:
 
     @pytest.mark.asyncio
     async def test_updates_path_for_existing_contact(self, test_db):
-        """Path is updated when the contact exists in the database."""
+        """Path is updated when the contact exists and payload includes full key."""
         from app.event_handlers import on_path_update
 
         await ContactRepository.upsert(
@@ -469,7 +469,7 @@ class TestOnPathUpdate:
 
         class MockEvent:
             payload = {
-                "pubkey_prefix": "aaaaaa",
+                "public_key": "aa" * 32,
                 "path": "0102",
                 "path_len": 2,
             }
@@ -489,7 +489,7 @@ class TestOnPathUpdate:
 
         class MockEvent:
             payload = {
-                "pubkey_prefix": "unknown",
+                "public_key": "cc" * 32,
                 "path": "0102",
                 "path_len": 2,
             }
@@ -498,8 +498,8 @@ class TestOnPathUpdate:
         await on_path_update(MockEvent())
 
     @pytest.mark.asyncio
-    async def test_uses_defaults_for_missing_payload_fields(self, test_db):
-        """Missing payload fields fall back to defaults (empty path, -1 length)."""
+    async def test_legacy_prefix_payload_still_supported(self, test_db):
+        """Legacy prefix payloads still update path when uniquely resolvable."""
         from app.event_handlers import on_path_update
 
         await ContactRepository.upsert(
@@ -512,19 +512,68 @@ class TestOnPathUpdate:
         )
 
         class MockEvent:
+            payload = {
+                "pubkey_prefix": "bbbbbb",
+                "path": "0a0b",
+                "path_len": 2,
+            }
+
+        await on_path_update(MockEvent())
+
+        contact = await ContactRepository.get_by_key("bb" * 32)
+        assert contact is not None
+        assert contact.last_path == "0a0b"
+        assert contact.last_path_len == 2
+
+    @pytest.mark.asyncio
+    async def test_missing_path_fields_does_not_modify_contact(self, test_db):
+        """Current PATH_UPDATE payloads without path fields should not mutate DB path."""
+        from app.event_handlers import on_path_update
+
+        await ContactRepository.upsert(
+            {
+                "public_key": "dd" * 32,
+                "name": "Dana",
+                "type": 1,
+                "flags": 0,
+            }
+        )
+        await ContactRepository.update_path("dd" * 32, "beef", 2)
+
+        class MockEvent:
+            payload = {"public_key": "dd" * 32}
+
+        await on_path_update(MockEvent())
+
+        contact = await ContactRepository.get_by_key("dd" * 32)
+        assert contact is not None
+        assert contact.last_path == "beef"
+        assert contact.last_path_len == 2
+
+    @pytest.mark.asyncio
+    async def test_missing_identity_fields_noop(self, test_db):
+        """PATH_UPDATE with no key fields should be a no-op."""
+        from app.event_handlers import on_path_update
+
+        await ContactRepository.upsert(
+            {
+                "public_key": "ee" * 32,
+                "name": "Eve",
+                "type": 1,
+                "flags": 0,
+            }
+        )
+        await ContactRepository.update_path("ee" * 32, "abcd", 2)
+
+        class MockEvent:
             payload = {}
 
         await on_path_update(MockEvent())
 
-        # With empty prefix, get_by_key_prefix("") should return None since
-        # no key starts with "" uniquely (if multiple contacts exist) or
-        # the single contact if only one. But with prefix="", the LIKE query
-        # matches all contacts. With exactly one contact, it returns it.
-        # The update_path call sets path="" and path_len=-1.
-        contact = await ContactRepository.get_by_key("bb" * 32)
+        contact = await ContactRepository.get_by_key("ee" * 32)
         assert contact is not None
-        assert contact.last_path == ""
-        assert contact.last_path_len == -1
+        assert contact.last_path == "abcd"
+        assert contact.last_path_len == 2
 
 
 class TestOnNewContact:
