@@ -1590,6 +1590,15 @@ export function PacketVisualizer3D({
                       Let &apos;em drift
                     </span>
                   </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={autoOrbit}
+                      onCheckedChange={(c) => setAutoOrbit(c === true)}
+                    />
+                    <span title="Automatically orbit the camera around the scene">
+                      Orbit the mesh
+                    </span>
+                  </label>
                   <div className="flex flex-col gap-1 mt-1">
                     <label
                       className="text-muted-foreground"
@@ -1630,17 +1639,6 @@ export function PacketVisualizer3D({
                   title="Expand nodes apart then contract back - can help untangle the graph"
                 >
                   Oooh Big Stretch!
-                </button>
-                <button
-                  onClick={() => setAutoOrbit((v) => !v)}
-                  className={`mt-1 px-3 py-1.5 rounded text-xs transition-colors ${
-                    autoOrbit
-                      ? 'bg-primary/40 text-primary'
-                      : 'bg-primary/20 hover:bg-primary/30 text-primary'
-                  }`}
-                  title="Automatically orbit the camera around the scene"
-                >
-                  {autoOrbit ? 'Stop orbit' : 'Auto orbit'}
                 </button>
                 <button
                   onClick={() => {
