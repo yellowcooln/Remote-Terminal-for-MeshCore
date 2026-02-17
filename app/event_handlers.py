@@ -221,7 +221,10 @@ async def on_new_contact(event: "Event") -> None:
     }
     await ContactRepository.upsert(contact_data)
 
-    broadcast_event("contact", contact_data)
+    # Read back from DB so the broadcast includes all fields (last_contacted,
+    # last_read_at, etc.) matching the REST Contact shape exactly.
+    db_contact = await ContactRepository.get_by_key(public_key)
+    broadcast_event("contact", (db_contact.model_dump() if db_contact else contact_data))
 
 
 async def on_ack(event: "Event") -> None:

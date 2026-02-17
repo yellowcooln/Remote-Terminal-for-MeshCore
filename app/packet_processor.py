@@ -697,23 +697,13 @@ async def _process_advertisement(
             advert.public_key[:12],
         )
 
-    # Broadcast contact update to connected clients
-    broadcast_event(
-        "contact",
-        {
-            "public_key": advert.public_key.lower(),
-            "name": advert.name,
-            "type": contact_type,
-            "flags": existing.flags if existing else 0,
-            "last_path": path_hex,
-            "last_path_len": path_len,
-            "last_advert": advert.timestamp if advert.timestamp > 0 else timestamp,
-            "lat": advert.lat,
-            "lon": advert.lon,
-            "last_seen": timestamp,
-            "on_radio": existing.on_radio if existing else False,
-        },
-    )
+    # Read back from DB so the broadcast includes all fields (last_contacted,
+    # last_read_at, flags, on_radio, etc.) matching the REST Contact shape exactly.
+    db_contact = await ContactRepository.get_by_key(advert.public_key.lower())
+    if db_contact:
+        broadcast_event("contact", db_contact.model_dump())
+    else:
+        broadcast_event("contact", contact_data)
 
     # For new contacts, optionally attempt to decrypt any historical DMs we may have stored
     # This is controlled by the auto_decrypt_dm_on_advert setting
