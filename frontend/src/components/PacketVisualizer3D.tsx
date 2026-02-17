@@ -1523,7 +1523,7 @@ export function PacketVisualizer3D({
                     onCheckedChange={(c) => setShowAmbiguousPaths(c === true)}
                   />
                   <span title="Show placeholder nodes for repeaters when the 1-byte prefix matches multiple contacts">
-                    Ambiguous repeaters
+                    Show ambiguous repeaters
                   </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1532,7 +1532,7 @@ export function PacketVisualizer3D({
                     onCheckedChange={(c) => setShowAmbiguousNodes(c === true)}
                   />
                   <span title="Show placeholder nodes for senders/recipients when only a 1-byte prefix is known">
-                    Ambiguous sender/recipient
+                    Show ambiguous sender/recipient
                   </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1578,7 +1578,7 @@ export function PacketVisualizer3D({
                       onCheckedChange={(c) => setPruneStaleNodes(c === true)}
                     />
                     <span title="Automatically remove nodes with no traffic in the last 5 minutes to keep the mesh manageable">
-                      Only show last 5 min of activity
+                      Only show repeaters/nodes active in last 5min
                     </span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
