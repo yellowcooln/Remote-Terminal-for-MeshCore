@@ -1,3 +1,17 @@
+## [1.10.0] - 2026-02-16
+
+Feature: Collapsible sidebar sections with per-section unread badge (thanks @rgregg !)
+Feature: 3D mesh visualizer
+Feature: Statistics pane
+Feature: Support incoming/outgoing indication for bot invocations
+Feature: Quick byte-perfect message resend if you got unlucky with repeats (thanks @rgregg -- we had a parallel implementation but I appreciate your work!)
+Bugfix: Fix top padding out outgoing message
+Bugfix: Frontend performance, appearance, and Lighthouse improvements (prefetches, form labelling, contrast, channel/roomlist changes)
+Bugfix: Multiple-sent messages had path appearing delays until rerender
+Bugfix: Fix ack/message race condition that caused dropped ack displays until rerender
+Misc: Dedupe contacts/rooms by key and not name to prevent name collisions creating unreachable conversations
+Misc: s/stopped/idle/ for room finder
+
 ## [1.9.3] - 2026-02-12
 
 Feature: Upgrade the room finder to support two-word rooms
