@@ -245,6 +245,9 @@ async def on_ack(event: "Event") -> None:
         logger.info("ACK received for message %d", message_id)
 
         ack_count = await MessageRepository.increment_ack_count(message_id)
+        # DM ACKs don't carry path data, so paths is intentionally omitted.
+        # The frontend's mergePendingAck handles the missing field correctly,
+        # preserving any previously known paths.
         broadcast_event("message_acked", {"message_id": message_id, "ack_count": ack_count})
     else:
         logger.debug("ACK code %s does not match any pending messages", ack_code)
