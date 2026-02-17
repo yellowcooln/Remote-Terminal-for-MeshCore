@@ -341,4 +341,45 @@ describe('SettingsModal', () => {
     expect(screen.getByText('general')).toBeInTheDocument();
     expect(screen.getByText('42 msgs')).toBeInTheDocument();
   });
+
+  it('fetches statistics when expanded in mobile external-nav mode', async () => {
+    const mockStats: StatisticsResponse = {
+      busiest_channels_24h: [],
+      contact_count: 10,
+      repeater_count: 3,
+      channel_count: 5,
+      total_packets: 200,
+      decrypted_packets: 150,
+      undecrypted_packets: 50,
+      total_dms: 25,
+      total_channel_messages: 80,
+      total_outgoing: 30,
+      contacts_heard: { last_hour: 2, last_24_hours: 7, last_week: 10 },
+      repeaters_heard: { last_hour: 1, last_24_hours: 3, last_week: 3 },
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(mockStats), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    renderModal({
+      mobile: true,
+      externalSidebarNav: true,
+      desktopSection: 'radio',
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Statistics/i }));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/statistics', expect.any(Object));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Network')).toBeInTheDocument();
+    });
+  });
 });
