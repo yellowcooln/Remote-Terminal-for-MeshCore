@@ -925,12 +925,14 @@ export function App() {
 
   const settingsSidebarContent = (
     <div className="sidebar w-60 h-full min-h-0 bg-card border-r border-border flex flex-col">
-      <div className="flex justify-between items-center px-3 py-3 border-b border-border">
-        <h2 className="text-xs uppercase text-muted-foreground font-medium">Settings</h2>
+      <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
+        <h2 className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          Settings
+        </h2>
         <button
           type="button"
           onClick={handleCloseSettingsView}
-          className="h-6 w-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+          className="h-6 w-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Back to conversations"
           aria-label="Back to conversations"
         >
@@ -943,7 +945,7 @@ export function App() {
             key={section}
             type="button"
             className={cn(
-              'w-full px-3 py-2.5 text-left border-l-2 border-transparent hover:bg-accent',
+              'w-full px-3 py-2 text-left text-[13px] border-l-2 border-transparent hover:bg-accent transition-colors',
               settingsSection === section && 'bg-accent border-l-primary'
             )}
             onClick={() => setSettingsSection(section)}
@@ -986,7 +988,7 @@ export function App() {
             {activeConversation ? (
               activeConversation.type === 'map' ? (
                 <>
-                  <div className="flex justify-between items-center px-4 py-3 border-b border-border font-medium text-lg">
+                  <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
                     Node Map
                   </div>
                   <div className="flex-1 overflow-hidden">
@@ -1018,7 +1020,7 @@ export function App() {
                 </Suspense>
               ) : activeConversation.type === 'raw' ? (
                 <>
-                  <div className="flex justify-between items-center px-4 py-3 border-b border-border font-medium text-lg">
+                  <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
                     Raw Packet Feed
                   </div>
                   <div className="flex-1 overflow-hidden">
@@ -1027,9 +1029,9 @@ export function App() {
                 </>
               ) : (
                 <>
-                  <div className="flex justify-between items-center px-4 py-3 border-b border-border font-medium text-lg gap-2">
+                  <div className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
                     <span className="flex flex-wrap items-baseline gap-x-2 min-w-0 flex-1">
-                      <span className="flex-shrink-0">
+                      <span className="flex-shrink-0 font-semibold text-base">
                         {activeConversation.type === 'channel' &&
                         !activeConversation.name.startsWith('#') &&
                         activeConversation.name !== 'Public'
@@ -1038,7 +1040,7 @@ export function App() {
                         {activeConversation.name}
                       </span>
                       <span
-                        className="font-normal text-sm text-muted-foreground font-mono truncate cursor-pointer hover:text-primary"
+                        className="font-normal text-[11px] text-muted-foreground font-mono truncate cursor-pointer hover:text-primary transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigator.clipboard.writeText(activeConversation.id);
@@ -1119,11 +1121,11 @@ export function App() {
                           ) : null;
                         })()}
                     </span>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
                       {/* Direct trace button (contacts only) */}
                       {activeConversation.type === 'contact' && (
                         <button
-                          className="p-1.5 rounded hover:bg-accent text-xl leading-none"
+                          className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors"
                           onClick={handleTrace}
                           title="Direct Trace"
                         >
@@ -1134,7 +1136,7 @@ export function App() {
                       {(activeConversation.type === 'channel' ||
                         activeConversation.type === 'contact') && (
                         <button
-                          className="p-1.5 rounded hover:bg-accent text-xl leading-none"
+                          className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors"
                           onClick={() =>
                             handleToggleFavorite(
                               activeConversation.type as 'channel' | 'contact',
@@ -1156,7 +1158,7 @@ export function App() {
                             activeConversation.type as 'channel' | 'contact',
                             activeConversation.id
                           ) ? (
-                            <span className="text-yellow-500">&#9733;</span>
+                            <span className="text-amber-400">&#9733;</span>
                           ) : (
                             <span className="text-muted-foreground">&#9734;</span>
                           )}
@@ -1168,7 +1170,7 @@ export function App() {
                         activeConversation.name === 'Public'
                       ) && (
                         <button
-                          className="p-1.5 rounded hover:bg-destructive/20 text-destructive text-xl leading-none"
+                          className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-lg leading-none transition-colors"
                           onClick={() => {
                             if (activeConversation.type === 'channel') {
                               handleDeleteChannel(activeConversation.id);
@@ -1234,7 +1236,7 @@ export function App() {
 
           {showSettings && (
             <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex justify-between items-center px-4 py-3 border-b border-border font-medium text-lg">
+              <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
                 <span>Radio & Settings</span>
                 <span className="text-sm text-muted-foreground hidden md:inline">
                   {SETTINGS_SECTION_LABELS[settingsSection]}

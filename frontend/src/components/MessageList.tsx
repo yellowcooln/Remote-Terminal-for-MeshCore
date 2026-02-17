@@ -461,14 +461,14 @@ export function MessageList({
               <div
                 className={cn(
                   'py-1.5 px-3 rounded-lg min-w-0',
-                  msg.outgoing ? 'bg-[#1e3a29]' : 'bg-muted'
+                  msg.outgoing ? 'bg-msg-outgoing' : 'bg-msg-incoming'
                 )}
               >
                 {showAvatar && (
-                  <div className="text-[13px] font-bold text-foreground mb-0.5">
+                  <div className="text-[13px] font-semibold text-foreground mb-0.5">
                     {canClickSender ? (
                       <span
-                        className="cursor-pointer hover:text-primary hover:underline"
+                        className="cursor-pointer hover:text-primary transition-colors"
                         onClick={() => onSenderClick(displaySender)}
                         title={`Mention ${displaySender}`}
                       >
@@ -587,13 +587,13 @@ export function MessageList({
       {showScrollToBottom && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-muted hover:bg-accent border border-border flex items-center justify-center shadow-lg transition-opacity"
+          className="absolute bottom-4 right-4 w-9 h-9 rounded-full bg-card hover:bg-accent border border-border flex items-center justify-center shadow-lg transition-all hover:scale-105"
           title="Scroll to bottom"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

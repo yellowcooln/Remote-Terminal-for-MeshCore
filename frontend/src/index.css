@@ -4,26 +4,30 @@
 
 @layer base {
   :root {
-    --background: 0 0% 10%;
-    --foreground: 0 0% 88%;
-    --card: 0 0% 14%;
-    --card-foreground: 0 0% 88%;
-    --popover: 0 0% 14%;
-    --popover-foreground: 0 0% 88%;
-    --primary: 122 39% 49%;
+    --background: 224 14% 8%;
+    --foreground: 213 15% 90%;
+    --card: 224 13% 11%;
+    --card-foreground: 213 15% 90%;
+    --popover: 224 13% 12%;
+    --popover-foreground: 213 15% 90%;
+    --primary: 152 60% 38%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 88%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 64%;
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 88%;
-    --destructive: 0 62% 50%;
+    --secondary: 224 12% 17%;
+    --secondary-foreground: 213 12% 85%;
+    --muted: 224 12% 15%;
+    --muted-foreground: 218 10% 60%;
+    --accent: 224 11% 19%;
+    --accent-foreground: 213 15% 90%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 122 39% 49%;
+    --border: 224 11% 17%;
+    --input: 224 11% 17%;
+    --ring: 152 60% 38%;
     --radius: 0.5rem;
+
+    /* Semantic colors for specific contexts */
+    --msg-outgoing: 152 30% 14%;
+    --msg-incoming: 224 12% 15%;
   }
 }
 
@@ -33,9 +37,38 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
     font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Custom scrollbar — thin, unobtrusive, matches palette */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(224 11% 22%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(224 11% 28%);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(224 11% 22%) transparent;
 }
 
 /* Constrain CodeMirror editor width */

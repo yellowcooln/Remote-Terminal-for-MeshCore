@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { MeshCoreDecoder, PayloadType, Utils } from '@michaelhart/meshcore-decoder';
 import type { RawPacket } from '../types';
+import { cn } from '@/lib/utils';
 
 interface RawPacketListProps {
   packets: RawPacket[];
@@ -204,9 +205,9 @@ export function RawPacketList({ packets }: RawPacketListProps) {
   const sortedPackets = [...decodedPackets].sort((a, b) => a.packet.timestamp - b.packet.timestamp);
 
   return (
-    <div className="h-full overflow-y-auto p-4 flex flex-col gap-3" ref={listRef}>
+    <div className="h-full overflow-y-auto p-4 flex flex-col gap-2" ref={listRef}>
       {sortedPackets.map(({ packet, decoded }) => (
-        <div key={packet.id} className="py-2 px-3 bg-muted rounded">
+        <div key={packet.id} className="py-2 px-3 bg-card rounded-md border border-border/50">
           <div className="flex items-center gap-2">
             {/* Route type badge */}
             <span
@@ -220,25 +221,27 @@ export function RawPacketList({ packets }: RawPacketListProps) {
             {!packet.decrypted && <span title="Encrypted">🔒</span>}
 
             {/* Summary */}
-            <span className={packet.decrypted ? 'text-primary' : 'text-foreground'}>
+            <span
+              className={cn('text-[13px]', packet.decrypted ? 'text-primary' : 'text-foreground')}
+            >
               {decoded.summary}
             </span>
 
             {/* Time */}
-            <span className="text-muted-foreground ml-auto text-sm">
+            <span className="text-muted-foreground ml-auto text-[12px] tabular-nums">
               {formatTime(packet.timestamp)}
             </span>
           </div>
 
           {/* Signal info */}
           {(packet.snr !== null || packet.rssi !== null) && (
-            <div className="text-[11px] text-muted-foreground mt-0.5">
+            <div className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
               {formatSignalInfo(packet)}
             </div>
           )}
 
           {/* Raw hex data (always visible) */}
-          <div className="font-mono text-[10px] break-all text-muted-foreground mt-1 p-1 bg-background/50 rounded">
+          <div className="font-mono text-[10px] break-all text-muted-foreground mt-1.5 p-1.5 bg-background/60 rounded">
             {packet.data.toUpperCase()}
           </div>
         </div>

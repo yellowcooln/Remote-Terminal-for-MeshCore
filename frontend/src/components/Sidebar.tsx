@@ -380,9 +380,9 @@ export function Sidebar({
     <div
       key={row.key}
       className={cn(
-        'px-3 py-2.5 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent',
+        'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors',
         isActive(row.type, row.id) && 'bg-accent border-l-primary',
-        row.unreadCount > 0 && '[&_.name]:font-bold [&_.name]:text-foreground'
+        row.unreadCount > 0 && '[&_.name]:font-semibold [&_.name]:text-foreground'
       )}
       onClick={() =>
         handleSelectConversation({
@@ -400,14 +400,14 @@ export function Sidebar({
           contactType={row.contact.type}
         />
       )}
-      <span className="name flex-1 truncate">{row.name}</span>
+      <span className="name flex-1 truncate text-[13px]">{row.name}</span>
       {row.unreadCount > 0 && (
         <span
           className={cn(
             'text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center',
             row.isMention
               ? 'bg-destructive text-destructive-foreground'
-              : 'bg-primary text-primary-foreground'
+              : 'bg-primary/90 text-primary-foreground'
           )}
         >
           {row.unreadCount}
@@ -443,10 +443,10 @@ export function Sidebar({
     const effectiveCollapsed = isSearching ? false : collapsed;
 
     return (
-      <div className="flex justify-between items-center px-3 py-2 pt-3">
+      <div className="flex justify-between items-center px-3 py-2 pt-3.5">
         <button
           className={cn(
-            'flex items-center gap-1 text-[11px] uppercase text-muted-foreground hover:text-foreground',
+            'flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors',
             isSearching && 'cursor-default'
           )}
           onClick={() => {
@@ -454,14 +454,14 @@ export function Sidebar({
           }}
           title={effectiveCollapsed ? `Expand ${title}` : `Collapse ${title}`}
         >
-          <span className="text-[10px]">{effectiveCollapsed ? '▸' : '▾'}</span>
+          <span className="text-[9px]">{effectiveCollapsed ? '▸' : '▾'}</span>
           <span>{title}</span>
         </button>
         {(showSortToggle || unreadCount > 0) && (
           <div className="ml-auto flex items-center gap-1.5">
             {showSortToggle && (
               <button
-                className="bg-transparent border border-border text-muted-foreground px-1.5 py-0.5 text-[10px] rounded hover:bg-accent hover:text-foreground mr-0.5"
+                className="bg-transparent text-muted-foreground/60 px-1 py-0.5 text-[10px] rounded hover:text-foreground transition-colors"
                 onClick={handleSortToggle}
                 title={sortOrder === 'alpha' ? 'Sort by recent' : 'Sort alphabetically'}
               >
@@ -469,7 +469,7 @@ export function Sidebar({
               </button>
             )}
             {unreadCount > 0 && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
                 {unreadCount}
               </span>
             )}
@@ -482,31 +482,33 @@ export function Sidebar({
   return (
     <div className="sidebar w-60 h-full min-h-0 bg-card border-r border-border flex flex-col">
       {/* Header */}
-      <div className="flex justify-between items-center px-3 py-3 border-b border-border">
-        <h2 className="text-xs uppercase text-muted-foreground font-medium">Conversations</h2>
+      <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
+        <h2 className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          Conversations
+        </h2>
         <Button
           variant="ghost"
           size="sm"
           onClick={onNewMessage}
           title="New Message"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
         >
           +
         </Button>
       </div>
 
       {/* Search */}
-      <div className="relative px-3 py-2 border-b border-border">
+      <div className="relative px-3 py-2">
         <Input
           type="text"
           placeholder="Search..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-8 text-sm pr-8"
+          className="h-7 text-[13px] pr-8 bg-background/50"
         />
         {searchQuery && (
           <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-lg leading-none"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-lg leading-none transition-colors"
             onClick={() => setSearchQuery('')}
             title="Clear search"
           >
@@ -521,7 +523,7 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2.5 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
               isActive('raw', 'raw') && 'bg-accent border-l-primary'
             )}
             onClick={() =>
@@ -533,7 +535,7 @@ export function Sidebar({
             }
           >
             <span className="text-muted-foreground text-xs">📡</span>
-            <span className="flex-1 truncate">Packet Feed</span>
+            <span className="flex-1 truncate text-muted-foreground">Packet Feed</span>
           </div>
         )}
 
@@ -541,7 +543,7 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2.5 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
               isActive('map', 'map') && 'bg-accent border-l-primary'
             )}
             onClick={() =>
@@ -553,7 +555,7 @@ export function Sidebar({
             }
           >
             <span className="text-muted-foreground text-xs">🗺️</span>
-            <span className="flex-1 truncate">Node Map</span>
+            <span className="flex-1 truncate text-muted-foreground">Node Map</span>
           </div>
         )}
 
@@ -561,7 +563,7 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2.5 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
               isActive('visualizer', 'visualizer') && 'bg-accent border-l-primary'
             )}
             onClick={() =>
@@ -573,7 +575,7 @@ export function Sidebar({
             }
           >
             <span className="text-muted-foreground text-xs">✨</span>
-            <span className="flex-1 truncate">Mesh Visualizer</span>
+            <span className="flex-1 truncate text-muted-foreground">Mesh Visualizer</span>
           </div>
         )}
 
@@ -581,18 +583,18 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2.5 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
               showCracker && 'bg-accent border-l-primary'
             )}
             onClick={onToggleCracker}
           >
             <span className="text-muted-foreground text-xs">🔓</span>
-            <span className="flex-1 truncate">
+            <span className="flex-1 truncate text-muted-foreground">
               {showCracker ? 'Hide' : 'Show'} Room Finder
               <span
                 className={cn(
-                  'ml-1 text-xs',
-                  crackerRunning ? 'text-green-500' : 'text-muted-foreground'
+                  'ml-1 text-[11px]',
+                  crackerRunning ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
                 ({crackerRunning ? 'running' : 'idle'})
@@ -604,7 +606,7 @@ export function Sidebar({
         {/* Mark All Read */}
         {!query && Object.keys(unreadCounts).length > 0 && (
           <div
-            className="px-3 py-2.5 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent"
+            className="px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]"
             onClick={onMarkAllRead}
           >
             <span className="text-muted-foreground text-xs">✓</span>

@@ -41,6 +41,8 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "msg-outgoing": "hsl(var(--msg-outgoing))",
+        "msg-incoming": "hsl(var(--msg-incoming))",
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -170,7 +170,10 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const showCharCounter = !isRepeaterMode && limits !== null;
 
   return (
-    <form className="px-4 py-3 border-t border-border flex flex-col gap-1" onSubmit={handleSubmit}>
+    <form
+      className="px-4 py-2.5 border-t border-border flex flex-col gap-1"
+      onSubmit={handleSubmit}
+    >
       <div className="flex gap-2">
         <Input
           ref={inputRef}
