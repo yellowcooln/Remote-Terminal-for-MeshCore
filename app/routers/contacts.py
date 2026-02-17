@@ -518,9 +518,12 @@ async def send_repeater_command(public_key: str, request: CommandRequest) -> Com
                     command=request.command, response=f"(error: {response_event.payload})"
                 )
 
-            # Extract the response text and timestamp from the payload
+            # CONTACT_MSG_RECV payloads use sender_timestamp in meshcore.
             response_text = response_event.payload.get("text", str(response_event.payload))
-            sender_timestamp = response_event.payload.get("timestamp")
+            sender_timestamp = response_event.payload.get(
+                "sender_timestamp",
+                response_event.payload.get("timestamp"),
+            )
             logger.info("Received response from %s: %s", contact.public_key[:12], response_text)
 
             return CommandResponse(

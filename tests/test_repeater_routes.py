@@ -184,7 +184,27 @@ class TestRepeaterCommandRoute:
         mc.start_auto_message_fetching.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_success_returns_command_response_text_and_timestamp(self, test_db):
+    async def test_success_returns_command_response_text_and_sender_timestamp(self, test_db):
+        mc = _mock_mc()
+        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
+        mc.commands.send_cmd = AsyncMock(return_value=_radio_result(EventType.OK))
+        mc.wait_for_event = AsyncMock(return_value=MagicMock())
+        mc.commands.get_msg = AsyncMock(
+            return_value=_radio_result(
+                EventType.CONTACT_MSG_RECV,
+                {"text": "firmware: v1.2.3", "sender_timestamp": 1700000000},
+            )
+        )
+
+        with patch("app.routers.contacts.require_connected", return_value=mc):
+            response = await send_repeater_command(KEY_A, CommandRequest(command="ver"))
+
+        assert response.command == "ver"
+        assert response.response == "firmware: v1.2.3"
+        assert response.sender_timestamp == 1700000000
+
+    @pytest.mark.asyncio
+    async def test_success_falls_back_to_legacy_timestamp_field(self, test_db):
         mc = _mock_mc()
         await _insert_contact(KEY_A, name="Repeater", contact_type=2)
         mc.commands.send_cmd = AsyncMock(return_value=_radio_result(EventType.OK))
