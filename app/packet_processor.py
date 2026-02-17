@@ -521,8 +521,10 @@ async def process_raw_packet(
         if decrypt_result:
             result.update(decrypt_result)
 
-    elif payload_type == PayloadType.ADVERT and is_new_packet:
-        # Only process new advertisements (duplicates don't add value)
+    elif payload_type == PayloadType.ADVERT:
+        # Process all advert arrivals (even payload-hash duplicates) so the
+        # path-freshness logic in _process_advertisement can pick the shortest
+        # path heard within the freshness window.
         await _process_advertisement(raw_bytes, ts, packet_info)
 
     elif payload_type == PayloadType.TEXT_MESSAGE:

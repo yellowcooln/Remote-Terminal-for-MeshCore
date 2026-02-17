@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.database import Database
-from app.decoder import DecryptedDirectMessage, PacketInfo, PayloadType
+from app.decoder import DecryptedDirectMessage, PacketInfo, ParsedAdvertisement, PayloadType
 from app.repository import (
     ChannelRepository,
     ContactRepository,
@@ -1552,8 +1552,9 @@ class TestProcessRawPacketIntegration:
         assert mock_gt.await_count == 2
 
     @pytest.mark.asyncio
-    async def test_dispatches_advert_only_for_new_packets(self, test_db, captured_broadcasts):
-        """ADVERT packets are dispatched only when is_new_packet is True."""
+    async def test_dispatches_advert_for_all_arrivals(self, test_db, captured_broadcasts):
+        """ADVERT packets are dispatched for every arrival (including duplicates)
+        so path-freshness logic can pick the shortest path."""
         from app.packet_processor import process_raw_packet
 
         broadcasts, mock_broadcast = captured_broadcasts
@@ -1575,12 +1576,64 @@ class TestProcessRawPacketIntegration:
                     "app.packet_processor._process_advertisement",
                     new_callable=AsyncMock,
                 ) as mock_adv:
-                    # First call: new packet -> should dispatch
+                    # Both calls should dispatch so path logic can compare
                     await process_raw_packet(raw, timestamp=3000)
-                    # Second call: duplicate -> should NOT dispatch
                     await process_raw_packet(raw, timestamp=3001)
 
-        assert mock_adv.await_count == 1
+        assert mock_adv.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_duplicate_advert_shorter_path_wins(self, test_db, captured_broadcasts):
+        """When the same advert arrives via a shorter path, the contact path is updated."""
+        from app.packet_processor import process_raw_packet
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        test_pubkey = "ab" * 32  # 64-char hex
+
+        long_path_info = PacketInfo(
+            route_type=1,
+            payload_type=PayloadType.ADVERT,
+            payload_version=0,
+            path_length=3,
+            path=bytes.fromhex("aabbcc"),
+            payload=b"\x00" * 101,
+        )
+        short_path_info = PacketInfo(
+            route_type=1,
+            payload_type=PayloadType.ADVERT,
+            payload_version=0,
+            path_length=1,
+            path=bytes.fromhex("dd"),
+            payload=b"\x00" * 101,
+        )
+
+        advert = ParsedAdvertisement(
+            public_key=test_pubkey,
+            name="TestNode",
+            timestamp=5000,
+            lat=None,
+            lon=None,
+            device_role=1,
+        )
+
+        # Same raw bytes → same payload hash → second call is a duplicate
+        raw = b"\x11\x00" + b"\xee" * 30
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            with patch("app.packet_processor.parse_advertisement", return_value=advert):
+                # First arrival: long path
+                with patch("app.packet_processor.parse_packet", return_value=long_path_info):
+                    await process_raw_packet(raw, timestamp=5000)
+
+                # Second arrival (duplicate payload): shorter path
+                with patch("app.packet_processor.parse_packet", return_value=short_path_info):
+                    await process_raw_packet(raw, timestamp=5001)
+
+        contact = await ContactRepository.get_by_key(test_pubkey)
+        assert contact is not None
+        assert contact.last_path_len == 1  # Shorter path won
+        assert contact.last_path == "dd"
 
     @pytest.mark.asyncio
     async def test_dispatches_text_message(self, test_db, captured_broadcasts):
