@@ -97,7 +97,7 @@ Specialized logic is delegated to hooks:
 
 ### Message behavior
 
-- Outgoing sends are optimistic in UI and persisted server-side.
+- Outgoing sends are added to UI after the send API returns (not pre-send optimistic insertion), then persisted server-side.
 - Backend also emits WS `message` for outgoing sends so other clients stay in sync.
 - ACK/repeat updates arrive as `message_acked` events.
 - Outgoing channel messages show a 30-second resend control; resend calls `POST /api/messages/channel/{message_id}/resend`.

@@ -35,7 +35,7 @@ async def mark_all_read() -> dict:
     """Mark all contacts and channels as read.
 
     Updates last_read_at to current timestamp for all contacts and channels
-    in a single database transaction.
+    using two repository updates (same timestamp value across both tables).
     """
     now = int(time.time())
 

@@ -63,7 +63,8 @@ app/
 ### Connection lifecycle
 
 - `RadioManager.start_connection_monitor()` checks health every 5s.
-- On reconnect, monitor runs `post_connect_setup()` before broadcasting healthy state.
+- Monitor reconnect path runs `post_connect_setup()` before broadcasting healthy state.
+- Manual reconnect/reboot endpoints call `reconnect()` then `post_connect_setup()`.
 - Setup includes handler registration, key export, time sync, contact/channel sync, polling/advert tasks.
 
 ## Important Behaviors
