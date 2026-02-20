@@ -1,0 +1,31 @@
+services:
+  remoteterm:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - meshcore-data:/app/data
+    environment:
+      # Radio connection — set ONE of the following transport options:
+
+      # Serial (USB) — also uncomment the `devices` section below
+      # MESHCORE_SERIAL_PORT: /dev/ttyUSB0
+      # MESHCORE_SERIAL_BAUDRATE: 115200
+
+      # TCP
+      # MESHCORE_TCP_HOST: 192.168.1.100
+      # MESHCORE_TCP_PORT: 5000
+
+      # BLE
+      # MESHCORE_BLE_ADDRESS: AA:BB:CC:DD:EE:FF
+      # MESHCORE_BLE_PIN: ""
+
+      MESHCORE_LOG_LEVEL: INFO
+      MESHCORE_DATABASE_PATH: data/meshcore.db
+    # Uncomment to pass through a USB serial device:
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+    restart: unless-stopped
+
+volumes:
+  meshcore-data:
