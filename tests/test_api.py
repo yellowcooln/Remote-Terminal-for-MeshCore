@@ -932,8 +932,8 @@ class TestMaintenanceEndpoint:
         from app.routers.packets import MaintenanceRequest, run_maintenance
 
         ts = int(time.time())
-        linked_1, _ = await RawPacketRepository.create(b"\x0A\x0B\x0C", ts)
-        linked_2, _ = await RawPacketRepository.create(b"\x0D\x0E\x0F", ts)
+        linked_1, _ = await RawPacketRepository.create(b"\x0a\x0b\x0c", ts)
+        linked_2, _ = await RawPacketRepository.create(b"\x0d\x0e\x0f", ts)
         await RawPacketRepository.mark_decrypted(linked_1, 201)
         await RawPacketRepository.mark_decrypted(linked_2, 202)
 

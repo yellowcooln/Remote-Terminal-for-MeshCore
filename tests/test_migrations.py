@@ -699,9 +699,7 @@ class TestMigration020:
             await conn.execute(
                 "CREATE TABLE raw_packets (id INTEGER PRIMARY KEY, data BLOB NOT NULL)"
             )
-            await conn.execute(
-                "CREATE TABLE messages (id INTEGER PRIMARY KEY, text TEXT NOT NULL)"
-            )
+            await conn.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY, text TEXT NOT NULL)")
             await conn.commit()
 
             # Verify defaults before migration
@@ -738,9 +736,7 @@ class TestMigration020:
             await conn.execute(
                 "CREATE TABLE raw_packets (id INTEGER PRIMARY KEY, data BLOB NOT NULL)"
             )
-            await conn.execute(
-                "CREATE TABLE messages (id INTEGER PRIMARY KEY, text TEXT NOT NULL)"
-            )
+            await conn.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY, text TEXT NOT NULL)")
             await conn.commit()
             await set_version(conn, 20)
 
