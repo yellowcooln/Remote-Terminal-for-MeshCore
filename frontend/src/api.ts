@@ -183,10 +183,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(params),
     }),
-  runMaintenance: (pruneUndecryptedDays: number) =>
+  runMaintenance: (options: { pruneUndecryptedDays?: number; purgeLinkedRawPackets?: boolean }) =>
     fetchJson<MaintenanceResult>('/packets/maintenance', {
       method: 'POST',
-      body: JSON.stringify({ prune_undecrypted_days: pruneUndecryptedDays }),
+      body: JSON.stringify({
+        ...(options.pruneUndecryptedDays !== undefined && {
+          prune_undecrypted_days: options.pruneUndecryptedDays,
+        }),
+        ...(options.purgeLinkedRawPackets !== undefined && {
+          purge_linked_raw_packets: options.purgeLinkedRawPackets,
+        }),
+      }),
     }),
 
   // Read State

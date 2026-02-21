@@ -145,6 +145,7 @@ export function SettingsModal(props: SettingsModalProps) {
   // Database maintenance state
   const [retentionDays, setRetentionDays] = useState('14');
   const [cleaning, setCleaning] = useState(false);
+  const [purgingDecryptedRaw, setPurgingDecryptedRaw] = useState(false);
   const [autoDecryptOnAdvert, setAutoDecryptOnAdvert] = useState(false);
   const [reopenLastConversation, setReopenLastConversation] = useState(
     getReopenLastConversationEnabled
@@ -509,7 +510,7 @@ export function SettingsModal(props: SettingsModalProps) {
     setCleaning(true);
 
     try {
-      const result = await api.runMaintenance(days);
+      const result = await api.runMaintenance({ pruneUndecryptedDays: days });
       toast.success('Database cleanup complete', {
         description: `Deleted ${result.packets_deleted} old packet${result.packets_deleted === 1 ? '' : 's'}`,
       });
@@ -521,6 +522,25 @@ export function SettingsModal(props: SettingsModalProps) {
       });
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const handlePurgeDecryptedRawPackets = async () => {
+    setPurgingDecryptedRaw(true);
+
+    try {
+      const result = await api.runMaintenance({ purgeLinkedRawPackets: true });
+      toast.success('Decrypted raw packets purged', {
+        description: `Deleted ${result.packets_deleted} raw packet${result.packets_deleted === 1 ? '' : 's'}`,
+      });
+      await onHealthRefresh();
+    } catch (err) {
+      console.error('Failed to purge decrypted raw packets:', err);
+      toast.error('Failed to purge decrypted raw packets', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      setPurgingDecryptedRaw(false);
     }
   };
 
@@ -1042,6 +1062,27 @@ export function SettingsModal(props: SettingsModalProps) {
                     {cleaning ? 'Cleaning...' : 'Cleanup'}
                   </Button>
                 </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label>Purge Decrypted Raw Packets</Label>
+                <p className="text-xs text-muted-foreground">
+                  Deletes raw packet bytes for messages already stored in chat history. No displayed
+                  message data is lost. Only use this if you do not plan to run manual analytics or
+                  parsing on original packet bytes.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={handlePurgeDecryptedRawPackets}
+                  disabled={purgingDecryptedRaw}
+                  className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+                >
+                  {purgingDecryptedRaw
+                    ? 'Purging Decrypted Raw Packets...'
+                    : 'Purge Decrypted Raw Packets'}
+                </Button>
               </div>
 
               <Separator />
