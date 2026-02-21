@@ -32,8 +32,16 @@ export function useConversationRouter({
   pendingDeleteFallbackRef,
   hasSetDefaultConversation,
 }: UseConversationRouterArgs) {
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [activeConversation, setActiveConversationState] = useState<Conversation | null>(null);
   const activeConversationRef = useRef<Conversation | null>(null);
+  const hashSyncEnabledRef = useRef(
+    typeof window !== 'undefined' ? window.location.hash.length > 0 : false
+  );
+
+  const setActiveConversation = useCallback((conv: Conversation | null) => {
+    hashSyncEnabledRef.current = true;
+    setActiveConversationState(conv);
+  }, []);
 
   const getPublicChannelConversation = useCallback((): Conversation | null => {
     const publicChannel = channels.find((c) => c.name === 'Public');
@@ -55,12 +63,12 @@ export function useConversationRouter({
 
     // Handle non-data views immediately
     if (hashConv?.type === 'raw') {
-      setActiveConversation({ type: 'raw', id: 'raw', name: 'Raw Packet Feed' });
+      setActiveConversationState({ type: 'raw', id: 'raw', name: 'Raw Packet Feed' });
       hasSetDefaultConversation.current = true;
       return;
     }
     if (hashConv?.type === 'map') {
-      setActiveConversation({
+      setActiveConversationState({
         type: 'map',
         id: 'map',
         name: 'Node Map',
@@ -70,7 +78,7 @@ export function useConversationRouter({
       return;
     }
     if (hashConv?.type === 'visualizer') {
-      setActiveConversation({ type: 'visualizer', id: 'visualizer', name: 'Mesh Visualizer' });
+      setActiveConversationState({ type: 'visualizer', id: 'visualizer', name: 'Mesh Visualizer' });
       hasSetDefaultConversation.current = true;
       return;
     }
@@ -79,7 +87,7 @@ export function useConversationRouter({
     if (hashConv?.type === 'channel') {
       const channel = resolveChannelFromHashToken(hashConv.name, channels);
       if (channel) {
-        setActiveConversation({ type: 'channel', id: channel.key, name: channel.name });
+        setActiveConversationState({ type: 'channel', id: channel.key, name: channel.name });
         hasSetDefaultConversation.current = true;
         return;
       }
@@ -92,17 +100,17 @@ export function useConversationRouter({
     if (!hashConv && getReopenLastConversationEnabled()) {
       const lastViewed = getLastViewedConversation();
       if (lastViewed?.type === 'raw') {
-        setActiveConversation(lastViewed);
+        setActiveConversationState(lastViewed);
         hasSetDefaultConversation.current = true;
         return;
       }
       if (lastViewed?.type === 'map') {
-        setActiveConversation(lastViewed);
+        setActiveConversationState(lastViewed);
         hasSetDefaultConversation.current = true;
         return;
       }
       if (lastViewed?.type === 'visualizer') {
-        setActiveConversation(lastViewed);
+        setActiveConversationState(lastViewed);
         hasSetDefaultConversation.current = true;
         return;
       }
@@ -111,7 +119,7 @@ export function useConversationRouter({
           channels.find((c) => c.key.toLowerCase() === lastViewed.id.toLowerCase()) ||
           resolveChannelFromHashToken(lastViewed.id, channels);
         if (channel) {
-          setActiveConversation({
+          setActiveConversationState({
             type: 'channel',
             id: channel.key,
             name: channel.name,
@@ -127,7 +135,7 @@ export function useConversationRouter({
     // No hash or unresolvable — default to Public
     const publicConversation = getPublicChannelConversation();
     if (publicConversation) {
-      setActiveConversation(publicConversation);
+      setActiveConversationState(publicConversation);
       hasSetDefaultConversation.current = true;
     }
   }, [channels, activeConversation, getPublicChannelConversation]);
@@ -142,7 +150,7 @@ export function useConversationRouter({
 
       const contact = resolveContactFromHashToken(hashConv.name, contacts);
       if (contact) {
-        setActiveConversation({
+        setActiveConversationState({
           type: 'contact',
           id: contact.public_key,
           name: getContactDisplayName(contact.name, contact.public_key),
@@ -154,7 +162,7 @@ export function useConversationRouter({
       // Contact hash didn't match — fall back to Public if channels loaded.
       const publicConversation = getPublicChannelConversation();
       if (publicConversation) {
-        setActiveConversation(publicConversation);
+        setActiveConversationState(publicConversation);
         hasSetDefaultConversation.current = true;
       }
       return;
@@ -170,7 +178,7 @@ export function useConversationRouter({
         (item) => item.public_key.toLowerCase() === lastViewed.id.toLowerCase()
       );
       if (contact) {
-        setActiveConversation({
+        setActiveConversationState({
           type: 'contact',
           id: contact.public_key,
           name: getContactDisplayName(contact.name, contact.public_key),
@@ -181,7 +189,7 @@ export function useConversationRouter({
 
       const publicConversation = getPublicChannelConversation();
       if (publicConversation) {
-        setActiveConversation(publicConversation);
+        setActiveConversationState(publicConversation);
         hasSetDefaultConversation.current = true;
       }
     }
@@ -191,7 +199,9 @@ export function useConversationRouter({
   useEffect(() => {
     activeConversationRef.current = activeConversation;
     if (activeConversation) {
-      updateUrlHash(activeConversation);
+      if (hashSyncEnabledRef.current) {
+        updateUrlHash(activeConversation);
+      }
       if (getReopenLastConversationEnabled()) {
         saveLastViewedConversation(activeConversation);
       }
@@ -213,7 +223,7 @@ export function useConversationRouter({
 
     hasSetDefaultConversation.current = true;
     pendingDeleteFallbackRef.current = false;
-    setActiveConversation({
+    setActiveConversationState({
       type: 'channel',
       id: publicChannel.key,
       name: publicChannel.name,
@@ -226,7 +236,7 @@ export function useConversationRouter({
       setActiveConversation(conv);
       setSidebarOpen(false);
     },
-    [setSidebarOpen]
+    [setActiveConversation, setSidebarOpen]
   );
 
   return {

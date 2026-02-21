@@ -224,6 +224,7 @@ describe('App startup hash resolution', () => {
         expect(node).toHaveTextContent(`channel:${chatChannel.key}:${chatChannel.name}`);
       }
     });
+    expect(window.location.hash).toBe('');
   });
 
   it('uses Public channel when hash is empty and reopen preference is disabled', async () => {
@@ -253,5 +254,6 @@ describe('App startup hash resolution', () => {
         expect(node).toHaveTextContent(`channel:${publicChannel.key}:Public`);
       }
     });
+    expect(window.location.hash).toBe('');
   });
 });
