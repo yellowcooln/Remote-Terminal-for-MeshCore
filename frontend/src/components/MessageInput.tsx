@@ -175,12 +175,17 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     <form
       className="px-4 py-2.5 border-t border-border flex flex-col gap-1"
       onSubmit={handleSubmit}
+      autoComplete="off"
     >
       <div className="flex gap-2">
         <Input
           ref={inputRef}
           type={isRepeaterMode ? 'password' : 'text'}
-          autoComplete={isRepeaterMode ? 'off' : undefined}
+          autoComplete="off"
+          name="chat-message-input"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-bwignore="true"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}

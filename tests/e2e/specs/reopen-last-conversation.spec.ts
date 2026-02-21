@@ -36,7 +36,7 @@ test.describe('Reopen last conversation (device-local)', () => {
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: /Database & Interfacr/i }).click();
+    await page.getByRole('button', { name: /Database & Interface/i }).click();
     await page.getByLabel('Reopen to last viewed channel/conversation').check();
     await page.getByRole('button', { name: 'Back to Chat' }).click();
 
@@ -57,7 +57,7 @@ test.describe('Reopen last conversation (device-local)', () => {
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: /Database & Interfacr/i }).click();
+    await page.getByRole('button', { name: /Database & Interface/i }).click();
 
     const reopenToggle = page.getByLabel('Reopen to last viewed channel/conversation');
     await reopenToggle.check();
