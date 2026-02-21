@@ -1038,15 +1038,17 @@ export function SettingsModal(props: SettingsModalProps) {
               <Separator />
 
               <div className="space-y-3">
-                <Label>Cleanup Old Packets</Label>
+                <Label>Delete Undecrypted Packets</Label>
                 <p className="text-xs text-muted-foreground">
-                  Delete undecrypted packets older than the specified days. This helps manage
-                  storage for packets that couldn't be decrypted (unknown channel keys).
+                  Permanently deletes stored raw packets containing DMs and channel messages that
+                  have not yet been decrypted. These packets are retained in case you later obtain
+                  the correct key — once deleted, these messages can never be recovered or
+                  decrypted.
                 </p>
                 <div className="flex gap-2 items-end">
                   <div className="space-y-1">
                     <Label htmlFor="retention-days" className="text-xs">
-                      Days to retain
+                      Older than (days)
                     </Label>
                     <Input
                       id="retention-days"
@@ -1058,8 +1060,13 @@ export function SettingsModal(props: SettingsModalProps) {
                       className="w-24"
                     />
                   </div>
-                  <Button variant="outline" onClick={handleCleanup} disabled={cleaning}>
-                    {cleaning ? 'Cleaning...' : 'Cleanup'}
+                  <Button
+                    variant="outline"
+                    onClick={handleCleanup}
+                    disabled={cleaning}
+                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  >
+                    {cleaning ? 'Deleting...' : 'Permanently Delete'}
                   </Button>
                 </div>
               </div>
@@ -1067,21 +1074,24 @@ export function SettingsModal(props: SettingsModalProps) {
               <Separator />
 
               <div className="space-y-3">
-                <Label>Purge Decrypted Raw Packets</Label>
+                <Label>Purge Archival Raw Packets</Label>
                 <p className="text-xs text-muted-foreground">
-                  Deletes raw packet bytes for messages already stored in chat history. No displayed
-                  message data is lost. Only use this if you do not plan to run manual analytics or
-                  parsing on original packet bytes.
+                  Deletes archival copies of raw packet bytes for messages that are already
+                  decrypted and visible in your chat history.{' '}
+                  <em className="text-muted-foreground/80">
+                    This will not affect any displayed messages or app functionality.
+                  </em>{' '}
+                  The raw bytes are only useful for manual packet analysis.
                 </p>
                 <Button
                   variant="outline"
                   onClick={handlePurgeDecryptedRawPackets}
                   disabled={purgingDecryptedRaw}
-                  className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  className="w-full border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
                 >
                   {purgingDecryptedRaw
-                    ? 'Purging Decrypted Raw Packets...'
-                    : 'Purge Decrypted Raw Packets'}
+                    ? 'Purging Archival Raw Packets...'
+                    : 'Purge Archival Raw Packets'}
                 </Button>
               </div>
 

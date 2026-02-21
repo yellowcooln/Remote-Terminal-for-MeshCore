@@ -331,7 +331,7 @@ describe('SettingsModal', () => {
     renderModal();
     openDatabaseSection();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Purge Decrypted Raw Packets' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Purge Archival Raw Packets' }));
 
     await waitFor(() => {
       expect(runMaintenanceSpy).toHaveBeenCalledWith({ purgeLinkedRawPackets: true });
