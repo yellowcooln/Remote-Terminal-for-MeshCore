@@ -99,17 +99,10 @@ export function useConversationRouter({
     // No hash: optionally restore last-viewed conversation if enabled on this device.
     if (!hashConv && getReopenLastConversationEnabled()) {
       const lastViewed = getLastViewedConversation();
-      if (lastViewed?.type === 'raw') {
-        setActiveConversationState(lastViewed);
-        hasSetDefaultConversation.current = true;
-        return;
-      }
-      if (lastViewed?.type === 'map') {
-        setActiveConversationState(lastViewed);
-        hasSetDefaultConversation.current = true;
-        return;
-      }
-      if (lastViewed?.type === 'visualizer') {
+      if (
+        lastViewed &&
+        (lastViewed.type === 'raw' || lastViewed.type === 'map' || lastViewed.type === 'visualizer')
+      ) {
         setActiveConversationState(lastViewed);
         hasSetDefaultConversation.current = true;
         return;
@@ -174,9 +167,9 @@ export function useConversationRouter({
       if (lastViewed?.type !== 'contact') return;
       if (!contactsLoaded) return;
 
-      const contact = contacts.find(
-        (item) => item.public_key.toLowerCase() === lastViewed.id.toLowerCase()
-      );
+      const contact =
+        contacts.find((item) => item.public_key.toLowerCase() === lastViewed.id.toLowerCase()) ||
+        resolveContactFromHashToken(lastViewed.id, contacts);
       if (contact) {
         setActiveConversationState({
           type: 'contact',

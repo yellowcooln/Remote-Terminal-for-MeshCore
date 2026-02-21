@@ -256,4 +256,43 @@ describe('App startup hash resolution', () => {
     });
     expect(window.location.hash).toBe('');
   });
+
+  it('restores last viewed contact from legacy name token when hash is empty and reopen is enabled', async () => {
+    const aliceContact = {
+      public_key: 'b'.repeat(64),
+      name: 'Alice',
+      type: 1,
+      flags: 0,
+      last_path: null,
+      last_path_len: -1,
+      last_advert: null,
+      lat: null,
+      lon: null,
+      last_seen: null,
+      on_radio: false,
+      last_contacted: null,
+      last_read_at: null,
+    };
+
+    window.location.hash = '';
+    localStorage.setItem(REOPEN_LAST_CONVERSATION_KEY, '1');
+    localStorage.setItem(
+      LAST_VIEWED_CONVERSATION_KEY,
+      JSON.stringify({
+        type: 'contact',
+        id: 'Alice',
+        name: 'Alice',
+      })
+    );
+    mocks.api.getContacts.mockResolvedValue([aliceContact]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      for (const node of screen.getAllByTestId('active-conversation')) {
+        expect(node).toHaveTextContent(`contact:${aliceContact.public_key}:Alice`);
+      }
+    });
+    expect(window.location.hash).toBe('');
+  });
 });
