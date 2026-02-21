@@ -79,6 +79,17 @@ class Database:
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._connection = await aiosqlite.connect(self.db_path)
         self._connection.row_factory = aiosqlite.Row
+
+        # WAL mode: faster writes, concurrent readers during writes, no journal file churn.
+        # Persists in the DB file but we set it explicitly on every connection.
+        await self._connection.execute("PRAGMA journal_mode = WAL")
+
+        # Incremental auto-vacuum: freed pages are reclaimable via
+        # PRAGMA incremental_vacuum without a full VACUUM. Must be set before
+        # the first table is created (for new databases); for existing databases
+        # migration 20 handles the one-time VACUUM to restructure the file.
+        await self._connection.execute("PRAGMA auto_vacuum = INCREMENTAL")
+
         await self._connection.executescript(SCHEMA)
         await self._connection.commit()
         logger.debug("Database schema initialized")

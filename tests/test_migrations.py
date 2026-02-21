@@ -100,8 +100,8 @@ class TestMigration001:
             # Run migrations
             applied = await run_migrations(conn)
 
-            assert applied == 19  # All 17 migrations run
-            assert await get_version(conn) == 19
+            assert applied == 20  # All 17 migrations run
+            assert await get_version(conn) == 20
 
             # Verify columns exist by inserting and selecting
             await conn.execute(
@@ -183,9 +183,9 @@ class TestMigration001:
             applied1 = await run_migrations(conn)
             applied2 = await run_migrations(conn)
 
-            assert applied1 == 19  # All 19 migrations run
+            assert applied1 == 20  # All 20 migrations run
             assert applied2 == 0  # No migrations on second run
-            assert await get_version(conn) == 19
+            assert await get_version(conn) == 20
         finally:
             await conn.close()
 
@@ -246,8 +246,8 @@ class TestMigration001:
             applied = await run_migrations(conn)
 
             # All 17 migrations applied (version incremented) but no error
-            assert applied == 19
-            assert await get_version(conn) == 19
+            assert applied == 20
+            assert await get_version(conn) == 20
         finally:
             await conn.close()
 
@@ -374,10 +374,10 @@ class TestMigration013:
             )
             await conn.commit()
 
-            # Run migration 13 (plus 14-19 which also run)
+            # Run migration 13 (plus 14-20 which also run)
             applied = await run_migrations(conn)
-            assert applied == 7
-            assert await get_version(conn) == 19
+            assert applied == 8
+            assert await get_version(conn) == 20
 
             # Verify bots array was created with migrated data
             cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
@@ -497,7 +497,7 @@ class TestMigration018:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 19
+            assert await get_version(conn) == 20
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -571,8 +571,8 @@ class TestMigration018:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 2  # Migrations 18+19 run (but both skip internally)
-            assert await get_version(conn) == 19
+            assert applied == 3  # Migrations 18+19+20 run (18+19 skip internally)
+            assert await get_version(conn) == 20
         finally:
             await conn.close()
 
@@ -644,7 +644,7 @@ class TestMigration019:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 19
+            assert await get_version(conn) == 20
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -679,5 +679,78 @@ class TestMigration019:
                 "SELECT name FROM sqlite_master WHERE name='idx_messages_dedup_null_safe'"
             )
             assert await cursor.fetchone() is not None
+        finally:
+            await conn.close()
+
+
+class TestMigration020:
+    """Test migration 020: enable WAL mode and incremental auto-vacuum."""
+
+    @pytest.mark.asyncio
+    async def test_migration_enables_wal_and_incremental_auto_vacuum(self, tmp_path):
+        """Migration switches journal mode to WAL and auto_vacuum to INCREMENTAL."""
+        db_path = str(tmp_path / "test.db")
+        conn = await aiosqlite.connect(db_path)
+        conn.row_factory = aiosqlite.Row
+        try:
+            await set_version(conn, 19)
+
+            # Create minimal tables so migration 20 can run
+            await conn.execute(
+                "CREATE TABLE raw_packets (id INTEGER PRIMARY KEY, data BLOB NOT NULL)"
+            )
+            await conn.execute(
+                "CREATE TABLE messages (id INTEGER PRIMARY KEY, text TEXT NOT NULL)"
+            )
+            await conn.commit()
+
+            # Verify defaults before migration
+            cursor = await conn.execute("PRAGMA auto_vacuum")
+            assert (await cursor.fetchone())[0] == 0  # NONE
+
+            cursor = await conn.execute("PRAGMA journal_mode")
+            assert (await cursor.fetchone())[0] == "delete"
+
+            applied = await run_migrations(conn)
+            assert applied == 1
+            assert await get_version(conn) == 20
+
+            # Verify WAL mode
+            cursor = await conn.execute("PRAGMA journal_mode")
+            assert (await cursor.fetchone())[0] == "wal"
+
+            # Verify incremental auto-vacuum
+            cursor = await conn.execute("PRAGMA auto_vacuum")
+            assert (await cursor.fetchone())[0] == 2  # INCREMENTAL
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_migration_is_idempotent(self, tmp_path):
+        """Running migration 20 twice doesn't error or re-VACUUM."""
+        db_path = str(tmp_path / "test.db")
+        conn = await aiosqlite.connect(db_path)
+        conn.row_factory = aiosqlite.Row
+        try:
+            # Set up as if already at version 20 with WAL + incremental
+            await conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
+            await conn.execute("PRAGMA journal_mode = WAL")
+            await conn.execute(
+                "CREATE TABLE raw_packets (id INTEGER PRIMARY KEY, data BLOB NOT NULL)"
+            )
+            await conn.execute(
+                "CREATE TABLE messages (id INTEGER PRIMARY KEY, text TEXT NOT NULL)"
+            )
+            await conn.commit()
+            await set_version(conn, 20)
+
+            applied = await run_migrations(conn)
+            assert applied == 0  # Already at version 20
+
+            # Still WAL + INCREMENTAL
+            cursor = await conn.execute("PRAGMA journal_mode")
+            assert (await cursor.fetchone())[0] == "wal"
+            cursor = await conn.execute("PRAGMA auto_vacuum")
+            assert (await cursor.fetchone())[0] == 2
         finally:
             await conn.close()
