@@ -15,6 +15,7 @@ import {
   LAST_VIEWED_CONVERSATION_KEY,
   REOPEN_LAST_CONVERSATION_KEY,
 } from '../utils/lastViewedConversation';
+import { api } from '../api';
 
 const baseConfig: RadioConfig = {
   public_key: 'aa'.repeat(32),
@@ -319,6 +320,22 @@ describe('SettingsModal', () => {
 
     expect(localStorage.getItem(REOPEN_LAST_CONVERSATION_KEY)).toBeNull();
     expect(localStorage.getItem(LAST_VIEWED_CONVERSATION_KEY)).toBeNull();
+  });
+
+  it('purges decrypted raw packets via maintenance endpoint action', async () => {
+    const runMaintenanceSpy = vi.spyOn(api, 'runMaintenance').mockResolvedValue({
+      packets_deleted: 12,
+      vacuumed: true,
+    });
+
+    renderModal();
+    openDatabaseSection();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Purge Decrypted Raw Packets' }));
+
+    await waitFor(() => {
+      expect(runMaintenanceSpy).toHaveBeenCalledWith({ purgeLinkedRawPackets: true });
+    });
   });
 
   it('renders statistics section with fetched data', async () => {
