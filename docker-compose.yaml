@@ -4,7 +4,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - meshcore-data:/app/data
+      - ./data:/app/data
     environment:
       # Radio connection — set ONE of the following transport options:
 
@@ -14,7 +14,7 @@ services:
 
       # TCP
       # MESHCORE_TCP_HOST: 192.168.1.100
-      # MESHCORE_TCP_PORT: 5000
+      # MESHCORE_TCP_PORT: 4000
 
       # BLE
       # MESHCORE_BLE_ADDRESS: AA:BB:CC:DD:EE:FF
@@ -27,5 +27,3 @@ services:
     #   - /dev/ttyUSB0:/dev/ttyUSB0
     restart: unless-stopped
 
-volumes:
-  meshcore-data:
