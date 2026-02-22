@@ -1,12 +1,5 @@
 import type { Contact, RadioConfig, MessagePath } from '../types';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import {
   resolvePath,
@@ -143,24 +136,29 @@ export function PathModal({
           </div>
         )}
 
-        <DialogFooter className="flex-col gap-2 sm:flex-col">
+        <div className="flex flex-col gap-2 pt-2">
           {hasResendActions && (
-            <div className="flex flex-col gap-2 w-full">
+            <div className="flex gap-2">
               {isResendable && (
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="flex-1 min-w-0 h-auto py-2"
                   onClick={() => {
                     onResend(messageId);
                     onClose();
                   }}
                 >
-                  ↻ Resend (byte-perfect)
+                  <span className="flex flex-col items-center leading-tight">
+                    <span>↻ Resend</span>
+                    <span className="text-[10px] font-normal opacity-80">
+                      Only repeated by new repeaters
+                    </span>
+                  </span>
                 </Button>
               )}
               <Button
                 variant="destructive"
-                className="w-full"
+                className="flex-1 min-w-0 h-auto py-2"
                 onClick={() => {
                   onResend(messageId, true);
                   onClose();
@@ -169,16 +167,16 @@ export function PathModal({
                 <span className="flex flex-col items-center leading-tight">
                   <span>↻ Resend as new</span>
                   <span className="text-[10px] font-normal opacity-80">
-                    May cause duplicate receives
+                    Will appear as duplicate to receivers
                   </span>
                 </span>
               </Button>
             </div>
           )}
-          <Button variant="secondary" onClick={onClose} className="w-full">
+          <Button variant="secondary" className="h-auto py-2" onClick={onClose}>
             Close
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
