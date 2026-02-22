@@ -1,12 +1,5 @@
 import type { Contact, RadioConfig, MessagePath } from '../types';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import {
   resolvePath,
@@ -28,14 +21,34 @@ interface PathModalProps {
   senderInfo: SenderInfo;
   contacts: Contact[];
   config: RadioConfig | null;
+  messageId?: number;
+  isOutgoingChan?: boolean;
+  isResendable?: boolean;
+  onResend?: (messageId: number, newTimestamp?: boolean) => void;
 }
 
-export function PathModal({ open, onClose, paths, senderInfo, contacts, config }: PathModalProps) {
+export function PathModal({
+  open,
+  onClose,
+  paths,
+  senderInfo,
+  contacts,
+  config,
+  messageId,
+  isOutgoingChan,
+  isResendable,
+  onResend,
+}: PathModalProps) {
+  const hasResendActions = isOutgoingChan && messageId !== undefined && onResend;
+  const hasPaths = paths.length > 0;
+
   // Resolve all paths
-  const resolvedPaths = paths.map((p) => ({
-    ...p,
-    resolved: resolvePath(p.path, senderInfo, contacts, config),
-  }));
+  const resolvedPaths = hasPaths
+    ? paths.map((p) => ({
+        ...p,
+        resolved: resolvePath(p.path, senderInfo, contacts, config),
+      }))
+    : [];
 
   const hasSinglePath = paths.length === 1;
 
@@ -43,9 +56,15 @@ export function PathModal({ open, onClose, paths, senderInfo, contacts, config }
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Message Path{!hasSinglePath && `s (${paths.length})`}</DialogTitle>
+          <DialogTitle>
+            {hasPaths
+              ? `Message Path${!hasSinglePath ? `s (${paths.length})` : ''}`
+              : 'Message Status'}
+          </DialogTitle>
           <DialogDescription>
-            {hasSinglePath ? (
+            {!hasPaths ? (
+              <>No echoes heard yet. Echoes appear when repeaters re-broadcast your message.</>
+            ) : hasSinglePath ? (
               <>
                 This shows <em>one route</em> that this message traveled through the mesh network.
                 Routers may be incorrectly identified due to prefix collisions between heard and
@@ -60,64 +79,104 @@ export function PathModal({ open, onClose, paths, senderInfo, contacts, config }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto py-2 space-y-4">
-          {/* Raw path summary */}
-          <div className="text-sm">
-            {paths.map((p, index) => {
-              const hops = parsePathHops(p.path);
-              const rawPath = hops.length > 0 ? hops.join('->') : 'direct';
-              return (
-                <div key={index}>
-                  <span className="text-foreground/70 font-semibold">Path {index + 1}:</span>{' '}
-                  <span className="font-mono text-muted-foreground">{rawPath}</span>
-                </div>
-              );
-            })}
-          </div>
+        {hasPaths && (
+          <div className="flex-1 overflow-y-auto py-2 space-y-4">
+            {/* Raw path summary */}
+            <div className="text-sm">
+              {paths.map((p, index) => {
+                const hops = parsePathHops(p.path);
+                const rawPath = hops.length > 0 ? hops.join('->') : 'direct';
+                return (
+                  <div key={index}>
+                    <span className="text-foreground/70 font-semibold">Path {index + 1}:</span>{' '}
+                    <span className="font-mono text-muted-foreground">{rawPath}</span>
+                  </div>
+                );
+              })}
+            </div>
 
-          {/* Straight-line distance (sender to receiver, same for all routes) */}
-          {resolvedPaths.length > 0 &&
-            isValidLocation(
-              resolvedPaths[0].resolved.sender.lat,
-              resolvedPaths[0].resolved.sender.lon
-            ) &&
-            isValidLocation(
-              resolvedPaths[0].resolved.receiver.lat,
-              resolvedPaths[0].resolved.receiver.lon
-            ) && (
-              <div className="text-sm pb-2 border-b border-border">
-                <span className="text-muted-foreground">Straight-line distance: </span>
-                <span className="font-medium">
-                  {formatDistance(
-                    calculateDistance(
-                      resolvedPaths[0].resolved.sender.lat,
-                      resolvedPaths[0].resolved.sender.lon,
-                      resolvedPaths[0].resolved.receiver.lat,
-                      resolvedPaths[0].resolved.receiver.lon
-                    )!
-                  )}
-                </span>
-              </div>
-            )}
-
-          {resolvedPaths.map((pathData, index) => (
-            <div key={index}>
-              {!hasSinglePath && (
-                <div className="text-sm text-foreground/70 font-semibold mb-2 pb-1 border-b border-border">
-                  Path {index + 1}{' '}
-                  <span className="font-normal text-muted-foreground">
-                    — received {formatTime(pathData.received_at)}
+            {/* Straight-line distance (sender to receiver, same for all routes) */}
+            {resolvedPaths.length > 0 &&
+              isValidLocation(
+                resolvedPaths[0].resolved.sender.lat,
+                resolvedPaths[0].resolved.sender.lon
+              ) &&
+              isValidLocation(
+                resolvedPaths[0].resolved.receiver.lat,
+                resolvedPaths[0].resolved.receiver.lon
+              ) && (
+                <div className="text-sm pb-2 border-b border-border">
+                  <span className="text-muted-foreground">Straight-line distance: </span>
+                  <span className="font-medium">
+                    {formatDistance(
+                      calculateDistance(
+                        resolvedPaths[0].resolved.sender.lat,
+                        resolvedPaths[0].resolved.sender.lon,
+                        resolvedPaths[0].resolved.receiver.lat,
+                        resolvedPaths[0].resolved.receiver.lon
+                      )!
+                    )}
                   </span>
                 </div>
               )}
-              <PathVisualization resolved={pathData.resolved} senderInfo={senderInfo} />
-            </div>
-          ))}
-        </div>
 
-        <DialogFooter>
-          <Button onClick={onClose}>Close</Button>
-        </DialogFooter>
+            {resolvedPaths.map((pathData, index) => (
+              <div key={index}>
+                {!hasSinglePath && (
+                  <div className="text-sm text-foreground/70 font-semibold mb-2 pb-1 border-b border-border">
+                    Path {index + 1}{' '}
+                    <span className="font-normal text-muted-foreground">
+                      — received {formatTime(pathData.received_at)}
+                    </span>
+                  </div>
+                )}
+                <PathVisualization resolved={pathData.resolved} senderInfo={senderInfo} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 pt-2">
+          {hasResendActions && (
+            <div className="flex gap-2">
+              {isResendable && (
+                <Button
+                  variant="outline"
+                  className="flex-1 min-w-0 h-auto py-2"
+                  onClick={() => {
+                    onResend(messageId);
+                    onClose();
+                  }}
+                >
+                  <span className="flex flex-col items-center leading-tight">
+                    <span>↻ Resend</span>
+                    <span className="text-[10px] font-normal opacity-80">
+                      Only repeated by new repeaters
+                    </span>
+                  </span>
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                className="flex-1 min-w-0 h-auto py-2"
+                onClick={() => {
+                  onResend(messageId, true);
+                  onClose();
+                }}
+              >
+                <span className="flex flex-col items-center leading-tight">
+                  <span>↻ Resend as new</span>
+                  <span className="text-[10px] font-normal opacity-80">
+                    Will appear as duplicate to receivers
+                  </span>
+                </span>
+              </Button>
+            </div>
+          )}
+          <Button variant="secondary" className="h-auto py-2" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

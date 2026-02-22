@@ -19,6 +19,11 @@ import { Separator } from './ui/separator';
 import { toast } from './ui/sonner';
 import { api } from '../api';
 import { formatTime } from '../utils/messageParser';
+import {
+  captureLastViewedConversationFromHash,
+  getReopenLastConversationEnabled,
+  setReopenLastConversationEnabled,
+} from '../utils/lastViewedConversation';
 
 // Radio presets for common configurations
 interface RadioPreset {
@@ -140,7 +145,11 @@ export function SettingsModal(props: SettingsModalProps) {
   // Database maintenance state
   const [retentionDays, setRetentionDays] = useState('14');
   const [cleaning, setCleaning] = useState(false);
+  const [purgingDecryptedRaw, setPurgingDecryptedRaw] = useState(false);
   const [autoDecryptOnAdvert, setAutoDecryptOnAdvert] = useState(false);
+  const [reopenLastConversation, setReopenLastConversation] = useState(
+    getReopenLastConversationEnabled
+  );
 
   // Advertisement interval state
   const [advertInterval, setAdvertInterval] = useState('0');
@@ -221,6 +230,12 @@ export function SettingsModal(props: SettingsModalProps) {
       onRefreshAppSettings();
     }
   }, [open, pageMode, onRefreshAppSettings]);
+
+  useEffect(() => {
+    if (open || pageMode) {
+      setReopenLastConversation(getReopenLastConversationEnabled());
+    }
+  }, [open, pageMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -495,7 +510,7 @@ export function SettingsModal(props: SettingsModalProps) {
     setCleaning(true);
 
     try {
-      const result = await api.runMaintenance(days);
+      const result = await api.runMaintenance({ pruneUndecryptedDays: days });
       toast.success('Database cleanup complete', {
         description: `Deleted ${result.packets_deleted} old packet${result.packets_deleted === 1 ? '' : 's'}`,
       });
@@ -507,6 +522,25 @@ export function SettingsModal(props: SettingsModalProps) {
       });
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const handlePurgeDecryptedRawPackets = async () => {
+    setPurgingDecryptedRaw(true);
+
+    try {
+      const result = await api.runMaintenance({ purgeLinkedRawPackets: true });
+      toast.success('Decrypted raw packets purged', {
+        description: `Deleted ${result.packets_deleted} raw packet${result.packets_deleted === 1 ? '' : 's'}`,
+      });
+      await onHealthRefresh();
+    } catch (err) {
+      console.error('Failed to purge decrypted raw packets:', err);
+      toast.error('Failed to purge decrypted raw packets', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      setPurgingDecryptedRaw(false);
     }
   };
 
@@ -526,6 +560,14 @@ export function SettingsModal(props: SettingsModalProps) {
       toast.error('Failed to save settings');
     } finally {
       setBusySection(null);
+    }
+  };
+
+  const handleToggleReopenLastConversation = (enabled: boolean) => {
+    setReopenLastConversation(enabled);
+    setReopenLastConversationEnabled(enabled);
+    if (enabled) {
+      captureLastViewedConversationFromHash();
     }
   };
 
@@ -612,14 +654,14 @@ export function SettingsModal(props: SettingsModalProps) {
   const shouldRenderSection = (section: SettingsSection) =>
     !externalDesktopSidebarMode || desktopSection === section;
 
-  const sectionWrapperClass = 'border border-input rounded-md overflow-hidden';
+  const sectionWrapperClass = 'overflow-hidden';
 
   const sectionContentClass = externalDesktopSidebarMode
-    ? 'space-y-4 p-4 h-full overflow-y-auto'
+    ? 'space-y-4 p-4'
     : 'space-y-4 p-4 border-t border-input';
 
   const settingsContainerClass = externalDesktopSidebarMode
-    ? 'w-full h-full'
+    ? 'w-full h-full overflow-y-auto'
     : 'w-full h-full overflow-y-auto space-y-3';
 
   const sectionButtonClasses =
@@ -996,15 +1038,17 @@ export function SettingsModal(props: SettingsModalProps) {
               <Separator />
 
               <div className="space-y-3">
-                <Label>Cleanup Old Packets</Label>
+                <Label>Delete Undecrypted Packets</Label>
                 <p className="text-xs text-muted-foreground">
-                  Delete undecrypted packets older than the specified days. This helps manage
-                  storage for packets that couldn't be decrypted (unknown channel keys).
+                  Permanently deletes stored raw packets containing DMs and channel messages that
+                  have not yet been decrypted. These packets are retained in case you later obtain
+                  the correct key — once deleted, these messages can never be recovered or
+                  decrypted.
                 </p>
                 <div className="flex gap-2 items-end">
                   <div className="space-y-1">
                     <Label htmlFor="retention-days" className="text-xs">
-                      Days to retain
+                      Older than (days)
                     </Label>
                     <Input
                       id="retention-days"
@@ -1016,10 +1060,39 @@ export function SettingsModal(props: SettingsModalProps) {
                       className="w-24"
                     />
                   </div>
-                  <Button variant="outline" onClick={handleCleanup} disabled={cleaning}>
-                    {cleaning ? 'Cleaning...' : 'Cleanup'}
+                  <Button
+                    variant="outline"
+                    onClick={handleCleanup}
+                    disabled={cleaning}
+                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                  >
+                    {cleaning ? 'Deleting...' : 'Permanently Delete'}
                   </Button>
                 </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label>Purge Archival Raw Packets</Label>
+                <p className="text-xs text-muted-foreground">
+                  Deletes archival copies of raw packet bytes for messages that are already
+                  decrypted and visible in your chat history.{' '}
+                  <em className="text-muted-foreground/80">
+                    This will not affect any displayed messages or app functionality.
+                  </em>{' '}
+                  The raw bytes are only useful for manual packet analysis.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={handlePurgeDecryptedRawPackets}
+                  disabled={purgingDecryptedRaw}
+                  className="w-full border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                >
+                  {purgingDecryptedRaw
+                    ? 'Purging Archival Raw Packets...'
+                    : 'Purge Archival Raw Packets'}
+                </Button>
               </div>
 
               <Separator />
@@ -1041,6 +1114,24 @@ export function SettingsModal(props: SettingsModalProps) {
                   When enabled, the server will automatically try to decrypt stored DM packets when
                   a new contact sends an advertisement. This may cause brief delays on large packet
                   backlogs.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label>Interface</Label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reopenLastConversation}
+                    onChange={(e) => handleToggleReopenLastConversation(e.target.checked)}
+                    className="w-4 h-4 rounded border-input accent-primary"
+                  />
+                  <span className="text-sm">Reopen to last viewed channel/conversation</span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  This applies only to this device/browser. It does not sync to server settings.
                 </p>
               </div>
 

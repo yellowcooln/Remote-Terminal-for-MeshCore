@@ -887,6 +887,23 @@ class TestRawPacketRepository:
         deleted = await RawPacketRepository.prune_old_undecrypted(10)
         assert deleted == 0
 
+    @pytest.mark.asyncio
+    async def test_purge_linked_to_messages_deletes_only_linked_packets(self, test_db):
+        """Purge linked raw packets removes only rows with a message_id."""
+        ts = int(time.time())
+        linked_1, _ = await RawPacketRepository.create(b"\x01\x02\x03", ts)
+        linked_2, _ = await RawPacketRepository.create(b"\x04\x05\x06", ts)
+        await RawPacketRepository.mark_decrypted(linked_1, 101)
+        await RawPacketRepository.mark_decrypted(linked_2, 102)
+
+        await RawPacketRepository.create(b"\x07\x08\x09", ts)  # undecrypted, should remain
+
+        deleted = await RawPacketRepository.purge_linked_to_messages()
+        assert deleted == 2
+
+        remaining = await RawPacketRepository.get_undecrypted_count()
+        assert remaining == 1
+
 
 class TestMaintenanceEndpoint:
     """Test database maintenance endpoint."""
@@ -904,6 +921,23 @@ class TestMaintenanceEndpoint:
         await RawPacketRepository.create(b"\x04\x05\x06", old_timestamp)
 
         request = MaintenanceRequest(prune_undecrypted_days=14)
+        result = await run_maintenance(request)
+
+        assert result.packets_deleted == 2
+        assert result.vacuumed is True
+
+    @pytest.mark.asyncio
+    async def test_maintenance_can_purge_linked_raw_packets(self, test_db):
+        """Maintenance endpoint can purge raw packets linked to messages."""
+        from app.routers.packets import MaintenanceRequest, run_maintenance
+
+        ts = int(time.time())
+        linked_1, _ = await RawPacketRepository.create(b"\x0a\x0b\x0c", ts)
+        linked_2, _ = await RawPacketRepository.create(b"\x0d\x0e\x0f", ts)
+        await RawPacketRepository.mark_decrypted(linked_1, 201)
+        await RawPacketRepository.mark_decrypted(linked_2, 202)
+
+        request = MaintenanceRequest(purge_linked_raw_packets=True)
         result = await run_maintenance(request)
 
         assert result.packets_deleted == 2

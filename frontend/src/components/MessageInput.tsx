@@ -166,19 +166,26 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   // For repeater mode, always allow submit (empty = guest login)
   const canSubmit = isRepeaterMode ? true : text.trim().length > 0;
 
-  // Show character counter for messages (not repeater mode or raw)
+  // Show counter for messages (not repeater mode or raw).
+  // Desktop: always visible. Mobile: only show count after 100 characters.
   const showCharCounter = !isRepeaterMode && limits !== null;
+  const showMobileCounterValue = text.length > 100;
 
   return (
     <form
       className="px-4 py-2.5 border-t border-border flex flex-col gap-1"
       onSubmit={handleSubmit}
+      autoComplete="off"
     >
       <div className="flex gap-2">
         <Input
           ref={inputRef}
           type={isRepeaterMode ? 'password' : 'text'}
-          autoComplete={isRepeaterMode ? 'off' : undefined}
+          autoComplete="off"
+          name="chat-message-input"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-bwignore="true"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -206,25 +213,53 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         </Button>
       </div>
       {showCharCounter && (
-        <div className="flex items-center justify-end gap-2 text-xs">
-          <span
-            className={cn(
-              'tabular-nums',
-              limitState === 'error' || limitState === 'danger'
-                ? 'text-red-500 font-medium'
-                : limitState === 'warning'
-                  ? 'text-yellow-500'
-                  : 'text-muted-foreground'
-            )}
-          >
-            {textByteLen}/{limits!.hardLimit}b{remaining < 0 && ` (${remaining})`}
-          </span>
-          {warningMessage && (
-            <span className={cn(limitState === 'error' ? 'text-red-500' : 'text-yellow-500')}>
-              — {warningMessage}
+        <>
+          <div className="hidden sm:flex items-center justify-end gap-2 text-xs">
+            <span
+              className={cn(
+                'tabular-nums',
+                limitState === 'error' || limitState === 'danger'
+                  ? 'text-red-500 font-medium'
+                  : limitState === 'warning'
+                    ? 'text-yellow-500'
+                    : 'text-muted-foreground'
+              )}
+            >
+              {textByteLen}/{limits!.hardLimit}
+              {remaining < 0 && ` (${remaining})`}
             </span>
+            {warningMessage && (
+              <span className={cn(limitState === 'error' ? 'text-red-500' : 'text-yellow-500')}>
+                — {warningMessage}
+              </span>
+            )}
+          </div>
+
+          {(showMobileCounterValue || warningMessage) && (
+            <div className="flex sm:hidden items-center justify-end gap-2 text-xs">
+              {showMobileCounterValue && (
+                <span
+                  className={cn(
+                    'tabular-nums',
+                    limitState === 'error' || limitState === 'danger'
+                      ? 'text-red-500 font-medium'
+                      : limitState === 'warning'
+                        ? 'text-yellow-500'
+                        : 'text-muted-foreground'
+                  )}
+                >
+                  {textByteLen}/{limits!.hardLimit}
+                  {remaining < 0 && ` (${remaining})`}
+                </span>
+              )}
+              {warningMessage && (
+                <span className={cn(limitState === 'error' ? 'text-red-500' : 'text-yellow-500')}>
+                  — {warningMessage}
+                </span>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </form>
   );
