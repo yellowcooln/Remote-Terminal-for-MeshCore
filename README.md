@@ -169,7 +169,6 @@ npm run build                        # build the frontend
 | `MESHCORE_BLE_PIN` | | BLE PIN (required when BLE address is set) |
 | `MESHCORE_LOG_LEVEL` | INFO | DEBUG, INFO, WARNING, ERROR |
 | `MESHCORE_DATABASE_PATH` | data/meshcore.db | SQLite database path |
-| `MESHCORE_MAX_RADIO_CONTACTS` | 200 | Max recent contacts to keep on radio for DM ACKs |
 
 Only one transport may be active at a time. If multiple are set, the server will refuse to start.
 
