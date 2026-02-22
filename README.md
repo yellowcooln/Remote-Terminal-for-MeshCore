@@ -100,7 +100,7 @@ docker run -d \
   --device=/dev/ttyUSB0 \
   -v remoteterm-data:/app/data \
   -p 8000:8000 \
-  jkingsman/remote-terminal-for-meshcore:latest
+  jkingsman/remoteterm-meshcore:latest
 
 # TCP
 docker run -d \
@@ -108,7 +108,7 @@ docker run -d \
   -e MESHCORE_TCP_PORT=4000 \
   -v remoteterm-data:/app/data \
   -p 8000:8000 \
-  jkingsman/remote-terminal-for-meshcore:latest
+  jkingsman/remoteterm-meshcore:latest
 ```
 
 ## Development
