@@ -94,7 +94,7 @@ Access at http://localhost:8000
 
 > **Note:** BLE-in-docker is outside the scope of this README, but the env vars should all still work.
 
-Edit `docker-compose.yaml` to uncomment your transport (Serial, TCP, or BLE). For serial connections, you'll also need to uncomment the `devices` section to pass through the USB device. Then:
+Edit `docker-compose.yaml` to set a serial device for passthrough, or uncomment your transport (serial or TCP).Then:
 
 ```bash
 docker compose up -d
@@ -139,7 +139,7 @@ docker compose down
 
 ```bash
 uv sync
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload # autodetects serial port
 
 # Or with explicit serial port
 MESHCORE_SERIAL_PORT=/dev/ttyUSB0 uv run uvicorn app.main:app --reload
@@ -209,11 +209,11 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=key.pem --s
 For Docker Compose, generate the cert and add the volume mounts and command override to `docker-compose.yaml`:
 
 ```bash
-# generate TLS cert
+# generate snakeoil TLS cert
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'
 ```
 
-Then add to the `remoteterm` service in `docker-compose.yaml` (keep your existing `./data:/app/data` mount):
+Then add the key and cert to the `remoteterm` service in `docker-compose.yaml`, and add an explicit launch command that uses them:
 
 ```yaml
     volumes:
@@ -228,6 +228,8 @@ Accept the browser warning, or use [mkcert](https://github.com/FiloSottile/mkcer
 
 <details>
 <summary>Systemd Service (Linux)</summary>
+
+Assumes you're running from `/opt/remoteterm`; update commands and `remoteterm.service` if you're running elsewhere.
 
 ```bash
 # Create service user
