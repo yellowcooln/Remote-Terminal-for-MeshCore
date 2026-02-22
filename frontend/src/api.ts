@@ -167,10 +167,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ channel_key: channelKey, text }),
     }),
-  resendChannelMessage: (messageId: number) =>
-    fetchJson<{ status: string; message_id: number }>(`/messages/channel/${messageId}/resend`, {
-      method: 'POST',
-    }),
+  resendChannelMessage: (messageId: number, newTimestamp?: boolean) =>
+    fetchJson<{ status: string; message_id: number }>(
+      `/messages/channel/${messageId}/resend${newTimestamp ? '?new_timestamp=true' : ''}`,
+      { method: 'POST' }
+    ),
 
   // Packets
   getUndecryptedPacketCount: () => fetchJson<{ count: number }>('/packets/undecrypted/count'),
@@ -183,10 +184,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(params),
     }),
-  runMaintenance: (pruneUndecryptedDays: number) =>
+  runMaintenance: (options: { pruneUndecryptedDays?: number; purgeLinkedRawPackets?: boolean }) =>
     fetchJson<MaintenanceResult>('/packets/maintenance', {
       method: 'POST',
-      body: JSON.stringify({ prune_undecrypted_days: pruneUndecryptedDays }),
+      body: JSON.stringify({
+        ...(options.pruneUndecryptedDays !== undefined && {
+          prune_undecrypted_days: options.pruneUndecryptedDays,
+        }),
+        ...(options.purgeLinkedRawPackets !== undefined && {
+          purge_linked_raw_packets: options.purgeLinkedRawPackets,
+        }),
+      }),
     }),
 
   // Read State

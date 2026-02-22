@@ -802,6 +802,13 @@ class RawPacketRepository:
         return cursor.rowcount
 
     @staticmethod
+    async def purge_linked_to_messages() -> int:
+        """Delete raw packets that are already linked to a stored message."""
+        cursor = await db.conn.execute("DELETE FROM raw_packets WHERE message_id IS NOT NULL")
+        await db.conn.commit()
+        return cursor.rowcount
+
+    @staticmethod
     async def get_undecrypted_text_messages() -> list[tuple[int, bytes, int]]:
         """Get all undecrypted TEXT_MESSAGE packets as (id, data, timestamp) tuples.
 

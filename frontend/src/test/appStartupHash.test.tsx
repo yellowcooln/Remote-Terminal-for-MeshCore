@@ -137,6 +137,10 @@ vi.mock('../components/ui/sonner', () => ({
 }));
 
 import { App } from '../App';
+import {
+  LAST_VIEWED_CONVERSATION_KEY,
+  REOPEN_LAST_CONVERSATION_KEY,
+} from '../utils/lastViewedConversation';
 
 const publicChannel = {
   key: '8B3387E9C5CDEA6AC9E5EDBAA115CD72',
@@ -149,6 +153,7 @@ const publicChannel = {
 describe('App startup hash resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     window.location.hash = `#contact/${'a'.repeat(64)}/Alice`;
 
     mocks.api.getRadioConfig.mockResolvedValue({
@@ -178,6 +183,7 @@ describe('App startup hash resolution', () => {
 
   afterEach(() => {
     window.location.hash = '';
+    localStorage.clear();
   });
 
   it('falls back to Public when contact hash is unresolvable and contacts are empty', async () => {
@@ -188,5 +194,105 @@ describe('App startup hash resolution', () => {
         expect(node).toHaveTextContent(`channel:${publicChannel.key}:Public`);
       }
     });
+  });
+
+  it('restores last viewed channel when hash is empty and reopen preference is enabled', async () => {
+    const chatChannel = {
+      key: '11111111111111111111111111111111',
+      name: 'Ops',
+      is_hashtag: false,
+      on_radio: false,
+      last_read_at: null,
+    };
+
+    window.location.hash = '';
+    localStorage.setItem(REOPEN_LAST_CONVERSATION_KEY, '1');
+    localStorage.setItem(
+      LAST_VIEWED_CONVERSATION_KEY,
+      JSON.stringify({
+        type: 'channel',
+        id: chatChannel.key,
+        name: chatChannel.name,
+      })
+    );
+    mocks.api.getChannels.mockResolvedValue([publicChannel, chatChannel]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      for (const node of screen.getAllByTestId('active-conversation')) {
+        expect(node).toHaveTextContent(`channel:${chatChannel.key}:${chatChannel.name}`);
+      }
+    });
+    expect(window.location.hash).toBe('');
+  });
+
+  it('uses Public channel when hash is empty and reopen preference is disabled', async () => {
+    const chatChannel = {
+      key: '11111111111111111111111111111111',
+      name: 'Ops',
+      is_hashtag: false,
+      on_radio: false,
+      last_read_at: null,
+    };
+
+    window.location.hash = '';
+    localStorage.setItem(
+      LAST_VIEWED_CONVERSATION_KEY,
+      JSON.stringify({
+        type: 'channel',
+        id: chatChannel.key,
+        name: chatChannel.name,
+      })
+    );
+    mocks.api.getChannels.mockResolvedValue([publicChannel, chatChannel]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      for (const node of screen.getAllByTestId('active-conversation')) {
+        expect(node).toHaveTextContent(`channel:${publicChannel.key}:Public`);
+      }
+    });
+    expect(window.location.hash).toBe('');
+  });
+
+  it('restores last viewed contact from legacy name token when hash is empty and reopen is enabled', async () => {
+    const aliceContact = {
+      public_key: 'b'.repeat(64),
+      name: 'Alice',
+      type: 1,
+      flags: 0,
+      last_path: null,
+      last_path_len: -1,
+      last_advert: null,
+      lat: null,
+      lon: null,
+      last_seen: null,
+      on_radio: false,
+      last_contacted: null,
+      last_read_at: null,
+    };
+
+    window.location.hash = '';
+    localStorage.setItem(REOPEN_LAST_CONVERSATION_KEY, '1');
+    localStorage.setItem(
+      LAST_VIEWED_CONVERSATION_KEY,
+      JSON.stringify({
+        type: 'contact',
+        id: 'Alice',
+        name: 'Alice',
+      })
+    );
+    mocks.api.getContacts.mockResolvedValue([aliceContact]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      for (const node of screen.getAllByTestId('active-conversation')) {
+        expect(node).toHaveTextContent(`contact:${aliceContact.public_key}:Alice`);
+      }
+    });
+    expect(window.location.hash).toBe('');
   });
 });

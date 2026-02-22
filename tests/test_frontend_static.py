@@ -53,6 +53,16 @@ def test_valid_dist_serves_static_and_spa_fallback(tmp_path):
         assert root_response.status_code == 200
         assert "index page" in root_response.text
 
+        manifest_response = client.get("/site.webmanifest")
+        assert manifest_response.status_code == 200
+        assert manifest_response.headers["content-type"].startswith("application/manifest+json")
+        manifest = manifest_response.json()
+        assert manifest["start_url"] == "http://testserver/"
+        assert manifest["scope"] == "http://testserver/"
+        assert manifest["id"] == "http://testserver/"
+        assert manifest["display"] == "standalone"
+        assert manifest["icons"][0]["src"] == "http://testserver/web-app-manifest-192x192.png"
+
         file_response = client.get("/robots.txt")
         assert file_response.status_code == 200
         assert file_response.text == "User-agent: *"
@@ -64,3 +74,28 @@ def test_valid_dist_serves_static_and_spa_fallback(tmp_path):
         asset_response = client.get("/assets/app.js")
         assert asset_response.status_code == 200
         assert "console.log('ok');" in asset_response.text
+
+
+def test_webmanifest_uses_forwarded_origin_headers(tmp_path):
+    app = FastAPI()
+    dist_dir = tmp_path / "frontend" / "dist"
+    dist_dir.mkdir(parents=True)
+    (dist_dir / "index.html").write_text("<html><body>index page</body></html>")
+
+    registered = register_frontend_static_routes(app, dist_dir)
+    assert registered is True
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/site.webmanifest",
+            headers={
+                "x-forwarded-proto": "https",
+                "x-forwarded-host": "mesh.example.com:8443",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["start_url"] == "https://mesh.example.com:8443/"
+        assert data["scope"] == "https://mesh.example.com:8443/"
+        assert data["id"] == "https://mesh.example.com:8443/"

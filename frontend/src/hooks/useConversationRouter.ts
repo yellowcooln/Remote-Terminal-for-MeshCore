@@ -5,6 +5,11 @@ import {
   resolveChannelFromHashToken,
   resolveContactFromHashToken,
 } from '../utils/urlHash';
+import {
+  getLastViewedConversation,
+  getReopenLastConversationEnabled,
+  saveLastViewedConversation,
+} from '../utils/lastViewedConversation';
 import { getContactDisplayName } from '../utils/pubkey';
 import type { Channel, Contact, Conversation } from '../types';
 
@@ -27,8 +32,26 @@ export function useConversationRouter({
   pendingDeleteFallbackRef,
   hasSetDefaultConversation,
 }: UseConversationRouterArgs) {
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [activeConversation, setActiveConversationState] = useState<Conversation | null>(null);
   const activeConversationRef = useRef<Conversation | null>(null);
+  const hashSyncEnabledRef = useRef(
+    typeof window !== 'undefined' ? window.location.hash.length > 0 : false
+  );
+
+  const setActiveConversation = useCallback((conv: Conversation | null) => {
+    hashSyncEnabledRef.current = true;
+    setActiveConversationState(conv);
+  }, []);
+
+  const getPublicChannelConversation = useCallback((): Conversation | null => {
+    const publicChannel = channels.find((c) => c.name === 'Public');
+    if (!publicChannel) return null;
+    return {
+      type: 'channel',
+      id: publicChannel.key,
+      name: publicChannel.name,
+    };
+  }, [channels]);
 
   // Phase 1: Set initial conversation from URL hash or default to Public channel
   // Only needs channels (fast path) - doesn't wait for contacts
@@ -40,12 +63,12 @@ export function useConversationRouter({
 
     // Handle non-data views immediately
     if (hashConv?.type === 'raw') {
-      setActiveConversation({ type: 'raw', id: 'raw', name: 'Raw Packet Feed' });
+      setActiveConversationState({ type: 'raw', id: 'raw', name: 'Raw Packet Feed' });
       hasSetDefaultConversation.current = true;
       return;
     }
     if (hashConv?.type === 'map') {
-      setActiveConversation({
+      setActiveConversationState({
         type: 'map',
         id: 'map',
         name: 'Node Map',
@@ -55,7 +78,7 @@ export function useConversationRouter({
       return;
     }
     if (hashConv?.type === 'visualizer') {
-      setActiveConversation({ type: 'visualizer', id: 'visualizer', name: 'Mesh Visualizer' });
+      setActiveConversationState({ type: 'visualizer', id: 'visualizer', name: 'Mesh Visualizer' });
       hasSetDefaultConversation.current = true;
       return;
     }
@@ -64,7 +87,7 @@ export function useConversationRouter({
     if (hashConv?.type === 'channel') {
       const channel = resolveChannelFromHashToken(hashConv.name, channels);
       if (channel) {
-        setActiveConversation({ type: 'channel', id: channel.key, name: channel.name });
+        setActiveConversationState({ type: 'channel', id: channel.key, name: channel.name });
         hasSetDefaultConversation.current = true;
         return;
       }
@@ -73,17 +96,42 @@ export function useConversationRouter({
     // Contact hash — wait for phase 2
     if (hashConv?.type === 'contact') return;
 
+    // No hash: optionally restore last-viewed conversation if enabled on this device.
+    if (!hashConv && getReopenLastConversationEnabled()) {
+      const lastViewed = getLastViewedConversation();
+      if (
+        lastViewed &&
+        (lastViewed.type === 'raw' || lastViewed.type === 'map' || lastViewed.type === 'visualizer')
+      ) {
+        setActiveConversationState(lastViewed);
+        hasSetDefaultConversation.current = true;
+        return;
+      }
+      if (lastViewed?.type === 'channel') {
+        const channel =
+          channels.find((c) => c.key.toLowerCase() === lastViewed.id.toLowerCase()) ||
+          resolveChannelFromHashToken(lastViewed.id, channels);
+        if (channel) {
+          setActiveConversationState({
+            type: 'channel',
+            id: channel.key,
+            name: channel.name,
+          });
+          hasSetDefaultConversation.current = true;
+          return;
+        }
+      }
+      // Last-viewed contact resolution waits for contacts in phase 2.
+      if (lastViewed?.type === 'contact') return;
+    }
+
     // No hash or unresolvable — default to Public
-    const publicChannel = channels.find((c) => c.name === 'Public');
-    if (publicChannel) {
-      setActiveConversation({
-        type: 'channel',
-        id: publicChannel.key,
-        name: publicChannel.name,
-      });
+    const publicConversation = getPublicChannelConversation();
+    if (publicConversation) {
+      setActiveConversationState(publicConversation);
       hasSetDefaultConversation.current = true;
     }
-  }, [channels, activeConversation]);
+  }, [channels, activeConversation, getPublicChannelConversation, hasSetDefaultConversation]);
 
   // Phase 2: Resolve contact hash (only if phase 1 didn't set a conversation)
   useEffect(() => {
@@ -95,7 +143,7 @@ export function useConversationRouter({
 
       const contact = resolveContactFromHashToken(hashConv.name, contacts);
       if (contact) {
-        setActiveConversation({
+        setActiveConversationState({
           type: 'contact',
           id: contact.public_key,
           name: getContactDisplayName(contact.name, contact.public_key),
@@ -105,25 +153,58 @@ export function useConversationRouter({
       }
 
       // Contact hash didn't match — fall back to Public if channels loaded.
-      if (channels.length > 0) {
-        const publicChannel = channels.find((c) => c.name === 'Public');
-        if (publicChannel) {
-          setActiveConversation({
-            type: 'channel',
-            id: publicChannel.key,
-            name: publicChannel.name,
-          });
-          hasSetDefaultConversation.current = true;
-        }
+      const publicConversation = getPublicChannelConversation();
+      if (publicConversation) {
+        setActiveConversationState(publicConversation);
+        hasSetDefaultConversation.current = true;
+      }
+      return;
+    }
+
+    // No hash: optionally restore a last-viewed contact once contacts are loaded.
+    if (!hashConv && getReopenLastConversationEnabled()) {
+      const lastViewed = getLastViewedConversation();
+      if (lastViewed?.type !== 'contact') return;
+      if (!contactsLoaded) return;
+
+      const contact =
+        contacts.find((item) => item.public_key.toLowerCase() === lastViewed.id.toLowerCase()) ||
+        resolveContactFromHashToken(lastViewed.id, contacts);
+      if (contact) {
+        setActiveConversationState({
+          type: 'contact',
+          id: contact.public_key,
+          name: getContactDisplayName(contact.name, contact.public_key),
+        });
+        hasSetDefaultConversation.current = true;
+        return;
+      }
+
+      const publicConversation = getPublicChannelConversation();
+      if (publicConversation) {
+        setActiveConversationState(publicConversation);
+        hasSetDefaultConversation.current = true;
       }
     }
-  }, [contacts, channels, activeConversation, contactsLoaded]);
+  }, [
+    contacts,
+    channels,
+    activeConversation,
+    contactsLoaded,
+    getPublicChannelConversation,
+    hasSetDefaultConversation,
+  ]);
 
   // Keep ref in sync and update URL hash
   useEffect(() => {
     activeConversationRef.current = activeConversation;
     if (activeConversation) {
-      updateUrlHash(activeConversation);
+      if (hashSyncEnabledRef.current) {
+        updateUrlHash(activeConversation);
+      }
+      if (getReopenLastConversationEnabled()) {
+        saveLastViewedConversation(activeConversation);
+      }
     }
   }, [activeConversation]);
 
@@ -142,12 +223,12 @@ export function useConversationRouter({
 
     hasSetDefaultConversation.current = true;
     pendingDeleteFallbackRef.current = false;
-    setActiveConversation({
+    setActiveConversationState({
       type: 'channel',
       id: publicChannel.key,
       name: publicChannel.name,
     });
-  }, [activeConversation, channels]);
+  }, [activeConversation, channels, hasSetDefaultConversation, pendingDeleteFallbackRef]);
 
   // Handle conversation selection (closes sidebar on mobile)
   const handleSelectConversation = useCallback(
@@ -155,7 +236,7 @@ export function useConversationRouter({
       setActiveConversation(conv);
       setSidebarOpen(false);
     },
-    [setSidebarOpen]
+    [setActiveConversation, setSidebarOpen]
   );
 
   return {

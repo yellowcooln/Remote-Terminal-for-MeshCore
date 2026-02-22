@@ -236,8 +236,12 @@ async def decrypt_historical_packets(
 
 
 class MaintenanceRequest(BaseModel):
-    prune_undecrypted_days: int = Field(
-        ge=1, description="Delete undecrypted packets older than this many days"
+    prune_undecrypted_days: int | None = Field(
+        default=None, ge=1, description="Delete undecrypted packets older than this many days"
+    )
+    purge_linked_raw_packets: bool = Field(
+        default=False,
+        description="Delete raw packets already linked to a stored message",
     )
 
 
@@ -249,18 +253,30 @@ class MaintenanceResult(BaseModel):
 @router.post("/maintenance", response_model=MaintenanceResult)
 async def run_maintenance(request: MaintenanceRequest) -> MaintenanceResult:
     """
-    Clean up old undecrypted packets and reclaim disk space.
+    Run packet maintenance tasks and reclaim disk space.
 
-    - Deletes undecrypted packets older than the specified number of days
+    - Optionally deletes undecrypted packets older than the specified number of days
+    - Optionally deletes raw packets already linked to stored messages
     - Runs VACUUM to reclaim disk space
     """
-    logger.info(
-        "Running maintenance: pruning packets older than %d days", request.prune_undecrypted_days
-    )
+    deleted = 0
 
-    # Prune old undecrypted packets
-    deleted = await RawPacketRepository.prune_old_undecrypted(request.prune_undecrypted_days)
-    logger.info("Deleted %d old undecrypted packets", deleted)
+    if request.prune_undecrypted_days is not None:
+        logger.info(
+            "Running maintenance: pruning undecrypted packets older than %d days",
+            request.prune_undecrypted_days,
+        )
+        pruned_undecrypted = await RawPacketRepository.prune_old_undecrypted(
+            request.prune_undecrypted_days
+        )
+        deleted += pruned_undecrypted
+        logger.info("Deleted %d old undecrypted packets", pruned_undecrypted)
+
+    if request.purge_linked_raw_packets:
+        logger.info("Running maintenance: purging raw packets linked to stored messages")
+        purged_linked = await RawPacketRepository.purge_linked_to_messages()
+        deleted += purged_linked
+        logger.info("Deleted %d linked raw packets", purged_linked)
 
     # Run VACUUM to reclaim space on a dedicated connection
     async with aiosqlite.connect(db.db_path) as vacuum_conn:
