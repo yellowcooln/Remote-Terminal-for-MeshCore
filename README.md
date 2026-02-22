@@ -106,6 +106,27 @@ The database is stored in `./data/` (bind-mounted), so the container shares the 
 docker compose up -d --build
 ```
 
+To use the prebuilt Docker Hub image instead of building locally, replace:
+
+```yaml
+build: .
+```
+
+with:
+
+```yaml
+image: jkingsman/remoteterm-meshcore:latest
+```
+
+Then run:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+The container runs as root by default for maximum serial passthrough compatibility across host setups. On Linux, if you switch between native and Docker runs, `./data` can end up root-owned. If you do not need that compatibility behavior, you can enable the optional `user: "${UID:-1000}:${GID:-1000}"` line in `docker-compose.yaml` to keep ownership aligned with your host user.
+
 To stop:
 
 ```bash
@@ -193,10 +214,11 @@ For Docker Compose, generate the cert and add the volume mounts and command over
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'
 ```
 
-Then add to the `remoteterm` service in `docker-compose.yaml`:
+Then add to the `remoteterm` service in `docker-compose.yaml` (keep your existing `./data:/app/data` mount):
 
 ```yaml
     volumes:
+      - ./data:/app/data
       - ./cert.pem:/app/cert.pem:ro
       - ./key.pem:/app/key.pem:ro
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=/app/key.pem --ssl-certfile=/app/cert.pem
