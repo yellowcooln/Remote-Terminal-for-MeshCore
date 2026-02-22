@@ -654,7 +654,7 @@ export function SettingsModal(props: SettingsModalProps) {
   const shouldRenderSection = (section: SettingsSection) =>
     !externalDesktopSidebarMode || desktopSection === section;
 
-  const sectionWrapperClass = 'border border-input rounded-md overflow-hidden';
+  const sectionWrapperClass = 'overflow-hidden';
 
   const sectionContentClass = externalDesktopSidebarMode
     ? 'space-y-4 p-4'
