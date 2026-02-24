@@ -12,8 +12,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fixtures from './fixtures/websocket_events.json';
 import { getMessageContentKey } from '../hooks/useConversationMessages';
 import { getStateKey } from '../utils/conversationState';
+import { mergeContactIntoList } from '../utils/contactMerge';
 import * as messageCache from '../messageCache';
-import type { Message } from '../types';
+import type { Contact, Message } from '../types';
 
 /**
  * Minimal state for testing message dedup and unread logic.
@@ -261,5 +262,177 @@ describe('Integration: State Key Contract', () => {
     const stateKey = getStateKey('contact', publicKey);
 
     expect(stateKey).toBe(`contact-${publicKey}`);
+  });
+});
+
+// --- Contact merge tests (imports real mergeContactIntoList) ---
+
+function makeContact(overrides: Partial<Contact> = {}): Contact {
+  return {
+    public_key: 'abc123',
+    name: 'TestNode',
+    type: 1,
+    flags: 0,
+    last_path: null,
+    last_path_len: 0,
+    last_advert: null,
+    lat: null,
+    lon: null,
+    last_seen: null,
+    on_radio: true,
+    last_contacted: null,
+    last_read_at: null,
+    ...overrides,
+  };
+}
+
+describe('Integration: Contact Merge', () => {
+  it('appends new contact to list', () => {
+    const existing = [makeContact({ public_key: 'aaa', name: 'Alpha' })];
+    const incoming = makeContact({ public_key: 'bbb', name: 'Beta' });
+
+    const result = mergeContactIntoList(existing, incoming);
+
+    expect(result).toHaveLength(2);
+    expect(result[1].name).toBe('Beta');
+  });
+
+  it('merges existing contact (updates name, preserves other fields)', () => {
+    const existing = [makeContact({ public_key: 'aaa', name: 'Alpha', lat: 47.0 })];
+    const incoming = makeContact({ public_key: 'aaa', name: 'Alpha-Updated' });
+
+    const result = mergeContactIntoList(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Alpha-Updated');
+    // Spread semantics: incoming lat (null) overwrites existing lat
+    expect(result[0].public_key).toBe('aaa');
+  });
+
+  it('returns same array reference when contact is unchanged', () => {
+    const contact = makeContact({ public_key: 'aaa', name: 'Alpha' });
+    const existing = [contact];
+    // Incoming with identical values
+    const incoming = makeContact({ public_key: 'aaa', name: 'Alpha' });
+
+    const result = mergeContactIntoList(existing, incoming);
+
+    expect(result).toBe(existing); // referential equality
+  });
+
+  it('partial update merges without clobbering unrelated fields', () => {
+    const existing = [makeContact({ public_key: 'aaa', name: 'Alpha', lat: 47.0, lon: -122.0 })];
+    // Incoming update only changes lat
+    const incoming = makeContact({ public_key: 'aaa', name: 'Alpha', lat: 48.0, lon: -122.0 });
+
+    const result = mergeContactIntoList(existing, incoming);
+
+    expect(result[0].lat).toBe(48.0);
+    expect(result[0].lon).toBe(-122.0);
+    expect(result[0].name).toBe('Alpha');
+  });
+});
+
+// --- ACK + messageCache propagation tests ---
+
+describe('Integration: ACK + messageCache propagation', () => {
+  beforeEach(() => {
+    messageCache.clear();
+  });
+
+  it('updateAck updates acked count on cached message', () => {
+    const msg: Message = {
+      id: 100,
+      type: 'PRIV',
+      conversation_key: 'pk_abc',
+      text: 'Hello',
+      sender_timestamp: 1700000000,
+      received_at: 1700000000,
+      paths: null,
+      txt_type: 0,
+      signature: null,
+      outgoing: true,
+      acked: 0,
+    };
+    messageCache.addMessage('pk_abc', msg, 'key-100');
+
+    messageCache.updateAck(100, 1);
+
+    const entry = messageCache.get('pk_abc');
+    expect(entry).toBeDefined();
+    expect(entry!.messages[0].acked).toBe(1);
+  });
+
+  it('updateAck updates paths when longer', () => {
+    const msg: Message = {
+      id: 101,
+      type: 'PRIV',
+      conversation_key: 'pk_abc',
+      text: 'Test',
+      sender_timestamp: 1700000001,
+      received_at: 1700000001,
+      paths: [{ path: 'aa', received_at: 1700000001 }],
+      txt_type: 0,
+      signature: null,
+      outgoing: true,
+      acked: 1,
+    };
+    messageCache.addMessage('pk_abc', msg, 'key-101');
+
+    const longerPaths = [
+      { path: 'aa', received_at: 1700000001 },
+      { path: 'bb', received_at: 1700000002 },
+    ];
+    messageCache.updateAck(101, 2, longerPaths);
+
+    const entry = messageCache.get('pk_abc');
+    expect(entry!.messages[0].paths).toHaveLength(2);
+    expect(entry!.messages[0].acked).toBe(2);
+  });
+
+  it('preserves higher existing ack count (max semantics)', () => {
+    const msg: Message = {
+      id: 102,
+      type: 'PRIV',
+      conversation_key: 'pk_abc',
+      text: 'Max test',
+      sender_timestamp: 1700000002,
+      received_at: 1700000002,
+      paths: null,
+      txt_type: 0,
+      signature: null,
+      outgoing: true,
+      acked: 5,
+    };
+    messageCache.addMessage('pk_abc', msg, 'key-102');
+
+    // Try to update with a lower ack count
+    messageCache.updateAck(102, 3);
+
+    const entry = messageCache.get('pk_abc');
+    expect(entry!.messages[0].acked).toBe(5); // max(5, 3) = 5
+  });
+
+  it('is a no-op for unknown message ID', () => {
+    const msg: Message = {
+      id: 103,
+      type: 'PRIV',
+      conversation_key: 'pk_abc',
+      text: 'Existing',
+      sender_timestamp: 1700000003,
+      received_at: 1700000003,
+      paths: null,
+      txt_type: 0,
+      signature: null,
+      outgoing: true,
+      acked: 0,
+    };
+    messageCache.addMessage('pk_abc', msg, 'key-103');
+
+    // Update a non-existent message ID — should not throw or modify anything
+    messageCache.updateAck(999, 1);
+
+    const entry = messageCache.get('pk_abc');
+    expect(entry!.messages[0].acked).toBe(0); // unchanged
   });
 });

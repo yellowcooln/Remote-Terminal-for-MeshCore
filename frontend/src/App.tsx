@@ -51,6 +51,7 @@ import { Toaster, toast } from './components/ui/sonner';
 import { getStateKey } from './utils/conversationState';
 import { appendRawPacketUnique } from './utils/rawPacketIdentity';
 import { messageContainsMention } from './utils/messageParser';
+import { mergeContactIntoList } from './utils/contactMerge';
 import { cn } from '@/lib/utils';
 import type { Contact, Conversation, HealthStatus, Message, MessagePath, RawPacket } from './types';
 
@@ -265,21 +266,7 @@ export function App() {
         }
       },
       onContact: (contact: Contact) => {
-        setContacts((prev) => {
-          const idx = prev.findIndex((c) => c.public_key === contact.public_key);
-          if (idx >= 0) {
-            const existing = prev[idx];
-            const merged = { ...existing, ...contact };
-            const unchanged = (Object.keys(merged) as (keyof Contact)[]).every(
-              (k) => existing[k] === merged[k]
-            );
-            if (unchanged) return prev;
-            const updated = [...prev];
-            updated[idx] = merged;
-            return updated;
-          }
-          return [...prev, contact as Contact];
-        });
+        setContacts((prev) => mergeContactIntoList(prev, contact));
       },
       onRawPacket: (packet: RawPacket) => {
         setRawPackets((prev) => appendRawPacketUnique(prev, packet, MAX_RAW_PACKETS));
