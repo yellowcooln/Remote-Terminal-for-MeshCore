@@ -36,3 +36,11 @@ export function formatTime(timestamp: number): string {
   const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   return `${dateStr} ${time}`;
 }
+
+/** Check if a message text contains a mention of the given name in @[name] format. */
+export function messageContainsMention(text: string, name: string | null): boolean {
+  if (!name) return false;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const mentionPattern = new RegExp(`@\\[${escaped}\\]`, 'i');
+  return mentionPattern.test(text);
+}

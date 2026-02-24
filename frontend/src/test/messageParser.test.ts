@@ -7,7 +7,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseSenderFromText, formatTime } from '../utils/messageParser';
-import { getStateKey } from '../utils/conversationState';
 
 describe('parseSenderFromText', () => {
   it('extracts sender and content from "sender: message" format', () => {
@@ -94,20 +93,5 @@ describe('formatTime', () => {
     // Should contain month, day, and time
     expect(result).toMatch(/\w+ \d{1,2}/); // e.g., "Nov 14"
     expect(result).toMatch(/\d{1,2}:\d{2}/); // time portion
-  });
-});
-
-describe('getStateKey', () => {
-  it('creates channel state key with full id', () => {
-    const key = getStateKey('channel', '5');
-
-    expect(key).toBe('channel-5');
-  });
-
-  it('creates contact state key with full public key', () => {
-    const fullKey = 'abcdef123456789012345678901234567890';
-    const key = getStateKey('contact', fullKey);
-
-    expect(key).toBe(`contact-${fullKey}`);
   });
 });

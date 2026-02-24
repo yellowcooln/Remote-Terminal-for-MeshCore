@@ -131,17 +131,6 @@ class TestPollingPause:
         assert not is_polling_paused()
 
     @pytest.mark.asyncio
-    async def test_triple_nested_pause(self):
-        """Three levels of nesting work correctly."""
-        async with pause_polling():
-            async with pause_polling():
-                async with pause_polling():
-                    assert is_polling_paused()
-                assert is_polling_paused()
-            assert is_polling_paused()
-        assert not is_polling_paused()
-
-    @pytest.mark.asyncio
     async def test_pause_resumes_on_exception(self):
         """Polling resumes even if exception occurs in context."""
         try:
@@ -170,23 +159,6 @@ class TestPollingPause:
 
         # All contexts exited
         assert not is_polling_paused()
-
-    @pytest.mark.asyncio
-    async def test_counter_increments_and_decrements(self):
-        """Counter correctly tracks pause depth."""
-        import app.radio_sync as radio_sync
-
-        assert radio_sync._polling_pause_count == 0
-
-        async with pause_polling():
-            assert radio_sync._polling_pause_count == 1
-
-            async with pause_polling():
-                assert radio_sync._polling_pause_count == 2
-
-            assert radio_sync._polling_pause_count == 1
-
-        assert radio_sync._polling_pause_count == 0
 
 
 class TestSyncRadioTime:

@@ -430,20 +430,27 @@ class TestRunBotForMessage:
         """Bot is triggered for outgoing messages (user can trigger their own bots)."""
         with patch("app.repository.AppSettingsRepository") as mock_repo:
             mock_settings = MagicMock()
-            mock_settings.bots = []  # No enabled bots, but settings ARE checked
+            mock_settings.bots = [
+                BotConfig(id="1", name="Echo", enabled=True, code="def bot(**k): return 'echo'")
+            ]
             mock_repo.get = AsyncMock(return_value=mock_settings)
 
-            await run_bot_for_message(
-                sender_name="Me",
-                sender_key="abc123",
-                message_text="Hello",
-                is_dm=True,
-                channel_key=None,
-                is_outgoing=True,
-            )
+            with (
+                patch("app.bot.asyncio.sleep", new_callable=AsyncMock),
+                patch("app.bot.execute_bot_code", return_value="echo") as mock_exec,
+                patch("app.bot.process_bot_response", new_callable=AsyncMock),
+            ):
+                await run_bot_for_message(
+                    sender_name="Me",
+                    sender_key="abc123" + "0" * 58,
+                    message_text="Hello",
+                    is_dm=True,
+                    channel_key=None,
+                    is_outgoing=True,
+                )
 
-            # Should check settings (outgoing no longer skipped)
-            mock_repo.get.assert_called_once()
+                # Bot should actually execute for outgoing messages
+                mock_exec.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_skips_when_no_enabled_bots(self):

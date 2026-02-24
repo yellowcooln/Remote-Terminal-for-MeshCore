@@ -50,6 +50,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from './components/ui/sh
 import { Toaster, toast } from './components/ui/sonner';
 import { getStateKey } from './utils/conversationState';
 import { appendRawPacketUnique } from './utils/rawPacketIdentity';
+import { messageContainsMention } from './utils/messageParser';
 import { cn } from '@/lib/utils';
 import type { Contact, Conversation, HealthStatus, Message, MessagePath, RawPacket } from './types';
 
@@ -110,13 +111,10 @@ export function App() {
   }, [config?.name]);
 
   // Check if a message mentions the user
-  const checkMention = useCallback((text: string): boolean => {
-    const name = myNameRef.current;
-    if (!name) return false;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const mentionPattern = new RegExp(`@\\[${escaped}\\]`, 'i');
-    return mentionPattern.test(text);
-  }, []);
+  const checkMention = useCallback(
+    (text: string): boolean => messageContainsMention(text, myNameRef.current),
+    []
+  );
 
   // useContactsAndChannels is called first — it uses the ref bridge for setActiveConversation
   const {

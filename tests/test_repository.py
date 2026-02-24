@@ -1,6 +1,5 @@
 """Tests for repository layer."""
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -122,153 +121,98 @@ class TestMessageRepositoryAddPath:
 
 
 class TestMessageRepositoryGetByContent:
-    """Test MessageRepository.get_by_content method."""
+    """Test MessageRepository.get_by_content against a real SQLite database."""
 
     @pytest.mark.asyncio
-    async def test_get_by_content_finds_matching_message(self):
+    async def test_get_by_content_finds_matching_message(self, test_db):
         """Returns message when all content fields match."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(
-            return_value={
-                "id": 42,
-                "type": "CHAN",
-                "conversation_key": "ABCD1234",
-                "text": "Hello world",
-                "sender_timestamp": 1700000000,
-                "received_at": 1700000001,
-                "paths": None,
-                "txt_type": 0,
-                "signature": None,
-                "outgoing": 0,
-                "acked": 1,
-            }
+        msg_id = await _create_message(
+            test_db,
+            msg_type="CHAN",
+            conversation_key="ABCD1234ABCD1234ABCD1234ABCD1234",
+            text="Hello world",
+            sender_timestamp=1700000000,
         )
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
 
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_by_content(
-                msg_type="CHAN",
-                conversation_key="ABCD1234",
-                text="Hello world",
-                sender_timestamp=1700000000,
-            )
+        result = await MessageRepository.get_by_content(
+            msg_type="CHAN",
+            conversation_key="ABCD1234ABCD1234ABCD1234ABCD1234",
+            text="Hello world",
+            sender_timestamp=1700000000,
+        )
 
         assert result is not None
-        assert result.id == 42
+        assert result.id == msg_id
         assert result.type == "CHAN"
-        assert result.conversation_key == "ABCD1234"
         assert result.text == "Hello world"
-        assert result.acked == 1
 
     @pytest.mark.asyncio
-    async def test_get_by_content_returns_none_when_not_found(self):
+    async def test_get_by_content_returns_none_when_not_found(self, test_db):
         """Returns None when no message matches."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(return_value=None)
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+        await _create_message(test_db, text="Existing message")
 
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_by_content(
-                msg_type="CHAN",
-                conversation_key="NONEXISTENT",
-                text="Not found",
-                sender_timestamp=1700000000,
-            )
+        result = await MessageRepository.get_by_content(
+            msg_type="CHAN",
+            conversation_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
+            text="Not found",
+            sender_timestamp=1700000000,
+        )
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_by_content_handles_null_sender_timestamp(self):
+    async def test_get_by_content_handles_null_sender_timestamp(self, test_db):
         """Handles messages with NULL sender_timestamp correctly."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(
-            return_value={
-                "id": 43,
-                "type": "PRIV",
-                "conversation_key": "abc123",
-                "text": "Test message",
-                "sender_timestamp": None,
-                "received_at": 1700000001,
-                "paths": None,
-                "txt_type": 0,
-                "signature": None,
-                "outgoing": 1,
-                "acked": 0,
-            }
+        msg_id = await _create_message(
+            test_db,
+            msg_type="PRIV",
+            conversation_key="abc123abc123abc123abc123abc12300",
+            text="Null timestamp msg",
+            sender_timestamp=None,
+            outgoing=True,
         )
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
 
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_by_content(
-                msg_type="PRIV",
-                conversation_key="abc123",
-                text="Test message",
-                sender_timestamp=None,
-            )
+        result = await MessageRepository.get_by_content(
+            msg_type="PRIV",
+            conversation_key="abc123abc123abc123abc123abc12300",
+            text="Null timestamp msg",
+            sender_timestamp=None,
+        )
 
         assert result is not None
+        assert result.id == msg_id
         assert result.sender_timestamp is None
         assert result.outgoing is True
 
     @pytest.mark.asyncio
-    async def test_get_by_content_parses_paths_correctly(self):
-        """Parses paths JSON into MessagePath objects."""
-        paths_json = json.dumps(
-            [
-                {"path": "1A2B", "received_at": 1700000000},
-                {"path": "3C4D", "received_at": 1700000001},
-            ]
+    async def test_get_by_content_distinguishes_by_timestamp(self, test_db):
+        """Different sender_timestamps are distinguished correctly."""
+        await _create_message(test_db, text="Same text", sender_timestamp=1700000000)
+        msg_id2 = await _create_message(test_db, text="Same text", sender_timestamp=1700000001)
+
+        result = await MessageRepository.get_by_content(
+            msg_type="CHAN",
+            conversation_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
+            text="Same text",
+            sender_timestamp=1700000001,
         )
 
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(
-            return_value={
-                "id": 44,
-                "type": "CHAN",
-                "conversation_key": "ABCD1234",
-                "text": "Multi-path message",
-                "sender_timestamp": 1700000000,
-                "received_at": 1700000000,
-                "paths": paths_json,
-                "txt_type": 0,
-                "signature": None,
-                "outgoing": 0,
-                "acked": 2,
-            }
+        assert result is not None
+        assert result.id == msg_id2
+
+    @pytest.mark.asyncio
+    async def test_get_by_content_with_paths(self, test_db):
+        """Returns message with paths correctly parsed."""
+        msg_id = await _create_message(test_db, text="Multi-path message")
+        await MessageRepository.add_path(msg_id, "1A2B", received_at=1700000000)
+        await MessageRepository.add_path(msg_id, "3C4D", received_at=1700000001)
+
+        result = await MessageRepository.get_by_content(
+            msg_type="CHAN",
+            conversation_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
+            text="Multi-path message",
+            sender_timestamp=1700000000,
         )
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
-
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_by_content(
-                msg_type="CHAN",
-                conversation_key="ABCD1234",
-                text="Multi-path message",
-                sender_timestamp=1700000000,
-            )
 
         assert result is not None
         assert result.paths is not None
@@ -277,99 +221,79 @@ class TestMessageRepositoryGetByContent:
         assert result.paths[1].path == "3C4D"
 
     @pytest.mark.asyncio
-    async def test_get_by_content_handles_corrupted_paths_json(self):
-        """Handles corrupted paths JSON gracefully."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(
-            return_value={
-                "id": 45,
-                "type": "CHAN",
-                "conversation_key": "ABCD1234",
-                "text": "Corrupted paths",
-                "sender_timestamp": 1700000000,
-                "received_at": 1700000000,
-                "paths": "not valid json {",
-                "txt_type": 0,
-                "signature": None,
-                "outgoing": 0,
-                "acked": 0,
-            }
+    async def test_get_by_content_recovers_from_corrupted_paths_json(self, test_db):
+        """Malformed JSON in paths column returns message with paths=None."""
+        msg_id = await _create_message(test_db, text="Corrupted paths")
+
+        # Inject malformed JSON directly into the paths column
+        await test_db.conn.execute(
+            "UPDATE messages SET paths = ? WHERE id = ?",
+            ("not valid json{{{", msg_id),
         )
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+        await test_db.conn.commit()
 
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
+        result = await MessageRepository.get_by_content(
+            msg_type="CHAN",
+            conversation_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
+            text="Corrupted paths",
+            sender_timestamp=1700000000,
+        )
 
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_by_content(
-                msg_type="CHAN",
-                conversation_key="ABCD1234",
-                text="Corrupted paths",
-                sender_timestamp=1700000000,
-            )
-
-        # Should return message with paths=None instead of raising
         assert result is not None
+        assert result.id == msg_id
+        assert result.paths is None
+
+    @pytest.mark.asyncio
+    async def test_get_by_content_recovers_from_paths_missing_keys(self, test_db):
+        """Valid JSON but missing expected keys returns message with paths=None."""
+        msg_id = await _create_message(test_db, text="Bad keys")
+
+        # Valid JSON but missing "path" / "received_at" keys
+        await test_db.conn.execute(
+            "UPDATE messages SET paths = ? WHERE id = ?",
+            ('[{"wrong_key": "value"}]', msg_id),
+        )
+        await test_db.conn.commit()
+
+        result = await MessageRepository.get_by_content(
+            msg_type="CHAN",
+            conversation_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
+            text="Bad keys",
+            sender_timestamp=1700000000,
+        )
+
+        assert result is not None
+        assert result.id == msg_id
         assert result.paths is None
 
 
 class TestMessageRepositoryGetAckCount:
-    """Test MessageRepository.get_ack_count method."""
+    """Test MessageRepository.get_ack_count against a real SQLite database."""
 
     @pytest.mark.asyncio
-    async def test_get_ack_count_returns_count(self):
+    async def test_get_ack_count_returns_count(self, test_db):
         """Returns ack count for existing message."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(return_value={"acked": 3})
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+        msg_id = await _create_message(test_db)
+        # Simulate acking by directly updating
+        await test_db.conn.execute("UPDATE messages SET acked = ? WHERE id = ?", (3, msg_id))
 
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_ack_count(message_id=42)
+        result = await MessageRepository.get_ack_count(message_id=msg_id)
 
         assert result == 3
 
     @pytest.mark.asyncio
-    async def test_get_ack_count_returns_zero_for_nonexistent(self):
+    async def test_get_ack_count_returns_zero_for_nonexistent(self, test_db):
         """Returns 0 for nonexistent message."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(return_value=None)
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
-
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_ack_count(message_id=999)
+        result = await MessageRepository.get_ack_count(message_id=999999)
 
         assert result == 0
 
     @pytest.mark.asyncio
-    async def test_get_ack_count_returns_zero_for_unacked(self):
+    async def test_get_ack_count_returns_zero_for_unacked(self, test_db):
         """Returns 0 for message with no acks."""
-        mock_conn = AsyncMock()
-        mock_cursor = AsyncMock()
-        mock_cursor.fetchone = AsyncMock(return_value={"acked": 0})
-        mock_conn.execute = AsyncMock(return_value=mock_cursor)
+        msg_id = await _create_message(test_db)
 
-        mock_db = MagicMock()
-        mock_db.conn = mock_conn
-
-        with patch("app.repository.db", mock_db):
-            from app.repository import MessageRepository
-
-            result = await MessageRepository.get_ack_count(message_id=42)
+        result = await MessageRepository.get_ack_count(message_id=msg_id)
 
         assert result == 0
 

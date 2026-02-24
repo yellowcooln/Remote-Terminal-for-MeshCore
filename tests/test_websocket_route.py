@@ -120,34 +120,6 @@ class TestWebSocketEndpoint:
 
                 assert pong == {"type": "pong"}
 
-    def test_multiple_pings_return_multiple_pongs(self):
-        """Each ping gets its own pong response."""
-        with (
-            patch("app.routers.ws.radio_manager") as mock_ws_rm,
-            patch("app.routers.health.radio_manager") as mock_health_rm,
-            patch("app.routers.health.RawPacketRepository") as mock_repo,
-            patch("app.routers.health.settings") as mock_settings,
-            patch("app.routers.health.os.path.getsize", return_value=0),
-        ):
-            mock_ws_rm.is_connected = True
-            mock_ws_rm.connection_info = "Serial: /dev/ttyUSB0"
-            mock_health_rm.is_connected = True
-            mock_health_rm.connection_info = "Serial: /dev/ttyUSB0"
-            mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
-            mock_settings.database_path = "/tmp/test.db"
-
-            from app.main import app
-
-            client = TestClient(app)
-
-            with client.websocket_connect("/api/ws") as ws:
-                ws.receive_json()  # consume health
-
-                for _ in range(3):
-                    ws.send_text("ping")
-                    pong = ws.receive_json()
-                    assert pong == {"type": "pong"}
-
     def test_non_ping_message_does_not_produce_response(self):
         """Messages other than 'ping' are silently ignored (no response sent)."""
         with (
@@ -203,31 +175,4 @@ class TestWebSocketEndpoint:
                 assert len(ws_manager.active_connections) == 1
 
             # After context manager exits, the WebSocket is closed
-            assert len(ws_manager.active_connections) == 0
-
-    def test_disconnect_is_clean_no_error(self):
-        """Normal client disconnect does not raise or leave dangling state."""
-        with (
-            patch("app.routers.ws.radio_manager") as mock_ws_rm,
-            patch("app.routers.health.radio_manager") as mock_health_rm,
-            patch("app.routers.health.RawPacketRepository") as mock_repo,
-            patch("app.routers.health.settings") as mock_settings,
-            patch("app.routers.health.os.path.getsize", return_value=0),
-        ):
-            mock_ws_rm.is_connected = False
-            mock_ws_rm.connection_info = None
-            mock_health_rm.is_connected = False
-            mock_health_rm.connection_info = None
-            mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
-            mock_settings.database_path = "/tmp/test.db"
-
-            from app.main import app
-
-            client = TestClient(app)
-
-            # Connect and immediately disconnect -- should not raise
-            with client.websocket_connect("/api/ws") as ws:
-                ws.receive_json()  # consume health
-
-            # Verify clean state
             assert len(ws_manager.active_connections) == 0

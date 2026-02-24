@@ -33,7 +33,10 @@ class TestChannelKeyDerivation:
         channel_name = "#test"
         expected_key = hashlib.sha256(channel_name.encode("utf-8")).digest()[:16]
 
-        # This matches the meshcore_py implementation
+        # Verify the derived key produces the expected channel hash
+        result_hash = calculate_channel_hash(expected_key)
+        expected_hash = format(hashlib.sha256(expected_key).digest()[0], "02x")
+        assert result_hash == expected_hash
         assert len(expected_key) == 16
 
     def test_channel_hash_calculation(self):
@@ -342,7 +345,7 @@ class TestAdvertisementParsing:
 
     def test_parse_advertisement_extracts_public_key(self):
         """Advertisement parsing extracts the public key correctly."""
-        from app.decoder import PayloadType, parse_packet
+        from app.decoder import parse_advertisement, parse_packet
 
         packet_hex = (
             "1100AE92564C5C9884854F04F469BBB2BAB8871A078053AF6CF4AA2C014B18CE8A83"
@@ -352,21 +355,27 @@ class TestAdvertisementParsing:
         )
         packet = bytes.fromhex(packet_hex)
 
-        # Verify packet is recognized as ADVERT type
         info = parse_packet(packet)
         assert info is not None
-        assert info.payload_type == PayloadType.ADVERT
+
+        result = parse_advertisement(info.payload)
+        assert result is not None
+        assert (
+            result.public_key == "ae92564c5c9884854f04f469bbb2bab8871a078053af6cf4aa2c014b18ce8a83"
+        )
 
     def test_non_advertisement_returns_none(self):
-        """Non-advertisement packets return None when parsed as advertisement."""
-        from app.decoder import PayloadType, parse_packet
+        """Non-advertisement payload returns None when parsed as advertisement."""
+        from app.decoder import parse_advertisement, parse_packet
 
         # GROUP_TEXT packet, not an advertisement
         packet = bytes([0x15, 0x00]) + bytes(50)
 
         info = parse_packet(packet)
         assert info is not None
-        assert info.payload_type != PayloadType.ADVERT
+
+        result = parse_advertisement(info.payload)
+        assert result is None
 
 
 class TestScalarClamping:
@@ -484,18 +493,13 @@ class TestSharedSecretDerivation:
 
     def test_derive_shared_secret_different_keys_different_result(self):
         """Different key pairs produce different shared secrets."""
-        other_pub = bytes.fromhex(
-            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-        )
+        # Use the real FACE12 public key as a second peer key (valid curve point)
+        face12_pub = derive_public_key(self.FACE12_PRIV)
 
         result1 = derive_shared_secret(self.FACE12_PRIV, self.A1B2C3_PUB)
-        # This may raise an exception for invalid public key, which is also acceptable
-        try:
-            result2 = derive_shared_secret(self.FACE12_PRIV, other_pub)
-            assert result1 != result2
-        except Exception:
-            # Invalid public keys may fail, which is fine
-            pass
+        result2 = derive_shared_secret(self.FACE12_PRIV, face12_pub)
+
+        assert result1 != result2
 
 
 class TestDirectMessageDecryption:
