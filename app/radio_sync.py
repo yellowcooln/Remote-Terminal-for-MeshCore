@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from meshcore import EventType
 
+from app.event_handlers import cleanup_expired_acks
 from app.models import Contact
 from app.radio import RadioOperationBusyError, radio_manager
 from app.repository import (
@@ -31,8 +32,8 @@ logger = logging.getLogger(__name__)
 # Message poll task handle
 _message_poll_task: asyncio.Task | None = None
 
-# Message poll interval in seconds
-MESSAGE_POLL_INTERVAL = 5
+# Message poll interval in seconds (10s gives DM ACKs plenty of time to arrive)
+MESSAGE_POLL_INTERVAL = 10
 
 # Periodic advertisement task handle
 _advert_task: asyncio.Task | None = None
@@ -322,6 +323,10 @@ async def _message_poll_loop():
     while True:
         try:
             await asyncio.sleep(MESSAGE_POLL_INTERVAL)
+
+            # Clean up expired pending ACKs every poll cycle so they don't
+            # accumulate when no ACKs arrive (e.g. all recipients out of range).
+            cleanup_expired_acks()
 
             if radio_manager.is_connected and not is_polling_paused():
                 mc = radio_manager.meshcore
