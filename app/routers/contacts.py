@@ -155,7 +155,11 @@ async def prepare_repeater_connection(mc, contact: Contact, password: str) -> No
     """
     # Add contact to radio with path from DB
     logger.info("Adding repeater %s to radio", contact.public_key[:12])
-    await mc.commands.add_contact(contact.to_radio_dict())
+    add_result = await mc.commands.add_contact(contact.to_radio_dict())
+    if add_result is not None and add_result.type == EventType.ERROR:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to add repeater contact: {add_result.payload}"
+        )
 
     # Send login with password
     logger.info("Sending login to repeater %s", contact.public_key[:12])
@@ -569,7 +573,11 @@ async def send_repeater_command(public_key: str, request: CommandRequest) -> Com
     ) as mc:
         # Add contact to radio with path from DB
         logger.info("Adding repeater %s to radio", contact.public_key[:12])
-        await mc.commands.add_contact(contact.to_radio_dict())
+        add_result = await mc.commands.add_contact(contact.to_radio_dict())
+        if add_result is not None and add_result.type == EventType.ERROR:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to add repeater contact: {add_result.payload}"
+            )
 
         # Send the command
         logger.info("Sending command to repeater %s: %s", contact.public_key[:12], request.command)
@@ -630,7 +638,11 @@ async def request_trace(public_key: str) -> TraceResponse:
     # from the reader loop, not via get_msg().
     async with radio_manager.radio_operation("request_trace", pause_polling=True) as mc:
         # Ensure contact is on radio so the trace can reach them
-        await mc.commands.add_contact(contact.to_radio_dict())
+        add_result = await mc.commands.add_contact(contact.to_radio_dict())
+        if add_result is not None and add_result.type == EventType.ERROR:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to add contact for trace: {add_result.payload}"
+            )
 
         logger.info(
             "Sending trace to %s (tag=%d, hash=%s)", contact.public_key[:12], tag, contact_hash
