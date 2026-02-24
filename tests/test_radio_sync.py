@@ -4,6 +4,7 @@ These tests verify the polling pause mechanism, radio time sync,
 contact/channel sync operations, and default channel management.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,8 +12,11 @@ from meshcore import EventType
 
 from app.database import Database
 from app.models import Favorite
-from app.radio import radio_manager
+from app.radio import RadioManager, radio_manager
 from app.radio_sync import (
+    _message_poll_loop,
+    _periodic_advert_loop,
+    _periodic_sync_loop,
     is_polling_paused,
     pause_polling,
     sync_radio_time,
@@ -849,3 +853,248 @@ class TestEnsureDefaultChannels:
 
         channel = await ChannelRepository.get_by_key(self.PUBLIC_KEY)
         assert channel.on_radio is True
+
+
+# ---------------------------------------------------------------------------
+# Background loop race-condition regression tests
+#
+# Each loop uses radio_operation(blocking=False) which can raise
+# RadioDisconnectedError (disconnect between pre-check and lock) or
+# RadioOperationBusyError (lock already held).  These tests verify the
+# loops handle both gracefully and that the lock-scoped mc is what gets
+# forwarded to helper functions (the R1 fix).
+# ---------------------------------------------------------------------------
+
+
+def _make_connected_manager() -> tuple[RadioManager, MagicMock]:
+    """Create a RadioManager with a mock MeshCore that reports is_connected=True."""
+    rm = RadioManager()
+    mock_mc = MagicMock(name="lock_scoped_mc")
+    mock_mc.is_connected = True
+    rm._meshcore = mock_mc
+    return rm, mock_mc
+
+
+def _disconnect_on_acquire(rm: RadioManager):
+    """Monkey-patch rm so _meshcore is set to None right after the lock is acquired.
+
+    This simulates the exact race: is_connected pre-check passes, but by the
+    time radio_operation() checks _meshcore post-lock, a reconnect has set it
+    to None → RadioDisconnectedError.
+    """
+    original = rm._acquire_operation_lock
+
+    async def _acquire_then_disconnect(name, *, blocking):
+        await original(name, blocking=blocking)
+        rm._meshcore = None
+
+    rm._acquire_operation_lock = _acquire_then_disconnect
+
+
+async def _pre_hold_lock(rm: RadioManager) -> asyncio.Lock:
+    """Pre-acquire the operation lock so non-blocking callers get RadioOperationBusyError."""
+    if rm._operation_lock is None:
+        rm._operation_lock = asyncio.Lock()
+    await rm._operation_lock.acquire()
+    return rm._operation_lock
+
+
+def _sleep_controller(*, cancel_after: int = 2):
+    """Return a (mock_sleep, calls) pair.
+
+    mock_sleep returns normally for the first *cancel_after - 1* calls, then
+    raises ``CancelledError`` to cleanly stop the infinite loop.
+    """
+    calls: list[float] = []
+
+    async def _sleep(duration):
+        calls.append(duration)
+        if len(calls) >= cancel_after:
+            raise asyncio.CancelledError()
+
+    return _sleep, calls
+
+
+class TestMessagePollLoopRaces:
+    """Regression tests for disconnect/reconnect race paths in _message_poll_loop."""
+
+    @pytest.mark.asyncio
+    async def test_disconnect_race_between_precheck_and_lock(self):
+        """RadioDisconnectedError between is_connected and radio_operation()
+        is caught by the outer except — loop survives and continues."""
+        rm, _mc = _make_connected_manager()
+        _disconnect_on_acquire(rm)
+        mock_sleep, sleep_calls = _sleep_controller(cancel_after=2)
+
+        with (
+            patch("app.radio_sync.radio_manager", rm),
+            patch("asyncio.sleep", side_effect=mock_sleep),
+            patch("app.radio_sync.cleanup_expired_acks"),
+            patch("app.radio_sync.poll_for_messages", new_callable=AsyncMock) as mock_poll,
+        ):
+            await _message_poll_loop()
+
+        mock_poll.assert_not_called()
+        # Loop ran two iterations: first handled the error, second was cancelled
+        assert len(sleep_calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_busy_lock_skips_iteration(self):
+        """RadioOperationBusyError is caught and poll_for_messages is not called."""
+        rm, _mc = _make_connected_manager()
+        lock = await _pre_hold_lock(rm)
+        mock_sleep, _ = _sleep_controller(cancel_after=2)
+
+        try:
+            with (
+                patch("app.radio_sync.radio_manager", rm),
+                patch("asyncio.sleep", side_effect=mock_sleep),
+                patch("app.radio_sync.cleanup_expired_acks"),
+                patch("app.radio_sync.poll_for_messages", new_callable=AsyncMock) as mock_poll,
+            ):
+                await _message_poll_loop()
+        finally:
+            lock.release()
+
+        mock_poll.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_passes_lock_scoped_mc_not_stale_global(self):
+        """The mc yielded by radio_operation() is forwarded to
+        poll_for_messages — not a stale radio_manager.meshcore read."""
+        rm, mock_mc = _make_connected_manager()
+        mock_sleep, _ = _sleep_controller(cancel_after=2)
+
+        with (
+            patch("app.radio_sync.radio_manager", rm),
+            patch("asyncio.sleep", side_effect=mock_sleep),
+            patch("app.radio_sync.cleanup_expired_acks"),
+            patch("app.radio_sync.poll_for_messages", new_callable=AsyncMock) as mock_poll,
+        ):
+            await _message_poll_loop()
+
+        mock_poll.assert_called_once_with(mock_mc)
+
+
+class TestPeriodicAdvertLoopRaces:
+    """Regression tests for disconnect/reconnect race paths in _periodic_advert_loop."""
+
+    @pytest.mark.asyncio
+    async def test_disconnect_race_between_precheck_and_lock(self):
+        """RadioDisconnectedError between is_connected and radio_operation()
+        is caught by the outer except — loop survives and continues."""
+        rm, _mc = _make_connected_manager()
+        _disconnect_on_acquire(rm)
+        # Advert loop: work first, then sleep.  On error the except-handler
+        # sleeps too, so we need 2 sleeps before cancel.
+        mock_sleep, sleep_calls = _sleep_controller(cancel_after=2)
+
+        with (
+            patch("app.radio_sync.radio_manager", rm),
+            patch("asyncio.sleep", side_effect=mock_sleep),
+            patch("app.radio_sync.send_advertisement", new_callable=AsyncMock) as mock_advert,
+        ):
+            await _periodic_advert_loop()
+
+        mock_advert.assert_not_called()
+        assert len(sleep_calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_busy_lock_skips_iteration(self):
+        """RadioOperationBusyError is caught and send_advertisement is not called."""
+        rm, _mc = _make_connected_manager()
+        lock = await _pre_hold_lock(rm)
+        # Busy path falls through to normal sleep (only 1 needed)
+        mock_sleep, _ = _sleep_controller(cancel_after=1)
+
+        try:
+            with (
+                patch("app.radio_sync.radio_manager", rm),
+                patch("asyncio.sleep", side_effect=mock_sleep),
+                patch("app.radio_sync.send_advertisement", new_callable=AsyncMock) as mock_advert,
+            ):
+                await _periodic_advert_loop()
+        finally:
+            lock.release()
+
+        mock_advert.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_passes_lock_scoped_mc_not_stale_global(self):
+        """The mc yielded by radio_operation() is forwarded to
+        send_advertisement — not a stale radio_manager.meshcore read."""
+        rm, mock_mc = _make_connected_manager()
+        mock_sleep, _ = _sleep_controller(cancel_after=1)
+
+        with (
+            patch("app.radio_sync.radio_manager", rm),
+            patch("asyncio.sleep", side_effect=mock_sleep),
+            patch("app.radio_sync.send_advertisement", new_callable=AsyncMock) as mock_advert,
+        ):
+            await _periodic_advert_loop()
+
+        mock_advert.assert_called_once_with(mock_mc)
+
+
+class TestPeriodicSyncLoopRaces:
+    """Regression tests for disconnect/reconnect race paths in _periodic_sync_loop."""
+
+    @pytest.mark.asyncio
+    async def test_disconnect_race_between_precheck_and_lock(self):
+        """RadioDisconnectedError between is_connected and radio_operation()
+        is caught by the outer except — loop survives and continues."""
+        rm, _mc = _make_connected_manager()
+        _disconnect_on_acquire(rm)
+        mock_sleep, sleep_calls = _sleep_controller(cancel_after=2)
+
+        with (
+            patch("app.radio_sync.radio_manager", rm),
+            patch("asyncio.sleep", side_effect=mock_sleep),
+            patch("app.radio_sync.sync_and_offload_all", new_callable=AsyncMock) as mock_sync,
+            patch("app.radio_sync.sync_radio_time", new_callable=AsyncMock) as mock_time,
+        ):
+            await _periodic_sync_loop()
+
+        mock_sync.assert_not_called()
+        mock_time.assert_not_called()
+        assert len(sleep_calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_busy_lock_skips_iteration(self):
+        """RadioOperationBusyError is caught and sync functions are not called."""
+        rm, _mc = _make_connected_manager()
+        lock = await _pre_hold_lock(rm)
+        mock_sleep, _ = _sleep_controller(cancel_after=2)
+
+        try:
+            with (
+                patch("app.radio_sync.radio_manager", rm),
+                patch("asyncio.sleep", side_effect=mock_sleep),
+                patch("app.radio_sync.sync_and_offload_all", new_callable=AsyncMock) as mock_sync,
+                patch("app.radio_sync.sync_radio_time", new_callable=AsyncMock) as mock_time,
+            ):
+                await _periodic_sync_loop()
+        finally:
+            lock.release()
+
+        mock_sync.assert_not_called()
+        mock_time.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_passes_lock_scoped_mc_not_stale_global(self):
+        """The mc yielded by radio_operation() is forwarded to
+        sync_and_offload_all and sync_radio_time — not a stale
+        radio_manager.meshcore read."""
+        rm, mock_mc = _make_connected_manager()
+        mock_sleep, _ = _sleep_controller(cancel_after=2)
+
+        with (
+            patch("app.radio_sync.radio_manager", rm),
+            patch("asyncio.sleep", side_effect=mock_sleep),
+            patch("app.radio_sync.sync_and_offload_all", new_callable=AsyncMock) as mock_sync,
+            patch("app.radio_sync.sync_radio_time", new_callable=AsyncMock) as mock_time,
+        ):
+            await _periodic_sync_loop()
+
+        mock_sync.assert_called_once_with(mock_mc)
+        mock_time.assert_called_once_with(mock_mc)
