@@ -110,6 +110,10 @@ frontend/src/
 - `useRepeaterMode`: repeater login/command workflow
 - `useAirtimeTracking`: repeater airtime stats polling
 
+### Local message IDs
+
+`useRepeaterMode` and `useAirtimeTracking` each have a `createLocalMessage` that generates ephemeral (non-persisted) message IDs via `-Date.now()`. Both hooks write to the same `setMessages`, so a same-millisecond call would produce duplicate IDs. In practice this requires a repeater command response and an airtime poll to land in the exact same ms — staggeringly unlikely and cosmetic-only (React duplicate key warning). Not worth fixing.
+
 ### Initial load + realtime
 
 - Initial data: REST fetches (`api.ts`) for config/settings/channels/contacts/unreads.
