@@ -61,10 +61,22 @@ async def lifespan(app: FastAPI):
     await db.disconnect()
 
 
+def _get_version() -> str:
+    """Read version from pyproject.toml so it stays in sync automatically."""
+    try:
+        pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        for line in pyproject.read_text().splitlines():
+            if line.startswith("version = "):
+                return line.split('"')[1]
+    except Exception:
+        pass
+    return "0.0.0"
+
+
 app = FastAPI(
     title="RemoteTerm for MeshCore API",
     description="API for interacting with MeshCore mesh radio networks",
-    version="1.9.2",
+    version=_get_version(),
     lifespan=lifespan,
 )
 
