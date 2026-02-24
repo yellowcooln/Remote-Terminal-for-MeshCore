@@ -152,6 +152,10 @@ export function useAirtimeTracking(
       }
     }
 
+    // If tracking was stopped while the request was in-flight (e.g. conversation
+    // switch called stopTracking), discard the stale response.
+    if (!baselineRef.current) return;
+
     if (telemetry) {
       const statsMessage = createLocalMessage(
         baseline.conversationId,
