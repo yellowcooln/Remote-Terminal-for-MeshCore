@@ -224,6 +224,49 @@ class TestChannelEchoDetection:
         assert "aa" in path_values
         assert "bbcc" in path_values
 
+    @pytest.mark.asyncio
+    async def test_incoming_duplicate_no_path_skips_broadcast(self, test_db, captured_broadcasts):
+        """Non-outgoing duplicate with no new path does NOT broadcast message_acked."""
+        from app.packet_processor import create_message_from_decrypted
+
+        pkt1, _ = await RawPacketRepository.create(b"inc_np_1", SENDER_TIMESTAMP)
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            msg_id = await create_message_from_decrypted(
+                packet_id=pkt1,
+                channel_key=CHANNEL_KEY,
+                sender="OtherUser",
+                message_text="No path msg",
+                timestamp=SENDER_TIMESTAMP,
+                received_at=SENDER_TIMESTAMP,
+                path=None,
+            )
+
+        assert msg_id is not None
+        broadcasts.clear()
+
+        # Duplicate arrives, also with no path
+        pkt2, _ = await RawPacketRepository.create(b"inc_np_2", SENDER_TIMESTAMP + 1)
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            result = await create_message_from_decrypted(
+                packet_id=pkt2,
+                channel_key=CHANNEL_KEY,
+                sender="OtherUser",
+                message_text="No path msg",
+                timestamp=SENDER_TIMESTAMP,
+                received_at=SENDER_TIMESTAMP + 1,
+                path=None,
+            )
+
+        assert result is None
+
+        # No message_acked broadcast — nothing changed
+        ack_broadcasts = [b for b in broadcasts if b["type"] == "message_acked"]
+        assert len(ack_broadcasts) == 0
+
 
 class TestDMEchoDetection:
     """Test echo detection for direct messages."""
@@ -329,6 +372,58 @@ class TestDMEchoDetection:
         paths = ack_broadcasts[0]["data"]["paths"]
         path_values = [p["path"] for p in paths]
         assert "bbcc" in path_values
+
+    @pytest.mark.asyncio
+    async def test_incoming_dm_duplicate_no_path_skips_broadcast(
+        self, test_db, captured_broadcasts
+    ):
+        """Non-outgoing DM duplicate with no new path does NOT broadcast message_acked."""
+        from app.packet_processor import create_dm_message_from_decrypted
+
+        pkt1, _ = await RawPacketRepository.create(b"dm_np_1", SENDER_TIMESTAMP)
+        decrypted = DecryptedDirectMessage(
+            timestamp=SENDER_TIMESTAMP,
+            flags=0,
+            message="No path DM",
+            dest_hash="fa",
+            src_hash="a1",
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            msg_id = await create_dm_message_from_decrypted(
+                packet_id=pkt1,
+                decrypted=decrypted,
+                their_public_key=CONTACT_PUB,
+                our_public_key=OUR_PUB,
+                received_at=SENDER_TIMESTAMP,
+                path=None,
+                outgoing=False,
+            )
+
+        assert msg_id is not None
+        broadcasts.clear()
+
+        # Duplicate arrives, also with no path
+        pkt2, _ = await RawPacketRepository.create(b"dm_np_2", SENDER_TIMESTAMP + 1)
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            result = await create_dm_message_from_decrypted(
+                packet_id=pkt2,
+                decrypted=decrypted,
+                their_public_key=CONTACT_PUB,
+                our_public_key=OUR_PUB,
+                received_at=SENDER_TIMESTAMP + 1,
+                path=None,
+                outgoing=False,
+            )
+
+        assert result is None
+
+        # No message_acked broadcast — nothing changed
+        ack_broadcasts = [b for b in broadcasts if b["type"] == "message_acked"]
+        assert len(ack_broadcasts) == 0
 
 
 class TestDualPathDedup:

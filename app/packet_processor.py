@@ -91,17 +91,22 @@ async def _handle_duplicate_message(
     if existing_msg.outgoing:
         ack_count = await MessageRepository.increment_ack_count(existing_msg.id)
     else:
-        ack_count = await MessageRepository.get_ack_count(existing_msg.id)
+        ack_count = existing_msg.acked
 
-    # Broadcast updated paths
-    broadcast_event(
-        "message_acked",
-        {
-            "message_id": existing_msg.id,
-            "ack_count": ack_count,
-            "paths": [p.model_dump() for p in paths] if paths else [],
-        },
-    )
+    # Only broadcast when something actually changed:
+    # - outgoing: ack count was incremented
+    # - path provided: a new path entry was appended
+    # The path=None case happens for direct-delivery DMs (0-hop, no routing bytes).
+    # A non-outgoing duplicate with no new path changes nothing in the DB, so skip.
+    if existing_msg.outgoing or path is not None:
+        broadcast_event(
+            "message_acked",
+            {
+                "message_id": existing_msg.id,
+                "ack_count": ack_count,
+                "paths": [p.model_dump() for p in paths] if paths else [],
+            },
+        )
 
     # Mark this packet as decrypted
     await RawPacketRepository.mark_decrypted(packet_id, existing_msg.id)
