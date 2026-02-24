@@ -12,8 +12,8 @@ import pytest
 from app.database import Database
 from app.event_handlers import (
     _active_subscriptions,
-    _cleanup_expired_acks,
     _pending_acks,
+    cleanup_expired_acks,
     register_event_handlers,
     track_pending_ack,
 )
@@ -81,7 +81,7 @@ class TestAckTracking:
         _pending_acks["expired"] = (1, time.time() - 100, 1000)  # Created 100s ago, 1s timeout
         _pending_acks["valid"] = (2, time.time(), 60000)  # Created now, 60s timeout
 
-        _cleanup_expired_acks()
+        cleanup_expired_acks()
 
         assert "expired" not in _pending_acks
         assert "valid" in _pending_acks
@@ -92,7 +92,7 @@ class TestAckTracking:
         # 2x buffer = 20 seconds, so should NOT be expired yet
         _pending_acks["recent"] = (1, time.time() - 5, 10000)
 
-        _cleanup_expired_acks()
+        cleanup_expired_acks()
 
         assert "recent" in _pending_acks
 

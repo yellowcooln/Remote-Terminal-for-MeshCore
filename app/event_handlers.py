@@ -35,7 +35,7 @@ def track_pending_ack(expected_ack: str, message_id: int, timeout_ms: int) -> No
     )
 
 
-def _cleanup_expired_acks() -> None:
+def cleanup_expired_acks() -> None:
     """Remove expired pending ACKs."""
     now = time.time()
     expired = []
@@ -268,7 +268,7 @@ async def on_ack(event: "Event") -> None:
 
     logger.debug("Received ACK with code %s", ack_code)
 
-    _cleanup_expired_acks()
+    cleanup_expired_acks()
 
     if ack_code in _pending_acks:
         message_id, _, _ = _pending_acks.pop(ack_code)
