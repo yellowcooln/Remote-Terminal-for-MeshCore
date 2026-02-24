@@ -221,6 +221,58 @@ class TestConnectionMonitor:
         assert healthy_calls == []
         assert rm._last_connected is False
 
+    @pytest.mark.asyncio
+    async def test_monitor_retries_setup_when_connected_but_incomplete(self):
+        """Monitor retries setup when transport is connected but setup previously failed."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        rm._connection_info = "TCP: test:4000"
+
+        # Simulate: transport connected, _last_connected=True (set by _connect_*),
+        # but setup failed so _setup_complete=False.
+        mock_mc = MagicMock()
+        mock_mc.is_connected = True
+        rm._meshcore = mock_mc
+        rm._last_connected = True
+        rm._setup_complete = False
+
+        setup_calls = 0
+
+        async def _mock_setup():
+            nonlocal setup_calls
+            setup_calls += 1
+            if setup_calls == 1:
+                raise RuntimeError("setup failed")
+            # Second call succeeds
+            rm._setup_complete = True
+
+        rm.post_connect_setup = AsyncMock(side_effect=_mock_setup)
+
+        sleep_count = 0
+
+        async def _sleep(_seconds: float):
+            nonlocal sleep_count
+            sleep_count += 1
+            if sleep_count >= 4:
+                raise asyncio.CancelledError()
+
+        with (
+            patch("app.radio.asyncio.sleep", side_effect=_sleep),
+            patch("app.websocket.broadcast_health") as mock_broadcast,
+        ):
+            await rm.start_connection_monitor()
+            try:
+                await rm._reconnect_task
+            finally:
+                await rm.stop_connection_monitor()
+
+        # Setup should have been retried and eventually succeeded
+        assert setup_calls >= 2
+        # Should broadcast healthy after setup succeeds
+        mock_broadcast.assert_any_call(True, "TCP: test:4000")
+        assert rm._setup_complete is True
+
 
 class TestReconnectLock:
     """Tests for reconnect() lock serialization — no duplicate reconnections."""

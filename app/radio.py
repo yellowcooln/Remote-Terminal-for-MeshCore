@@ -133,6 +133,7 @@ class RadioManager:
         self._operation_lock: asyncio.Lock | None = None
         self._setup_lock: asyncio.Lock | None = None
         self._setup_in_progress: bool = False
+        self._setup_complete: bool = False
 
     async def _acquire_operation_lock(
         self,
@@ -247,6 +248,7 @@ class RadioManager:
             if not self._meshcore:
                 return
             self._setup_in_progress = True
+            self._setup_complete = False
             mc = self._meshcore
             try:
                 register_event_handlers(mc)
@@ -284,6 +286,8 @@ class RadioManager:
 
                 # Start periodic message polling as fallback (idempotent)
                 start_message_polling()
+
+                self._setup_complete = True
             finally:
                 self._setup_in_progress = False
 
@@ -308,6 +312,10 @@ class RadioManager:
     @property
     def is_setup_in_progress(self) -> bool:
         return self._setup_in_progress
+
+    @property
+    def is_setup_complete(self) -> bool:
+        return self._setup_complete
 
     async def connect(self) -> None:
         """Connect to the radio using the configured transport."""
@@ -346,6 +354,7 @@ class RadioManager:
         )
         self._connection_info = f"Serial: {port}"
         self._last_connected = True
+        self._setup_complete = False
         logger.debug("Serial connection established")
 
     async def _connect_tcp(self) -> None:
@@ -362,6 +371,7 @@ class RadioManager:
         )
         self._connection_info = f"TCP: {host}:{port}"
         self._last_connected = True
+        self._setup_complete = False
         logger.debug("TCP connection established")
 
     async def _connect_ble(self) -> None:
@@ -378,6 +388,7 @@ class RadioManager:
         )
         self._connection_info = f"BLE: {address}"
         self._last_connected = True
+        self._setup_complete = False
         logger.debug("BLE connection established")
 
     async def disconnect(self) -> None:
@@ -386,6 +397,7 @@ class RadioManager:
             logger.debug("Disconnecting from radio")
             await self._meshcore.disconnect()
             self._meshcore = None
+            self._setup_complete = False
             logger.debug("Radio disconnected")
 
     async def reconnect(self, *, broadcast_on_success: bool = True) -> bool:
@@ -474,6 +486,12 @@ class RadioManager:
                         await self.post_connect_setup()
                         broadcast_health(True, self._connection_info)
                         self._last_connected = True
+
+                    elif current_connected and not self._setup_complete:
+                        # Transport connected but setup incomplete — retry
+                        logger.info("Retrying post-connect setup...")
+                        await self.post_connect_setup()
+                        broadcast_health(True, self._connection_info)
 
                 except asyncio.CancelledError:
                     # Task is being cancelled, exit cleanly

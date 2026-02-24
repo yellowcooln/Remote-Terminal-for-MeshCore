@@ -206,7 +206,14 @@ async def reboot_radio() -> dict:
     success = await radio_manager.reconnect()
 
     if success:
-        await radio_manager.post_connect_setup()
+        try:
+            await radio_manager.post_connect_setup()
+        except Exception as e:
+            logger.exception("Post-connect setup failed after reconnect")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Radio connected but setup failed: {e}",
+            ) from e
 
         return {"status": "ok", "message": "Reconnected successfully", "connected": True}
     else:
@@ -224,7 +231,20 @@ async def reconnect_radio() -> dict:
     or power-cycled.
     """
     if radio_manager.is_connected:
-        return {"status": "ok", "message": "Already connected", "connected": True}
+        if radio_manager.is_setup_complete:
+            return {"status": "ok", "message": "Already connected", "connected": True}
+
+        # Connected but setup incomplete — retry setup
+        logger.info("Radio connected but setup incomplete, retrying setup")
+        try:
+            await radio_manager.post_connect_setup()
+            return {"status": "ok", "message": "Setup completed", "connected": True}
+        except Exception as e:
+            logger.exception("Post-connect setup failed")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Radio connected but setup failed: {e}",
+            ) from e
 
     if radio_manager.is_reconnecting:
         return {
@@ -237,7 +257,14 @@ async def reconnect_radio() -> dict:
     success = await radio_manager.reconnect()
 
     if success:
-        await radio_manager.post_connect_setup()
+        try:
+            await radio_manager.post_connect_setup()
+        except Exception as e:
+            logger.exception("Post-connect setup failed after reconnect")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Radio connected but setup failed: {e}",
+            ) from e
 
         return {"status": "ok", "message": "Reconnected successfully", "connected": True}
     else:
