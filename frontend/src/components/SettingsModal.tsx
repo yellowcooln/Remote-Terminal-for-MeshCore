@@ -151,8 +151,8 @@ export function SettingsModal(props: SettingsModalProps) {
     getReopenLastConversationEnabled
   );
 
-  // Advertisement interval state
-  const [advertInterval, setAdvertInterval] = useState('0');
+  // Advertisement interval state (displayed in hours, stored as seconds in DB)
+  const [advertIntervalHours, setAdvertIntervalHours] = useState('0');
 
   // Bot state
   const DEFAULT_BOT_CODE = `def bot(
@@ -218,7 +218,7 @@ export function SettingsModal(props: SettingsModalProps) {
     if (appSettings) {
       setMaxRadioContacts(String(appSettings.max_radio_contacts));
       setAutoDecryptOnAdvert(appSettings.auto_decrypt_dm_on_advert);
-      setAdvertInterval(String(appSettings.advert_interval));
+      setAdvertIntervalHours(String(Math.round(appSettings.advert_interval / 3600)));
       setBots(appSettings.bots || []);
     }
   }, [appSettings]);
@@ -394,9 +394,10 @@ export function SettingsModal(props: SettingsModalProps) {
       const update: RadioConfigUpdate = { name };
       await onSave(update);
 
-      // Save advert interval to app settings
-      const newAdvertInterval = parseInt(advertInterval, 10);
-      if (!isNaN(newAdvertInterval) && newAdvertInterval !== appSettings?.advert_interval) {
+      // Save advert interval to app settings (convert hours to seconds)
+      const hours = parseInt(advertIntervalHours, 10);
+      const newAdvertInterval = isNaN(hours) ? 0 : hours * 3600;
+      if (newAdvertInterval !== appSettings?.advert_interval) {
         await onSaveAppSettings({ advert_interval: newAdvertInterval });
       }
 
@@ -865,15 +866,15 @@ export function SettingsModal(props: SettingsModalProps) {
                     id="advert-interval"
                     type="number"
                     min="0"
-                    value={advertInterval}
-                    onChange={(e) => setAdvertInterval(e.target.value)}
+                    value={advertIntervalHours}
+                    onChange={(e) => setAdvertIntervalHours(e.target.value)}
                     className="w-28"
                   />
-                  <span className="text-sm text-muted-foreground">seconds (0 = off)</span>
+                  <span className="text-sm text-muted-foreground">hours (0 = off)</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  How often to automatically advertise presence. Set to 0 to disable. Recommended:
-                  86400 (24 hours) or higher.
+                  How often to automatically advertise presence. Set to 0 to disable. Minimum: 1
+                  hour. Recommended: 24 hours or higher.
                 </p>
               </div>
 

@@ -41,6 +41,11 @@ _advert_task: asyncio.Task | None = None
 # We still need to periodically check if it's been enabled
 ADVERT_CHECK_INTERVAL = 60
 
+# Minimum allowed advertisement interval (1 hour).
+# Even if the database has a shorter value, we silently refuse to advertise
+# more frequently than this.
+MIN_ADVERT_INTERVAL = 3600
+
 # Counter to pause polling during repeater operations (supports nested pauses)
 _polling_pause_count: int = 0
 
@@ -383,6 +388,9 @@ async def send_advertisement(force: bool = False) -> bool:
         if interval <= 0:
             logger.debug("Advertisement skipped: periodic advertising is disabled")
             return False
+
+        # Enforce minimum interval floor
+        interval = max(interval, MIN_ADVERT_INTERVAL)
 
         # Check if enough time has passed
         elapsed = now - last_time

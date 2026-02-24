@@ -52,7 +52,7 @@ class AppSettingsUpdate(BaseModel):
     advert_interval: int | None = Field(
         default=None,
         ge=0,
-        description="Periodic advertisement interval in seconds (0 = disabled)",
+        description="Periodic advertisement interval in seconds (0 = disabled, minimum 3600)",
     )
     bots: list[BotConfig] | None = Field(
         default=None,
@@ -111,8 +111,12 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         kwargs["sidebar_sort_order"] = update.sidebar_sort_order
 
     if update.advert_interval is not None:
-        logger.info("Updating advert_interval to %d", update.advert_interval)
-        kwargs["advert_interval"] = update.advert_interval
+        # Enforce minimum 1-hour interval; 0 means disabled
+        interval = update.advert_interval
+        if 0 < interval < 3600:
+            interval = 3600
+        logger.info("Updating advert_interval to %d", interval)
+        kwargs["advert_interval"] = interval
 
     if update.bots is not None:
         validate_all_bots(update.bots)

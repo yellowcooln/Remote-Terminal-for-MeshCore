@@ -100,8 +100,8 @@ class TestMigration001:
             # Run migrations
             applied = await run_migrations(conn)
 
-            assert applied == 20  # All 17 migrations run
-            assert await get_version(conn) == 20
+            assert applied == 21  # All migrations run
+            assert await get_version(conn) == 21
 
             # Verify columns exist by inserting and selecting
             await conn.execute(
@@ -183,9 +183,9 @@ class TestMigration001:
             applied1 = await run_migrations(conn)
             applied2 = await run_migrations(conn)
 
-            assert applied1 == 20  # All 20 migrations run
+            assert applied1 == 21  # All 21 migrations run
             assert applied2 == 0  # No migrations on second run
-            assert await get_version(conn) == 20
+            assert await get_version(conn) == 21
         finally:
             await conn.close()
 
@@ -245,9 +245,9 @@ class TestMigration001:
             # Run migrations - should not fail
             applied = await run_migrations(conn)
 
-            # All 17 migrations applied (version incremented) but no error
-            assert applied == 20
-            assert await get_version(conn) == 20
+            # All migrations applied (version incremented) but no error
+            assert applied == 21
+            assert await get_version(conn) == 21
         finally:
             await conn.close()
 
@@ -374,10 +374,10 @@ class TestMigration013:
             )
             await conn.commit()
 
-            # Run migration 13 (plus 14-20 which also run)
+            # Run migration 13 (plus 14-21 which also run)
             applied = await run_migrations(conn)
-            assert applied == 8
-            assert await get_version(conn) == 20
+            assert applied == 9
+            assert await get_version(conn) == 21
 
             # Verify bots array was created with migrated data
             cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
@@ -497,7 +497,7 @@ class TestMigration018:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 20
+            assert await get_version(conn) == 21
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -571,8 +571,8 @@ class TestMigration018:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 3  # Migrations 18+19+20 run (18+19 skip internally)
-            assert await get_version(conn) == 20
+            assert applied == 4  # Migrations 18+19+20+21 run (18+19 skip internally)
+            assert await get_version(conn) == 21
         finally:
             await conn.close()
 
@@ -644,7 +644,7 @@ class TestMigration019:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 20
+            assert await get_version(conn) == 21
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -710,8 +710,8 @@ class TestMigration020:
             assert (await cursor.fetchone())[0] == "delete"
 
             applied = await run_migrations(conn)
-            assert applied == 1
-            assert await get_version(conn) == 20
+            assert applied == 2  # Migrations 20+21
+            assert await get_version(conn) == 21
 
             # Verify WAL mode
             cursor = await conn.execute("PRAGMA journal_mode")
@@ -741,7 +741,7 @@ class TestMigration020:
             await set_version(conn, 20)
 
             applied = await run_migrations(conn)
-            assert applied == 0  # Already at version 20
+            assert applied == 1  # Migration 21 still runs
 
             # Still WAL + INCREMENTAL
             cursor = await conn.execute("PRAGMA journal_mode")

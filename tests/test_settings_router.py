@@ -48,6 +48,21 @@ class TestUpdateSettings:
         assert result.advert_interval == 3600
 
     @pytest.mark.asyncio
+    async def test_advert_interval_below_minimum_is_clamped_to_one_hour(self, test_db):
+        result = await update_settings(AppSettingsUpdate(advert_interval=600))
+        assert result.advert_interval == 3600
+
+    @pytest.mark.asyncio
+    async def test_advert_interval_zero_stays_disabled(self, test_db):
+        result = await update_settings(AppSettingsUpdate(advert_interval=0))
+        assert result.advert_interval == 0
+
+    @pytest.mark.asyncio
+    async def test_advert_interval_above_minimum_is_preserved(self, test_db):
+        result = await update_settings(AppSettingsUpdate(advert_interval=86400))
+        assert result.advert_interval == 86400
+
+    @pytest.mark.asyncio
     async def test_empty_patch_returns_current_settings(self, test_db):
         result = await update_settings(AppSettingsUpdate())
 
