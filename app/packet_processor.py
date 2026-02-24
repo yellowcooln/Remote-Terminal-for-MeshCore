@@ -34,6 +34,7 @@ from app.repository import (
     ContactRepository,
     MessageRepository,
     RawPacketRepository,
+    RepeaterAdvertPathRepository,
 )
 from app.websocket import broadcast_error, broadcast_event
 
@@ -687,6 +688,15 @@ async def _process_advertisement(
     contact_type = (
         advert.device_role if advert.device_role > 0 else (existing.type if existing else 0)
     )
+
+    # Keep recent unique advert paths for repeaters to improve frontend identity hints.
+    if contact_type == CONTACT_TYPE_REPEATER:
+        await RepeaterAdvertPathRepository.record_observation(
+            repeater_key=advert.public_key.lower(),
+            path_hex=new_path_hex,
+            timestamp=timestamp,
+            max_paths_per_repeater=10,
+        )
 
     contact_data = {
         "public_key": advert.public_key.lower(),

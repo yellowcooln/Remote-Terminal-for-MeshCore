@@ -184,6 +184,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 21)
         applied += 1
 
+    # Migration 22: Track recent unique advert paths per repeater
+    if version < 22:
+        logger.info("Applying migration 22: add repeater_advert_paths table")
+        await _migrate_022_add_repeater_advert_paths(conn)
+        await set_version(conn, 22)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -1283,3 +1290,31 @@ async def _migrate_021_enforce_min_advert_interval(conn: aiosqlite.Connection) -
     )
     await conn.commit()
     logger.debug("Clamped advert_interval to minimum 3600 seconds")
+
+
+async def _migrate_022_add_repeater_advert_paths(conn: aiosqlite.Connection) -> None:
+    """
+    Create table for recent unique advert paths per repeater.
+
+    This keeps path diversity for repeater advertisements without changing the
+    existing payload-hash raw packet dedup policy.
+    """
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS repeater_advert_paths (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            repeater_key TEXT NOT NULL,
+            path_hex TEXT NOT NULL,
+            path_len INTEGER NOT NULL,
+            first_seen INTEGER NOT NULL,
+            last_seen INTEGER NOT NULL,
+            heard_count INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(repeater_key, path_hex),
+            FOREIGN KEY (repeater_key) REFERENCES contacts(public_key)
+        )
+    """)
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_repeater_advert_paths_recent "
+        "ON repeater_advert_paths(repeater_key, last_seen DESC)"
+    )
+    await conn.commit()
+    logger.debug("Ensured repeater_advert_paths table and indexes exist")

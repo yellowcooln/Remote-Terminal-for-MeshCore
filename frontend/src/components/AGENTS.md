@@ -174,6 +174,22 @@ function resolveNode(source, isRepeater, showAmbiguous): string | null {
 
 When only a 1-byte prefix is known (from packet path bytes), the node is marked ambiguous and shown with a `?` prefix and gray styling. However, if the node is identified as a repeater (via advert or path hop), it shows blue regardless of ambiguity.
 
+### Advert-Path Identity Hints
+
+**Problem:** When multiple repeaters share a 1-byte prefix, the visualizer can't tell which physical repeater a path hop refers to.
+
+**Solution:** The backend tracks recent unique advertisement paths per repeater in `repeater_advert_paths` (see root `AGENTS.md` § "Repeater Advert Path Memory"). On mount (and when new contacts appear), the visualizer fetches this data via `GET /api/contacts/repeaters/advert-paths` and builds an index keyed by 12-char prefix.
+
+**Scoring:** `pickLikelyRepeaterByAdvertPath(candidates, nextPrefix)` scores each candidate repeater by how often its stored advert paths' `next_hop` matches the packet's actual next-hop prefix. It requires:
+- At least 2 matching observations (stronger-than-trivial evidence)
+- The top candidate's match score must be at least 2x the runner-up's
+
+When a winner is found, the ambiguous node gets a `probableIdentity` label (the likely repeater's name) and the display name updates accordingly. The remaining candidates are listed as "Other possible" in the tooltip.
+
+**Interaction with traffic splitting:** Advert-path hints run first. If a probable identity is found, the display name is set. Traffic splitting can still produce separate node IDs (`?XX:>YY`), but won't overwrite the advert-path display name.
+
+**Toggle:** "Use repeater advert-path identity hints" checkbox (enabled by default, disabled when ambiguous repeaters are hidden).
+
 ### Traffic Pattern Splitting (Experimental)
 
 **Problem:** Multiple physical repeaters can share the same 1-byte prefix (collision). Since packet paths only contain 1-byte hashes, we can't directly distinguish them. However, traffic patterns provide a heuristic.
@@ -292,6 +308,7 @@ function buildPath(parsed, packet, myPrefix): string[] {
 | -------------------------- | ------- | --------------------------------------------------------- |
 | Ambiguous repeaters        | On      | Show nodes when only partial prefix known                 |
 | Ambiguous sender/recipient | Off     | Show placeholder nodes for unknown senders                |
+| Advert-path identity hints | On      | Use stored advert paths to label ambiguous repeaters      |
 | Split by traffic pattern   | Off     | Split ambiguous repeaters by next-hop routing (see above) |
 | Observation window         | 15 sec  | Wait time for duplicate packets before animating (1-60s)  |
 | Let 'em drift              | On      | Continuous layout optimization                            |

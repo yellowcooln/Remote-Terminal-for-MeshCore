@@ -16,13 +16,20 @@ from app.models import (
     Contact,
     CreateContactRequest,
     NeighborInfo,
+    RepeaterAdvertPath,
+    RepeaterAdvertPathSummary,
     TelemetryRequest,
     TelemetryResponse,
     TraceResponse,
 )
 from app.packet_processor import start_historical_dm_decryption
 from app.radio import radio_manager
-from app.repository import AmbiguousPublicKeyPrefixError, ContactRepository, MessageRepository
+from app.repository import (
+    AmbiguousPublicKeyPrefixError,
+    ContactRepository,
+    MessageRepository,
+    RepeaterAdvertPathRepository,
+)
 
 if TYPE_CHECKING:
     from meshcore.events import Event
@@ -182,6 +189,16 @@ async def list_contacts(
     return await ContactRepository.get_all(limit=limit, offset=offset)
 
 
+@router.get("/repeaters/advert-paths", response_model=list[RepeaterAdvertPathSummary])
+async def list_repeater_advert_paths(
+    limit_per_repeater: int = Query(default=10, ge=1, le=50),
+) -> list[RepeaterAdvertPathSummary]:
+    """List recent unique advert paths for all repeaters."""
+    return await RepeaterAdvertPathRepository.get_recent_for_all_repeaters(
+        limit_per_repeater=limit_per_repeater
+    )
+
+
 @router.post("", response_model=Contact)
 async def create_contact(
     request: CreateContactRequest, background_tasks: BackgroundTasks
@@ -263,6 +280,21 @@ async def create_contact(
 async def get_contact(public_key: str) -> Contact:
     """Get a specific contact by public key or prefix."""
     return await _resolve_contact_or_404(public_key)
+
+
+@router.get("/{public_key}/advert-paths", response_model=list[RepeaterAdvertPath])
+async def get_contact_advert_paths(
+    public_key: str,
+    limit: int = Query(default=10, ge=1, le=50),
+) -> list[RepeaterAdvertPath]:
+    """List recent unique advert paths for a single repeater contact."""
+    contact = await _resolve_contact_or_404(public_key)
+    if contact.type != CONTACT_TYPE_REPEATER:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Contact is not a repeater (type={contact.type}, expected {CONTACT_TYPE_REPEATER})",
+        )
+    return await RepeaterAdvertPathRepository.get_recent_for_repeater(contact.public_key, limit)
 
 
 @router.post("/sync")
