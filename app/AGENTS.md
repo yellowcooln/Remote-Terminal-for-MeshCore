@@ -59,6 +59,7 @@ app/
 2. Message is persisted as outgoing.
 3. Endpoint broadcasts WS `message` event so all live clients update.
 4. ACK/repeat updates arrive later as `message_acked` events.
+5. Channel resend (`POST /messages/channel/{id}/resend`) strips the sender name prefix by exact match against the current radio name. This assumes the radio name hasn't changed between the original send and the resend — a safe assumption since name changes require a radio config update and are not something that happens mid-conversation.
 
 ### Connection lifecycle
 
@@ -86,6 +87,11 @@ app/
 - Realtime raw-packet WS broadcasts include `observation_id` (unique per RF arrival) in addition to `id`.
 - Frontend packet-feed features should key/dedupe by `observation_id`; use `id` only as the storage reference.
 - Message-layer repeat handling (`_handle_duplicate_message` + `MessageRepository.add_path`) is separate from raw-packet storage dedup.
+
+### Contact sync throttle
+
+- `sync_recent_contacts_to_radio()` sets `_last_contact_sync = now` before the sync completes.
+- This is intentional: if sync fails, the next attempt is still throttled to prevent a retry-storm against a flaky radio. Contacts will resync on the next scheduled cycle or on reconnect.
 
 ### Periodic advertisement
 
