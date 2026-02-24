@@ -120,3 +120,16 @@ def register_frontend_static_routes(app: FastAPI, frontend_dir: Path) -> bool:
 
     logger.info("Serving frontend from %s", frontend_dir)
     return True
+
+
+def register_frontend_missing_fallback(app: FastAPI) -> None:
+    """Register a fallback route that tells the user to build the frontend."""
+
+    @app.get("/", include_in_schema=False)
+    async def frontend_not_built():
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": "Frontend not built. Run: cd frontend && npm install && npm run build"
+            },
+        )

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import setup_logging
 from app.database import db
-from app.frontend_static import register_frontend_static_routes
+from app.frontend_static import register_frontend_missing_fallback, register_frontend_static_routes
 from app.radio import RadioDisconnectedError, radio_manager
 from app.radio_sync import (
     stop_message_polling,
@@ -109,4 +109,5 @@ app.include_router(ws.router, prefix="/api")
 
 # Serve frontend static files in production
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend" / "dist"
-register_frontend_static_routes(app, FRONTEND_DIR)
+if not register_frontend_static_routes(app, FRONTEND_DIR):
+    register_frontend_missing_fallback(app)

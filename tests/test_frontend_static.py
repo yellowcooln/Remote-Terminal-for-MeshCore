@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.frontend_static import register_frontend_static_routes
+from app.frontend_static import register_frontend_missing_fallback, register_frontend_static_routes
 
 
 def test_missing_dist_logs_error_and_keeps_app_running(tmp_path, caplog):
@@ -16,9 +16,14 @@ def test_missing_dist_logs_error_and_keeps_app_running(tmp_path, caplog):
     assert registered is False
     assert "Frontend build directory not found" in caplog.text
 
+    # Register the fallback like main.py does
+    register_frontend_missing_fallback(app)
+
     with TestClient(app) as client:
-        # App still runs; no frontend route is registered.
-        assert client.get("/").status_code == 404
+        resp = client.get("/")
+        assert resp.status_code == 404
+        assert "npm install" in resp.json()["detail"]
+        assert "npm run build" in resp.json()["detail"]
 
 
 def test_missing_index_logs_error_and_skips_frontend_routes(tmp_path, caplog):
