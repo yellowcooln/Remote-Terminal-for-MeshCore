@@ -222,6 +222,114 @@ class TestConnectionMonitor:
         assert rm._last_connected is False
 
 
+class TestReconnectLock:
+    """Tests for reconnect() lock serialization — no duplicate reconnections."""
+
+    @pytest.mark.asyncio
+    async def test_concurrent_reconnects_only_connect_once(self):
+        """Two concurrent reconnect() calls should only call connect() once."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        rm._meshcore = None
+
+        connect_count = 0
+
+        async def mock_connect():
+            nonlocal connect_count
+            connect_count += 1
+            # Simulate connect taking some time
+            await asyncio.sleep(0.05)
+            mock_mc = MagicMock()
+            mock_mc.is_connected = True
+            rm._meshcore = mock_mc
+            rm._connection_info = "TCP: test:4000"
+
+        rm.connect = AsyncMock(side_effect=mock_connect)
+
+        with (
+            patch("app.websocket.broadcast_health"),
+            patch("app.websocket.broadcast_error"),
+        ):
+            result_a, result_b = await asyncio.gather(
+                rm.reconnect(broadcast_on_success=False),
+                rm.reconnect(broadcast_on_success=False),
+            )
+
+        # First caller does the real connect, second sees is_connected=True
+        assert connect_count == 1
+        assert result_a is True
+        assert result_b is True
+
+    @pytest.mark.asyncio
+    async def test_second_reconnect_skips_when_first_succeeds(self):
+        """Second caller returns True without connecting when first already succeeded."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        rm._meshcore = None
+
+        call_order: list[str] = []
+
+        async def mock_connect():
+            call_order.append("connect")
+            await asyncio.sleep(0.05)
+            mock_mc = MagicMock()
+            mock_mc.is_connected = True
+            rm._meshcore = mock_mc
+            rm._connection_info = "TCP: test:4000"
+
+        rm.connect = AsyncMock(side_effect=mock_connect)
+
+        with (
+            patch("app.websocket.broadcast_health"),
+            patch("app.websocket.broadcast_error"),
+        ):
+            await asyncio.gather(
+                rm.reconnect(broadcast_on_success=False),
+                rm.reconnect(broadcast_on_success=False),
+            )
+
+        # connect should appear exactly once
+        assert call_order == ["connect"]
+
+    @pytest.mark.asyncio
+    async def test_reconnect_retries_after_first_failure(self):
+        """If first reconnect fails, a subsequent call should attempt connect again."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        rm._meshcore = None
+
+        attempt = 0
+
+        async def mock_connect():
+            nonlocal attempt
+            attempt += 1
+            if attempt == 1:
+                # First attempt fails
+                return
+            # Second attempt succeeds
+            mock_mc = MagicMock()
+            mock_mc.is_connected = True
+            rm._meshcore = mock_mc
+            rm._connection_info = "TCP: test:4000"
+
+        rm.connect = AsyncMock(side_effect=mock_connect)
+
+        with (
+            patch("app.websocket.broadcast_health"),
+            patch("app.websocket.broadcast_error"),
+        ):
+            result1 = await rm.reconnect(broadcast_on_success=False)
+            assert result1 is False
+            assert attempt == 1
+
+            result2 = await rm.reconnect(broadcast_on_success=False)
+            assert result2 is True
+            assert attempt == 2
+
+
 class TestSerialDeviceProbe:
     """Tests for test_serial_device() — verifies cleanup on all exit paths."""
 

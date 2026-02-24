@@ -188,6 +188,12 @@ export function RawPacketList({ packets }: RawPacketListProps) {
     }));
   }, [packets]);
 
+  // Sort packets by timestamp ascending (oldest first)
+  const sortedPackets = useMemo(
+    () => [...decodedPackets].sort((a, b) => a.packet.timestamp - b.packet.timestamp),
+    [decodedPackets]
+  );
+
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -201,9 +207,6 @@ export function RawPacketList({ packets }: RawPacketListProps) {
       </div>
     );
   }
-
-  // Sort packets by timestamp ascending (oldest first)
-  const sortedPackets = [...decodedPackets].sort((a, b) => a.packet.timestamp - b.packet.timestamp);
 
   return (
     <div className="h-full overflow-y-auto p-4 flex flex-col gap-2" ref={listRef}>

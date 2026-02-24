@@ -261,7 +261,16 @@ export function MessageList({
     };
   }, [messages, onResendChannelMessage]);
 
+  // Refs for scroll handler to read without causing callback recreation
+  const onLoadOlderRef = useRef(onLoadOlder);
+  const loadingOlderRef = useRef(loadingOlder);
+  const hasOlderMessagesRef = useRef(hasOlderMessages);
+  onLoadOlderRef.current = onLoadOlder;
+  loadingOlderRef.current = loadingOlder;
+  hasOlderMessagesRef.current = hasOlderMessages;
+
   // Handle scroll - capture state and detect when user is near top/bottom
+  // Stable callback: reads changing values from refs, never recreated.
   const handleScroll = useCallback(() => {
     if (!listRef.current) return;
 
@@ -280,13 +289,13 @@ export function MessageList({
     // Show scroll-to-bottom button when not near the bottom (more than 100px away)
     setShowScrollToBottom(distanceFromBottom > 100);
 
-    if (!onLoadOlder || loadingOlder || !hasOlderMessages) return;
+    if (!onLoadOlderRef.current || loadingOlderRef.current || !hasOlderMessagesRef.current) return;
 
     // Trigger load when within 100px of top
     if (scrollTop < 100) {
-      onLoadOlder();
+      onLoadOlderRef.current();
     }
-  }, [onLoadOlder, loadingOlder, hasOlderMessages]);
+  }, []);
 
   // Scroll to bottom handler
   const scrollToBottom = useCallback(() => {

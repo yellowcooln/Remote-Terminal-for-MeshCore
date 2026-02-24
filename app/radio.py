@@ -399,12 +399,13 @@ class RadioManager:
         if self._reconnect_lock is None:
             self._reconnect_lock = asyncio.Lock()
 
-        # Try to acquire lock without blocking to check if reconnect is in progress
-        if self._reconnect_lock.locked():
-            logger.debug("Reconnection already in progress")
-            return False
-
         async with self._reconnect_lock:
+            # If we became connected while waiting for the lock (another
+            # reconnect succeeded ahead of us), skip the redundant attempt.
+            if self.is_connected:
+                logger.debug("Already connected after acquiring lock, skipping reconnect")
+                return True
+
             logger.info("Attempting to reconnect to radio...")
 
             try:
