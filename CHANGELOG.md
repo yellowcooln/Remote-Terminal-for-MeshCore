@@ -1,3 +1,33 @@
+## [2.1.0] - 2026-02-23
+
+Feature: Add ability to remember last-used channel on load
+Feature: Add `docker compose` support (thanks @suymur !)
+Feature: Better-aligned favicon (lol)
+Bugfix: Disable autocomplete on message field
+Bugfix: Legacy hash restoration on page load
+Bugfix: Align resend buttons in pathing modal
+Bugfix: Update README.md (briefly), then docker-compose.yaml, to reflect correct docker image host
+Bugfix: Correct settings pane scroll lock on zoom (thanks @yellowcooln !)
+Bugfix: Improved repeater comms on busy meshes
+Bugfix: Drain before autofetch from radio
+Bugfix: Fix, or document exceptions to, sub-second resolution message failure
+Bugfix: Improved handling of radio connection, disconnection, and connection-aliveness-status
+Bugfix: Force server-side keystore update when radio key changes
+Bugfix: Reduce WS churn for incoming message handling
+Bugfix: Fix content type signalling for irrelevant endpoints
+Bugfix: Handle stuck post-connect failure state
+Misc: Documentation & version parsing improvements
+Misc: Hide char counter on mobile for short messages
+Misc: Typo fixes in docs and settings
+Misc: Add dynamic webmanifest for hosts that can support it
+Misc: Improve DB size via dropping unnecessary uniqs, indices, vacuum, and offering ability to drop historical matches packets
+Misc: Drop weird rounded bounding box for settings
+Misc: Move resend buttons to pathing modal
+Misc: Improved comments around database ownership on *nix systems
+Misc: Move to SSoT for message dedupe on frontend
+Misc: Move DM ack clearing to standard poll, and increase hold time between polling
+Misc: Holistic testing overhaul
+
 ## [2.0.1] - 2026-02-16
 
 Bugfix: Fix missing trigger condition on statistics pane expansion on mobile
