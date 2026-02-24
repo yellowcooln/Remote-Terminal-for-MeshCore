@@ -1029,9 +1029,10 @@ class AppSettingsRepository:
 
 class StatisticsRepository:
     @staticmethod
-    async def _activity_counts(type_condition: str) -> dict[str, int]:
+    async def _activity_counts(*, contact_type: int, exclude: bool = False) -> dict[str, int]:
         """Get time-windowed counts for contacts/repeaters heard."""
         now = int(time.time())
+        op = "!=" if exclude else "="
         cursor = await db.conn.execute(
             f"""
             SELECT
@@ -1039,9 +1040,9 @@ class StatisticsRepository:
                 SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS last_24_hours,
                 SUM(CASE WHEN last_seen >= ? THEN 1 ELSE 0 END) AS last_week
             FROM contacts
-            WHERE {type_condition} AND last_seen IS NOT NULL
+            WHERE type {op} ? AND last_seen IS NOT NULL
             """,
-            (now - SECONDS_1H, now - SECONDS_24H, now - SECONDS_7D),
+            (now - SECONDS_1H, now - SECONDS_24H, now - SECONDS_7D, contact_type),
         )
         row = await cursor.fetchone()
         assert row is not None  # Aggregate query always returns a row
@@ -1128,8 +1129,8 @@ class StatisticsRepository:
         total_outgoing: int = row["cnt"]
 
         # Activity windows
-        contacts_heard = await StatisticsRepository._activity_counts("type != 2")
-        repeaters_heard = await StatisticsRepository._activity_counts("type = 2")
+        contacts_heard = await StatisticsRepository._activity_counts(contact_type=2, exclude=True)
+        repeaters_heard = await StatisticsRepository._activity_counts(contact_type=2)
 
         return {
             "busiest_channels_24h": busiest_channels_24h,
