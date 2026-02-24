@@ -324,6 +324,75 @@ class TestContactMessageCLIFiltering:
             assert isinstance(payload["acked"], int)
 
     @pytest.mark.asyncio
+    async def test_broadcast_message_payload_matches_frontend_type(self, test_db):
+        """Broadcast payload keys must match the frontend Message interface in types.ts."""
+        from app.event_handlers import on_contact_message
+
+        # Keys the frontend Message interface expects (see frontend/src/types.ts)
+        EXPECTED_MESSAGE_KEYS = {
+            "id",
+            "type",
+            "conversation_key",
+            "text",
+            "sender_timestamp",
+            "received_at",
+            "paths",
+            "txt_type",
+            "signature",
+            "outgoing",
+            "acked",
+        }
+
+        with (
+            patch("app.event_handlers.broadcast_event") as mock_broadcast,
+            patch("app.bot.run_bot_for_message", new_callable=AsyncMock),
+        ):
+
+            class MockEvent:
+                payload = {
+                    "pubkey_prefix": "abc123def456",
+                    "text": "shape test",
+                    "txt_type": 0,
+                    "sender_timestamp": 1700000000,
+                }
+
+            await on_contact_message(MockEvent())
+
+            mock_broadcast.assert_called_once()
+            event_type, payload = mock_broadcast.call_args[0]
+            assert event_type == "message"
+            assert set(payload.keys()) == EXPECTED_MESSAGE_KEYS
+
+    @pytest.mark.asyncio
+    async def test_broadcast_ack_payload_matches_frontend_type(self, test_db):
+        """Broadcast payload keys for message_acked must match frontend expectations."""
+        from app.event_handlers import on_ack
+
+        msg_id = await MessageRepository.create(
+            msg_type="PRIV",
+            text="ack shape test",
+            received_at=1700000000,
+            conversation_key="bb" * 32,
+            sender_timestamp=1700000000,
+        )
+        track_pending_ack("ackshape", message_id=msg_id, timeout_ms=10000)
+
+        # Keys the frontend expects (see frontend/src/useWebSocket.ts:111-114)
+        EXPECTED_ACK_KEYS = {"message_id", "ack_count"}
+
+        with patch("app.event_handlers.broadcast_event") as mock_broadcast:
+
+            class MockEvent:
+                payload = {"code": "ackshape"}
+
+            await on_ack(MockEvent())
+
+            mock_broadcast.assert_called_once()
+            event_type, payload = mock_broadcast.call_args[0]
+            assert event_type == "message_acked"
+            assert set(payload.keys()) == EXPECTED_ACK_KEYS
+
+    @pytest.mark.asyncio
     async def test_missing_txt_type_defaults_to_normal(self, test_db):
         """Messages without txt_type field are treated as normal (not filtered)."""
         from app.event_handlers import on_contact_message

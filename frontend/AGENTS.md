@@ -92,8 +92,8 @@ frontend/src/
     ├── useConversationMessages.test.ts
     ├── useConversationMessages.race.test.ts
     ├── useRepeaterMode.test.ts
-    ├── useWebSocket.lifecycle.test.ts
-    └── websocket.test.ts
+    ├── useWebSocket.dispatch.test.ts
+    └── useWebSocket.lifecycle.test.ts
 ```
 
 ## Architecture Notes
