@@ -104,7 +104,7 @@ async def update_radio_config(update: RadioConfigUpdate) -> RadioConfigResponse:
             )
 
         # Sync time with system clock
-        await sync_radio_time()
+        await sync_radio_time(mc)
 
         # Re-fetch self_info so the response reflects the changes we just made.
         # Commands like set_name() write to flash but don't update the cached
@@ -168,8 +168,8 @@ async def send_advertisement() -> dict:
     require_connected()
 
     logger.info("Sending flood advertisement")
-    async with radio_manager.radio_operation("manual_advertisement"):
-        success = await do_send_advertisement(force=True)
+    async with radio_manager.radio_operation("manual_advertisement") as mc:
+        success = await do_send_advertisement(mc, force=True)
 
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send advertisement")

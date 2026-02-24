@@ -189,30 +189,20 @@ class TestSyncRadioTime:
     """Test the radio time sync function."""
 
     @pytest.mark.asyncio
-    async def test_returns_false_when_not_connected(self):
-        """sync_radio_time returns False when radio is not connected."""
-        with patch("app.radio_sync.radio_manager") as mock_manager:
-            mock_manager.meshcore = None
-            result = await sync_radio_time()
-            assert result is False
-
-    @pytest.mark.asyncio
     async def test_returns_true_on_success(self):
         """sync_radio_time returns True when time is set successfully."""
         mock_mc = MagicMock()
         mock_mc.commands.set_time = AsyncMock()
 
-        with patch("app.radio_sync.radio_manager") as mock_manager:
-            mock_manager.meshcore = mock_mc
-            result = await sync_radio_time()
+        result = await sync_radio_time(mock_mc)
 
-            assert result is True
-            mock_mc.commands.set_time.assert_called_once()
-            # Verify timestamp is reasonable (within last few seconds)
-            call_args = mock_mc.commands.set_time.call_args[0][0]
-            import time
+        assert result is True
+        mock_mc.commands.set_time.assert_called_once()
+        # Verify timestamp is reasonable (within last few seconds)
+        call_args = mock_mc.commands.set_time.call_args[0][0]
+        import time
 
-            assert abs(call_args - int(time.time())) < 5
+        assert abs(call_args - int(time.time())) < 5
 
     @pytest.mark.asyncio
     async def test_returns_false_on_exception(self):
@@ -220,11 +210,9 @@ class TestSyncRadioTime:
         mock_mc = MagicMock()
         mock_mc.commands.set_time = AsyncMock(side_effect=Exception("Radio error"))
 
-        with patch("app.radio_sync.radio_manager") as mock_manager:
-            mock_manager.meshcore = mock_mc
-            result = await sync_radio_time()
+        result = await sync_radio_time(mock_mc)
 
-            assert result is False
+        assert result is False
 
 
 class TestSyncRecentContactsToRadio:
@@ -430,21 +418,6 @@ class TestSyncAndOffloadContacts:
     """Test sync_and_offload_contacts: pull contacts from radio, save to DB, remove from radio."""
 
     @pytest.mark.asyncio
-    async def test_returns_error_when_not_connected(self):
-        """Returns error dict when radio is not connected."""
-        from app.radio_sync import sync_and_offload_contacts
-
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = False
-            mock_rm.meshcore = None
-
-            result = await sync_and_offload_contacts()
-
-        assert result["synced"] == 0
-        assert result["removed"] == 0
-        assert "error" in result
-
-    @pytest.mark.asyncio
     async def test_syncs_and_removes_contacts(self, test_db):
         """Contacts are upserted to DB and removed from radio."""
         from app.radio_sync import sync_and_offload_contacts
@@ -465,11 +438,7 @@ class TestSyncAndOffloadContacts:
         mock_mc.commands.get_contacts = AsyncMock(return_value=mock_get_result)
         mock_mc.commands.remove_contact = AsyncMock(return_value=mock_remove_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_contacts()
+        result = await sync_and_offload_contacts(mock_mc)
 
         assert result["synced"] == 2
         assert result["removed"] == 2
@@ -509,11 +478,7 @@ class TestSyncAndOffloadContacts:
         mock_mc.commands.get_contacts = AsyncMock(return_value=mock_get_result)
         mock_mc.commands.remove_contact = AsyncMock(return_value=mock_remove_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            await sync_and_offload_contacts()
+        await sync_and_offload_contacts(mock_mc)
 
         # Verify the prefix message was claimed (promoted to full key)
         messages = await MessageRepository.get_all(conversation_key=KEY_A)
@@ -546,11 +511,7 @@ class TestSyncAndOffloadContacts:
         # First remove fails, second succeeds
         mock_mc.commands.remove_contact = AsyncMock(side_effect=[mock_fail_result, mock_ok_result])
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_contacts()
+        result = await sync_and_offload_contacts(mock_mc)
 
         # Both contacts synced, but only one removed successfully
         assert result["synced"] == 2
@@ -571,11 +532,7 @@ class TestSyncAndOffloadContacts:
         mock_mc.commands.get_contacts = AsyncMock(return_value=mock_get_result)
         mock_mc.commands.remove_contact = AsyncMock(side_effect=Exception("Timeout"))
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_contacts()
+        result = await sync_and_offload_contacts(mock_mc)
 
         assert result["synced"] == 1
         assert result["removed"] == 0
@@ -592,11 +549,7 @@ class TestSyncAndOffloadContacts:
         mock_mc = MagicMock()
         mock_mc.commands.get_contacts = AsyncMock(return_value=mock_error_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_contacts()
+        result = await sync_and_offload_contacts(mock_mc)
 
         assert result["synced"] == 0
         assert result["removed"] == 0
@@ -620,11 +573,7 @@ class TestSyncAndOffloadContacts:
         mock_mc.commands.get_contacts = AsyncMock(return_value=mock_get_result)
         mock_mc.commands.remove_contact = AsyncMock(return_value=mock_remove_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            await sync_and_offload_contacts()
+        await sync_and_offload_contacts(mock_mc)
 
         contact = await ContactRepository.get_by_key(KEY_A)
         assert contact is not None
@@ -633,21 +582,6 @@ class TestSyncAndOffloadContacts:
 
 class TestSyncAndOffloadChannels:
     """Test sync_and_offload_channels: pull channels from radio, save to DB, clear from radio."""
-
-    @pytest.mark.asyncio
-    async def test_returns_error_when_not_connected(self):
-        """Returns error dict when radio is not connected."""
-        from app.radio_sync import sync_and_offload_channels
-
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = False
-            mock_rm.meshcore = None
-
-            result = await sync_and_offload_channels()
-
-        assert result["synced"] == 0
-        assert result["cleared"] == 0
-        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_syncs_valid_channel_and_clears(self, test_db):
@@ -672,11 +606,7 @@ class TestSyncAndOffloadChannels:
         clear_result.type = EventType.OK
         mock_mc.commands.set_channel = AsyncMock(return_value=clear_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_channels()
+        result = await sync_and_offload_channels(mock_mc)
 
         assert result["synced"] == 1
         assert result["cleared"] == 1
@@ -708,11 +638,7 @@ class TestSyncAndOffloadChannels:
             side_effect=[empty_name_result] + [other_result] * 39
         )
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_channels()
+        result = await sync_and_offload_channels(mock_mc)
 
         assert result["synced"] == 0
         assert result["cleared"] == 0
@@ -737,11 +663,7 @@ class TestSyncAndOffloadChannels:
             side_effect=[zero_key_result] + [other_result] * 39
         )
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_channels()
+        result = await sync_and_offload_channels(mock_mc)
 
         assert result["synced"] == 0
 
@@ -767,11 +689,7 @@ class TestSyncAndOffloadChannels:
         clear_result.type = EventType.OK
         mock_mc.commands.set_channel = AsyncMock(return_value=clear_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            await sync_and_offload_channels()
+        await sync_and_offload_channels(mock_mc)
 
         channel = await ChannelRepository.get_by_key("8B3387E9C5CDEA6AC9E5EDBAA115CD72")
         assert channel is not None
@@ -799,11 +717,7 @@ class TestSyncAndOffloadChannels:
         clear_result.type = EventType.OK
         mock_mc.commands.set_channel = AsyncMock(return_value=clear_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            await sync_and_offload_channels()
+        await sync_and_offload_channels(mock_mc)
 
         mock_mc.commands.set_channel.assert_called_once_with(
             channel_idx=0,
@@ -841,11 +755,7 @@ class TestSyncAndOffloadChannels:
 
         mock_mc.commands.set_channel = AsyncMock(side_effect=[fail_result, ok_result])
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_channels()
+        result = await sync_and_offload_channels(mock_mc)
 
         assert result["synced"] == 2
         assert result["cleared"] == 1
@@ -861,11 +771,7 @@ class TestSyncAndOffloadChannels:
         mock_mc = MagicMock()
         mock_mc.commands.get_channel = AsyncMock(return_value=empty_result)
 
-        with patch("app.radio_sync.radio_manager") as mock_rm:
-            mock_rm.is_connected = True
-            mock_rm.meshcore = mock_mc
-
-            result = await sync_and_offload_channels()
+        result = await sync_and_offload_channels(mock_mc)
 
         assert mock_mc.commands.get_channel.call_count == 40
         assert result["synced"] == 0

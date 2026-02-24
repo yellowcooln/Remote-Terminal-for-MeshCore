@@ -452,7 +452,7 @@ class TestPostConnectSetupOrdering:
 
         call_order = []
 
-        async def mock_drain():
+        async def mock_drain(mc):
             call_order.append("drain")
             return 0
 
@@ -494,7 +494,7 @@ class TestPostConnectSetupOrdering:
 
         observed_during = None
 
-        async def mock_drain():
+        async def mock_drain(mc):
             nonlocal observed_during
             observed_during = rm.is_setup_in_progress
             return 0

@@ -237,7 +237,7 @@ class TestAdvertise:
         active = 0
         max_active = 0
 
-        async def fake_send(*, force: bool):
+        async def fake_send(mc, *, force: bool):
             nonlocal active, max_active
             assert force is True
             active += 1

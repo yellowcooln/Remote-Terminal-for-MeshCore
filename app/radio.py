@@ -247,23 +247,24 @@ class RadioManager:
             if not self._meshcore:
                 return
             self._setup_in_progress = True
+            mc = self._meshcore
             try:
-                register_event_handlers(self._meshcore)
-                await export_and_store_private_key(self._meshcore)
+                register_event_handlers(mc)
+                await export_and_store_private_key(mc)
 
                 # Sync radio clock with system time
-                await sync_radio_time()
+                await sync_radio_time(mc)
 
                 # Sync contacts/channels from radio to DB and clear radio
                 logger.info("Syncing and offloading radio data...")
-                result = await sync_and_offload_all()
+                result = await sync_and_offload_all(mc)
                 logger.info("Sync complete: %s", result)
 
                 # Start periodic sync (idempotent)
                 start_periodic_sync()
 
                 # Send advertisement to announce our presence (if enabled and not throttled)
-                if await send_advertisement():
+                if await send_advertisement(mc):
                     logger.info("Advertisement sent")
                 else:
                     logger.debug("Advertisement skipped (disabled or throttled)")
@@ -274,11 +275,11 @@ class RadioManager:
                 # Drain any messages that were queued before we connected.
                 # This must happen BEFORE starting auto-fetch, otherwise both
                 # compete on get_msg() with interleaved radio I/O.
-                drained = await drain_pending_messages()
+                drained = await drain_pending_messages(mc)
                 if drained > 0:
                     logger.info("Drained %d pending message(s)", drained)
 
-                await self._meshcore.start_auto_message_fetching()
+                await mc.start_auto_message_fetching()
                 logger.info("Auto message fetching started")
 
                 # Start periodic message polling as fallback (idempotent)

@@ -14,7 +14,7 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from meshcore import EventType
+from meshcore import EventType, MeshCore
 
 from app.event_handlers import cleanup_expired_acks
 from app.models import Contact
@@ -77,16 +77,11 @@ _sync_task: asyncio.Task | None = None
 SYNC_INTERVAL = 300
 
 
-async def sync_and_offload_contacts() -> dict:
+async def sync_and_offload_contacts(mc: MeshCore) -> dict:
     """
     Sync contacts from radio to database, then remove them from radio.
     Returns counts of synced and removed contacts.
     """
-    if not radio_manager.is_connected or radio_manager.meshcore is None:
-        logger.warning("Cannot sync contacts: radio not connected")
-        return {"synced": 0, "removed": 0, "error": "Radio not connected"}
-
-    mc = radio_manager.meshcore
     synced = 0
     removed = 0
 
@@ -137,16 +132,11 @@ async def sync_and_offload_contacts() -> dict:
     return {"synced": synced, "removed": removed}
 
 
-async def sync_and_offload_channels() -> dict:
+async def sync_and_offload_channels(mc: MeshCore) -> dict:
     """
     Sync channels from radio to database, then clear them from radio.
     Returns counts of synced and cleared channels.
     """
-    if not radio_manager.is_connected or radio_manager.meshcore is None:
-        logger.warning("Cannot sync channels: radio not connected")
-        return {"synced": 0, "cleared": 0, "error": "Radio not connected"}
-
-    mc = radio_manager.meshcore
     synced = 0
     cleared = 0
 
@@ -227,12 +217,12 @@ async def ensure_default_channels() -> None:
         )
 
 
-async def sync_and_offload_all() -> dict:
+async def sync_and_offload_all(mc: MeshCore) -> dict:
     """Sync and offload both contacts and channels, then ensure defaults exist."""
     logger.info("Starting full radio sync and offload")
 
-    contacts_result = await sync_and_offload_contacts()
-    channels_result = await sync_and_offload_channels()
+    contacts_result = await sync_and_offload_contacts(mc)
+    channels_result = await sync_and_offload_channels(mc)
 
     # Ensure default channels exist
     await ensure_default_channels()
@@ -243,17 +233,13 @@ async def sync_and_offload_all() -> dict:
     }
 
 
-async def drain_pending_messages() -> int:
+async def drain_pending_messages(mc: MeshCore) -> int:
     """
     Drain all pending messages from the radio.
 
     Calls get_msg() repeatedly until NO_MORE_MSGS is received.
     Returns the count of messages retrieved.
     """
-    if not radio_manager.is_connected or radio_manager.meshcore is None:
-        return 0
-
-    mc = radio_manager.meshcore
     count = 0
     max_iterations = 100  # Safety limit
 
@@ -281,7 +267,7 @@ async def drain_pending_messages() -> int:
     return count
 
 
-async def poll_for_messages() -> int:
+async def poll_for_messages(mc: MeshCore) -> int:
     """
     Poll the radio for any pending messages (single pass).
 
@@ -290,10 +276,6 @@ async def poll_for_messages() -> int:
 
     Returns the count of messages retrieved.
     """
-    if not radio_manager.is_connected or radio_manager.meshcore is None:
-        return 0
-
-    mc = radio_manager.meshcore
     count = 0
 
     try:
@@ -308,7 +290,7 @@ async def poll_for_messages() -> int:
         elif result.type in (EventType.CONTACT_MSG_RECV, EventType.CHANNEL_MSG_RECV):
             count += 1
             # If we got a message, there might be more - drain them
-            count += await drain_pending_messages()
+            count += await drain_pending_messages(mc)
 
     except asyncio.TimeoutError:
         pass
@@ -329,16 +311,14 @@ async def _message_poll_loop():
             cleanup_expired_acks()
 
             if radio_manager.is_connected and not is_polling_paused():
-                mc = radio_manager.meshcore
-                if mc is not None:
-                    try:
-                        async with radio_manager.radio_operation(
-                            "message_poll_loop",
-                            blocking=False,
-                        ):
-                            await poll_for_messages()
-                    except RadioOperationBusyError:
-                        logger.debug("Skipping message poll: radio busy")
+                try:
+                    async with radio_manager.radio_operation(
+                        "message_poll_loop",
+                        blocking=False,
+                    ) as mc:
+                        await poll_for_messages(mc)
+                except RadioOperationBusyError:
+                    logger.debug("Skipping message poll: radio busy")
 
         except asyncio.CancelledError:
             break
@@ -367,21 +347,18 @@ async def stop_message_polling():
         logger.info("Stopped periodic message polling")
 
 
-async def send_advertisement(force: bool = False) -> bool:
+async def send_advertisement(mc: MeshCore, *, force: bool = False) -> bool:
     """Send an advertisement to announce presence on the mesh.
 
     Respects the configured advert_interval - won't send if not enough time
     has elapsed since the last advertisement, unless force=True.
 
     Args:
+        mc: The MeshCore instance to use for the advertisement.
         force: If True, send immediately regardless of interval.
 
     Returns True if successful, False otherwise (including if throttled).
     """
-    if not radio_manager.is_connected or radio_manager.meshcore is None:
-        logger.debug("Cannot send advertisement: radio not connected")
-        return False
-
     # Check if enough time has elapsed (unless forced)
     if not force:
         settings = await AppSettingsRepository.get()
@@ -410,7 +387,7 @@ async def send_advertisement(force: bool = False) -> bool:
             return False
 
     try:
-        result = await radio_manager.meshcore.commands.send_advert(flood=True)
+        result = await mc.commands.send_advert(flood=True)
         if result.type == EventType.OK:
             # Update last_advert_time in database
             now = int(time.time())
@@ -437,16 +414,14 @@ async def _periodic_advert_loop():
             # Try to send - send_advertisement() handles all checks
             # (disabled, throttled, not connected)
             if radio_manager.is_connected:
-                mc = radio_manager.meshcore
-                if mc is not None:
-                    try:
-                        async with radio_manager.radio_operation(
-                            "periodic_advertisement",
-                            blocking=False,
-                        ):
-                            await send_advertisement()
-                    except RadioOperationBusyError:
-                        logger.debug("Skipping periodic advertisement: radio busy")
+                try:
+                    async with radio_manager.radio_operation(
+                        "periodic_advertisement",
+                        blocking=False,
+                    ) as mc:
+                        await send_advertisement(mc)
+                except RadioOperationBusyError:
+                    logger.debug("Skipping periodic advertisement: radio busy")
 
             # Sleep before next check
             await asyncio.sleep(ADVERT_CHECK_INTERVAL)
@@ -484,16 +459,11 @@ async def stop_periodic_advert():
         logger.info("Stopped periodic advertisement")
 
 
-async def sync_radio_time() -> bool:
+async def sync_radio_time(mc: MeshCore) -> bool:
     """Sync the radio's clock with the system time.
 
     Returns True if successful, False otherwise.
     """
-    mc = radio_manager.meshcore
-    if not mc:
-        logger.debug("Cannot sync time: radio not connected")
-        return False
-
     try:
         now = int(time.time())
         await mc.commands.set_time(now)
@@ -509,18 +479,17 @@ async def _periodic_sync_loop():
     while True:
         try:
             await asyncio.sleep(SYNC_INTERVAL)
-            mc = radio_manager.meshcore
-            if mc is None:
+            if not radio_manager.is_connected:
                 continue
 
             try:
                 async with radio_manager.radio_operation(
                     "periodic_sync",
                     blocking=False,
-                ):
+                ) as mc:
                     logger.debug("Running periodic radio sync")
-                    await sync_and_offload_all()
-                    await sync_radio_time()
+                    await sync_and_offload_all(mc)
+                    await sync_radio_time(mc)
             except RadioOperationBusyError:
                 logger.debug("Skipping periodic sync: radio busy")
         except asyncio.CancelledError:
