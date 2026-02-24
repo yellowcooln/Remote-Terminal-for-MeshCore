@@ -346,6 +346,135 @@ class TestTelemetryRoute:
         mc.stop_auto_message_fetching.assert_awaited_once()
         mc.start_auto_message_fetching.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_full_success_with_neighbors_acl_and_clock(self, test_db):
+        """Full telemetry success: status, neighbors (name-resolved), ACL (with perm names), clock."""
+        mc = _mock_mc()
+        # Insert the repeater itself
+        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
+        # Insert a known neighbor so name resolution works
+        neighbor_key = "bb" * 32
+        await _insert_contact(neighbor_key, name="NeighborNode", contact_type=1)
+
+        mc.commands.req_status_sync = AsyncMock(
+            return_value={
+                "pubkey_pre": KEY_A[:12],
+                "bat": 4200,
+                "uptime": 86400,
+                "tx_queue_len": 2,
+                "noise_floor": -120,
+                "last_rssi": -85,
+                "last_snr": 7.5,
+                "nb_recv": 1000,
+                "nb_sent": 500,
+                "airtime": 3600,
+                "rx_airtime": 7200,
+                "sent_flood": 100,
+                "sent_direct": 400,
+                "recv_flood": 300,
+                "recv_direct": 700,
+                "flood_dups": 10,
+                "direct_dups": 5,
+                "full_evts": 0,
+            }
+        )
+        mc.commands.fetch_all_neighbours = AsyncMock(
+            return_value={
+                "neighbours": [
+                    {"pubkey": neighbor_key[:12], "snr": 9.0, "secs_ago": 5},
+                    {"pubkey": "cccccccccccc", "snr": 3.0, "secs_ago": 120},
+                ]
+            }
+        )
+        mc.commands.req_acl_sync = AsyncMock(
+            return_value=[
+                {"key": neighbor_key[:12], "perm": 3},
+                {"key": "dddddddddddd", "perm": 0},
+            ]
+        )
+        mc.commands.send_cmd = AsyncMock(return_value=_radio_result(EventType.OK))
+        mc.commands.get_msg = AsyncMock(
+            return_value=_radio_result(
+                EventType.CONTACT_MSG_RECV,
+                {
+                    "pubkey_prefix": KEY_A[:12],
+                    "text": "2026-02-23 12:00:00 UTC",
+                    "txt_type": 1,
+                },
+            )
+        )
+
+        with (
+            patch("app.routers.contacts.require_connected", return_value=mc),
+            patch(
+                "app.routers.contacts.prepare_repeater_connection",
+                new_callable=AsyncMock,
+            ),
+            patch(_MONOTONIC, side_effect=_advancing_clock()),
+        ):
+            response = await request_telemetry(KEY_A, TelemetryRequest(password="pw"))
+
+        # Status fields
+        assert response.pubkey_prefix == KEY_A[:12]
+        assert response.battery_volts == 4.2
+        assert response.uptime_seconds == 86400
+        assert response.packets_received == 1000
+        assert response.packets_sent == 500
+        assert response.noise_floor_dbm == -120
+        assert response.last_rssi_dbm == -85
+        assert response.last_snr_db == 7.5
+
+        # Neighbors — first resolved by name, second unknown
+        assert len(response.neighbors) == 2
+        assert response.neighbors[0].name == "NeighborNode"
+        assert response.neighbors[0].snr == 9.0
+        assert response.neighbors[1].name is None
+        assert response.neighbors[1].last_heard_seconds == 120
+
+        # ACL — first resolved, permission names mapped
+        assert len(response.acl) == 2
+        assert response.acl[0].name == "NeighborNode"
+        assert response.acl[0].permission_name == "Admin"
+        assert response.acl[1].name is None
+        assert response.acl[1].permission_name == "Guest"
+
+        # Clock
+        assert response.clock_output == "2026-02-23 12:00:00 UTC"
+
+    @pytest.mark.asyncio
+    async def test_empty_neighbors_and_acl(self, test_db):
+        """Telemetry with empty neighbor list and ACL still succeeds."""
+        mc = _mock_mc()
+        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
+
+        mc.commands.req_status_sync = AsyncMock(
+            return_value={"pubkey_pre": KEY_A[:12], "bat": 3700, "uptime": 100}
+        )
+        mc.commands.fetch_all_neighbours = AsyncMock(return_value={"neighbours": []})
+        mc.commands.req_acl_sync = AsyncMock(return_value=[])
+        mc.commands.send_cmd = AsyncMock(return_value=_radio_result(EventType.OK))
+        mc.commands.get_msg = AsyncMock(
+            return_value=_radio_result(
+                EventType.CONTACT_MSG_RECV,
+                {"pubkey_prefix": KEY_A[:12], "text": "12:00", "txt_type": 1},
+            )
+        )
+
+        with (
+            patch("app.routers.contacts.require_connected", return_value=mc),
+            patch(
+                "app.routers.contacts.prepare_repeater_connection",
+                new_callable=AsyncMock,
+            ),
+            patch(_MONOTONIC, side_effect=_advancing_clock()),
+        ):
+            response = await request_telemetry(KEY_A, TelemetryRequest(password="pw"))
+
+        assert response.battery_volts == 3.7
+        assert response.neighbors == []
+        assert response.acl == []
+        assert response.clock_output == "12:00"
+
 
 class TestRepeaterCommandRoute:
     @pytest.mark.asyncio

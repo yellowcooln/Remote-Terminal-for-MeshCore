@@ -86,12 +86,13 @@ describe('getMessageContentKey', () => {
     expect(getMessageContentKey(msg1)).toBe(getMessageContentKey(msg2));
   });
 
-  it('handles null sender_timestamp', () => {
+  it('handles null sender_timestamp by falling back to received_at and id', () => {
     const msg = createMessage({ sender_timestamp: null });
 
     const key = getMessageContentKey(msg);
 
-    expect(key).toBe('CHAN-channel123-Hello world-null');
+    // Falls back to `r${received_at}-${id}` when sender_timestamp is null
+    expect(key).toBe('CHAN-channel123-Hello world-r1700000001-1');
   });
 
   it('handles empty text', () => {
@@ -108,6 +109,54 @@ describe('getMessageContentKey', () => {
     const key = getMessageContentKey(msg);
 
     expect(key).toContain('Hello: World! @user #channel');
+  });
+
+  it('null-timestamp messages with different received_at produce different keys', () => {
+    const msg1 = createMessage({ sender_timestamp: null, received_at: 1700000001 });
+    const msg2 = createMessage({ sender_timestamp: null, received_at: 1700000002 });
+
+    expect(getMessageContentKey(msg1)).not.toBe(getMessageContentKey(msg2));
+  });
+
+  it('null-timestamp key does not collide with numeric timestamp key', () => {
+    // A message with sender_timestamp=null and received_at=123
+    // should not match a message with sender_timestamp that looks similar
+    const nullTsMsg = createMessage({ sender_timestamp: null, received_at: 123 });
+    const numericTsMsg = createMessage({ sender_timestamp: 123 });
+
+    expect(getMessageContentKey(nullTsMsg)).not.toBe(getMessageContentKey(numericTsMsg));
+  });
+
+  it('same text and null timestamp but different conversations produce different keys', () => {
+    const msg1 = createMessage({
+      sender_timestamp: null,
+      conversation_key: 'chan1',
+      received_at: 1700000001,
+    });
+    const msg2 = createMessage({
+      sender_timestamp: null,
+      conversation_key: 'chan2',
+      received_at: 1700000001,
+    });
+
+    expect(getMessageContentKey(msg1)).not.toBe(getMessageContentKey(msg2));
+  });
+
+  it('null-timestamp messages with same text and same received_at but different ids produce different keys', () => {
+    // This is the key fix: two genuinely different messages arriving in the same second
+    // with null sender_timestamp must NOT collide, even if text is identical
+    const msg1 = createMessage({ id: 10, sender_timestamp: null, received_at: 1700000001 });
+    const msg2 = createMessage({ id: 11, sender_timestamp: null, received_at: 1700000001 });
+
+    expect(getMessageContentKey(msg1)).not.toBe(getMessageContentKey(msg2));
+  });
+
+  it('null-timestamp messages with same id produce same key (true duplicates dedup)', () => {
+    // Same message arriving via WS + API fetch has the same id — should still dedup
+    const msg1 = createMessage({ id: 42, sender_timestamp: null, received_at: 1700000001 });
+    const msg2 = createMessage({ id: 42, sender_timestamp: null, received_at: 1700000001 });
+
+    expect(getMessageContentKey(msg1)).toBe(getMessageContentKey(msg2));
   });
 });
 

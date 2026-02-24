@@ -1,7 +1,5 @@
-"""Tests for RadioManager multi-transport connect dispatch.
-
-These tests verify that connect() routes to the correct transport method
-based on settings.connection_type, and that connection_info is set correctly.
+"""Tests for RadioManager multi-transport connect dispatch, serial device
+testing, and post-connect setup ordering.
 """
 
 import asyncio
@@ -219,8 +217,232 @@ class TestConnectionMonitor:
 
         # Should report connection lost, but not report healthy until setup succeeds.
         mock_broadcast_health.assert_any_call(False, "Serial: /dev/ttyUSB0")
-        healthy_calls = [
-            call for call in mock_broadcast_health.call_args_list if call.args[0] is True
-        ]
+        healthy_calls = [c for c in mock_broadcast_health.call_args_list if c.args[0] is True]
         assert healthy_calls == []
         assert rm._last_connected is False
+
+
+class TestSerialDeviceProbe:
+    """Tests for test_serial_device() — verifies cleanup on all exit paths."""
+
+    @pytest.mark.asyncio
+    async def test_success_returns_true_and_disconnects(self):
+        """Successful probe returns True and always disconnects."""
+        from app.radio import test_serial_device
+
+        mock_mc = MagicMock()
+        mock_mc.is_connected = True
+        mock_mc.self_info = {"name": "MyNode"}
+        mock_mc.disconnect = AsyncMock()
+
+        with patch("app.radio.MeshCore") as mock_meshcore:
+            mock_meshcore.create_serial = AsyncMock(return_value=mock_mc)
+
+            result = await test_serial_device("/dev/ttyUSB0", 115200)
+
+        assert result is True
+        mock_mc.disconnect.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_not_connected_returns_false_and_disconnects(self):
+        """Device that connects but reports is_connected=False still disconnects."""
+        from app.radio import test_serial_device
+
+        mock_mc = MagicMock()
+        mock_mc.is_connected = False
+        mock_mc.self_info = None
+        mock_mc.disconnect = AsyncMock()
+
+        with patch("app.radio.MeshCore") as mock_meshcore:
+            mock_meshcore.create_serial = AsyncMock(return_value=mock_mc)
+
+            result = await test_serial_device("/dev/ttyUSB0", 115200)
+
+        assert result is False
+        mock_mc.disconnect.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_no_self_info_returns_false_and_disconnects(self):
+        """Connected but no self_info returns False; still disconnects."""
+        from app.radio import test_serial_device
+
+        mock_mc = MagicMock()
+        mock_mc.is_connected = True
+        mock_mc.self_info = None
+        mock_mc.disconnect = AsyncMock()
+
+        with patch("app.radio.MeshCore") as mock_meshcore:
+            mock_meshcore.create_serial = AsyncMock(return_value=mock_mc)
+
+            result = await test_serial_device("/dev/ttyUSB0", 115200)
+
+        assert result is False
+        mock_mc.disconnect.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_false_no_disconnect_needed(self):
+        """asyncio.TimeoutError before create_serial completes — mc is None, no disconnect."""
+        from app.radio import test_serial_device
+
+        with patch("app.radio.MeshCore") as mock_meshcore:
+            mock_meshcore.create_serial = AsyncMock(side_effect=asyncio.TimeoutError)
+
+            result = await test_serial_device("/dev/ttyUSB0", 115200, timeout=0.1)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_false_and_disconnects(self):
+        """If create_serial succeeds but subsequent code raises, disconnect still runs."""
+        from app.radio import test_serial_device
+
+        mock_mc = MagicMock()
+        # Accessing is_connected raises (simulates corrupted state)
+        type(mock_mc).is_connected = property(lambda self: (_ for _ in ()).throw(OSError("oops")))
+        mock_mc.disconnect = AsyncMock()
+
+        with patch("app.radio.MeshCore") as mock_meshcore:
+            mock_meshcore.create_serial = AsyncMock(return_value=mock_mc)
+
+            result = await test_serial_device("/dev/ttyUSB0", 115200)
+
+        assert result is False
+        mock_mc.disconnect.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_disconnect_exception_is_swallowed(self):
+        """If disconnect() itself raises, the exception does not propagate."""
+        from app.radio import test_serial_device
+
+        mock_mc = MagicMock()
+        mock_mc.is_connected = True
+        mock_mc.self_info = {"name": "MyNode"}
+        mock_mc.disconnect = AsyncMock(side_effect=OSError("port closed"))
+
+        with patch("app.radio.MeshCore") as mock_meshcore:
+            mock_meshcore.create_serial = AsyncMock(return_value=mock_mc)
+
+            result = await test_serial_device("/dev/ttyUSB0", 115200)
+
+        # Should still return True despite disconnect failure
+        assert result is True
+        mock_mc.disconnect.assert_awaited_once()
+
+
+class TestPostConnectSetupOrdering:
+    """Tests for post_connect_setup() — verifies drain-before-auto-fetch ordering."""
+
+    @pytest.mark.asyncio
+    async def test_drain_runs_before_auto_fetch(self):
+        """drain_pending_messages must be called BEFORE start_auto_message_fetching."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        mock_mc = MagicMock()
+        mock_mc.start_auto_message_fetching = AsyncMock()
+        rm._meshcore = mock_mc
+
+        call_order = []
+
+        async def mock_drain():
+            call_order.append("drain")
+            return 0
+
+        async def mock_start_auto():
+            call_order.append("auto_fetch")
+
+        mock_mc.start_auto_message_fetching = AsyncMock(side_effect=mock_start_auto)
+
+        with (
+            patch("app.event_handlers.register_event_handlers"),
+            patch("app.keystore.export_and_store_private_key", new_callable=AsyncMock),
+            patch("app.radio_sync.sync_radio_time", new_callable=AsyncMock),
+            patch("app.radio_sync.sync_and_offload_all", new_callable=AsyncMock, return_value={}),
+            patch("app.radio_sync.start_periodic_sync"),
+            patch("app.radio_sync.send_advertisement", new_callable=AsyncMock, return_value=False),
+            patch("app.radio_sync.start_periodic_advert"),
+            patch(
+                "app.radio_sync.drain_pending_messages",
+                new_callable=AsyncMock,
+                side_effect=mock_drain,
+            ),
+            patch("app.radio_sync.start_message_polling"),
+        ):
+            await rm.post_connect_setup()
+
+        assert call_order == ["drain", "auto_fetch"], (
+            f"Expected drain before auto_fetch, got: {call_order}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_setup_sets_and_clears_in_progress_flag(self):
+        """is_setup_in_progress is True during setup and False after."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        mock_mc = MagicMock()
+        mock_mc.start_auto_message_fetching = AsyncMock()
+        rm._meshcore = mock_mc
+
+        observed_during = None
+
+        async def mock_drain():
+            nonlocal observed_during
+            observed_during = rm.is_setup_in_progress
+            return 0
+
+        with (
+            patch("app.event_handlers.register_event_handlers"),
+            patch("app.keystore.export_and_store_private_key", new_callable=AsyncMock),
+            patch("app.radio_sync.sync_radio_time", new_callable=AsyncMock),
+            patch("app.radio_sync.sync_and_offload_all", new_callable=AsyncMock, return_value={}),
+            patch("app.radio_sync.start_periodic_sync"),
+            patch("app.radio_sync.send_advertisement", new_callable=AsyncMock, return_value=False),
+            patch("app.radio_sync.start_periodic_advert"),
+            patch(
+                "app.radio_sync.drain_pending_messages",
+                new_callable=AsyncMock,
+                side_effect=mock_drain,
+            ),
+            patch("app.radio_sync.start_message_polling"),
+        ):
+            await rm.post_connect_setup()
+
+        assert observed_during is True
+        assert rm.is_setup_in_progress is False
+
+    @pytest.mark.asyncio
+    async def test_setup_clears_in_progress_flag_on_failure(self):
+        """is_setup_in_progress is cleared even if setup raises."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        mock_mc = MagicMock()
+        mock_mc.start_auto_message_fetching = AsyncMock()
+        rm._meshcore = mock_mc
+
+        with (
+            patch("app.event_handlers.register_event_handlers"),
+            patch("app.keystore.export_and_store_private_key", new_callable=AsyncMock),
+            patch(
+                "app.radio_sync.sync_radio_time",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("clock failed"),
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="clock failed"):
+                await rm.post_connect_setup()
+
+        assert rm.is_setup_in_progress is False
+
+    @pytest.mark.asyncio
+    async def test_setup_noop_when_no_meshcore(self):
+        """post_connect_setup does nothing when meshcore is None."""
+        from app.radio import RadioManager
+
+        rm = RadioManager()
+        rm._meshcore = None
+
+        # Should not raise or call any functions
+        await rm.post_connect_setup()
+        assert rm.is_setup_in_progress is False

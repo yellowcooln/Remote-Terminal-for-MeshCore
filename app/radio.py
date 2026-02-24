@@ -70,6 +70,7 @@ def detect_serial_devices() -> list[str]:
 
 async def test_serial_device(port: str, baudrate: int, timeout: float = 3.0) -> bool:
     """Test if a MeshCore radio responds on the given serial port."""
+    mc = None
     try:
         logger.debug("Testing serial device %s", port)
         mc = await asyncio.wait_for(
@@ -80,10 +81,8 @@ async def test_serial_device(port: str, baudrate: int, timeout: float = 3.0) -> 
         # Check if we got valid self_info (indicates successful communication)
         if mc.is_connected and mc.self_info:
             logger.debug("Device %s responded with valid self_info", port)
-            await mc.disconnect()
             return True
 
-        await mc.disconnect()
         return False
     except asyncio.TimeoutError:
         logger.debug("Device %s timed out", port)
@@ -91,6 +90,12 @@ async def test_serial_device(port: str, baudrate: int, timeout: float = 3.0) -> 
     except Exception as e:
         logger.debug("Device %s failed: %s", port, e)
         return False
+    finally:
+        if mc is not None:
+            try:
+                await mc.disconnect()
+            except Exception:
+                pass
 
 
 async def find_radio_port(baudrate: int) -> str | None:
@@ -251,13 +256,15 @@ class RadioManager:
                 # Start periodic advertisement (idempotent)
                 start_periodic_advert()
 
-                await self._meshcore.start_auto_message_fetching()
-                logger.info("Auto message fetching started")
-
-                # Drain any messages that were queued before we connected
+                # Drain any messages that were queued before we connected.
+                # This must happen BEFORE starting auto-fetch, otherwise both
+                # compete on get_msg() with interleaved radio I/O.
                 drained = await drain_pending_messages()
                 if drained > 0:
                     logger.info("Drained %d pending message(s)", drained)
+
+                await self._meshcore.start_auto_message_fetching()
+                logger.info("Auto message fetching started")
 
                 # Start periodic message polling as fallback (idempotent)
                 start_message_polling()
