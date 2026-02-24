@@ -110,6 +110,15 @@ Raw packet handling uses two identities by design:
 
 Frontend packet-feed consumers should treat `observation_id` as the dedup/render key, while `id` remains the storage reference.
 
+## Repeater Advert Path Memory
+
+To improve repeater disambiguation in the network visualizer, the backend stores recent unique advertisement paths per repeater in a dedicated table (`repeater_advert_paths`).
+
+- This is independent of raw-packet payload deduplication.
+- Paths are keyed per repeater + path, with `heard_count`, `first_seen`, and `last_seen`.
+- Only the N most recent unique paths are retained per repeater (currently 10).
+- See `frontend/src/components/AGENTS.md` § "Advert-Path Identity Hints" for how the visualizer consumes this data.
+
 ## Data Flow
 
 ### Incoming Messages
@@ -259,7 +268,9 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/radio/reboot` | Reboot radio or reconnect if disconnected |
 | POST | `/api/radio/reconnect` | Manual radio reconnection |
 | GET | `/api/contacts` | List contacts |
+| GET | `/api/contacts/repeaters/advert-paths` | List recent unique advert paths for all repeaters |
 | GET | `/api/contacts/{key}` | Get contact by public key or prefix |
+| GET | `/api/contacts/{key}/advert-paths` | List recent unique advert paths for one repeater |
 | POST | `/api/contacts` | Create contact (optionally trigger historical DM decrypt) |
 | DELETE | `/api/contacts/{key}` | Delete contact |
 | POST | `/api/contacts/sync` | Pull from radio |

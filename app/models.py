@@ -72,6 +72,28 @@ class CreateContactRequest(BaseModel):
 CONTACT_TYPE_REPEATER = 2
 
 
+class RepeaterAdvertPath(BaseModel):
+    """A unique advert path observed for a repeater."""
+
+    path: str = Field(description="Hex-encoded routing path (empty string for direct)")
+    path_len: int = Field(description="Number of hops in the path")
+    next_hop: str | None = Field(
+        default=None, description="First hop toward us (2-char hex), or null for direct"
+    )
+    first_seen: int = Field(description="Unix timestamp of first observation")
+    last_seen: int = Field(description="Unix timestamp of most recent observation")
+    heard_count: int = Field(description="Number of times this unique path was heard")
+
+
+class RepeaterAdvertPathSummary(BaseModel):
+    """Recent unique advertisement paths for a single repeater."""
+
+    repeater_key: str = Field(description="Repeater public key (64-char hex)")
+    paths: list[RepeaterAdvertPath] = Field(
+        default_factory=list, description="Most recent unique advert paths"
+    )
+
+
 class Channel(BaseModel):
     key: str = Field(description="Channel key (32-char hex)")
     name: str

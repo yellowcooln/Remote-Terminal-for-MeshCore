@@ -12,6 +12,8 @@ import type {
   MigratePreferencesResponse,
   RadioConfig,
   RadioConfigUpdate,
+  RepeaterAdvertPath,
+  RepeaterAdvertPathSummary,
   StatisticsResponse,
   TelemetryResponse,
   TraceResponse,
@@ -94,6 +96,12 @@ export const api = {
   // Contacts
   getContacts: (limit = 100, offset = 0) =>
     fetchJson<Contact[]>(`/contacts?limit=${limit}&offset=${offset}`),
+  getRepeaterAdvertPaths: (limitPerRepeater = 10) =>
+    fetchJson<RepeaterAdvertPathSummary[]>(
+      `/contacts/repeaters/advert-paths?limit_per_repeater=${limitPerRepeater}`
+    ),
+  getContactAdvertPaths: (publicKey: string, limit = 10) =>
+    fetchJson<RepeaterAdvertPath[]>(`/contacts/${publicKey}/advert-paths?limit=${limit}`),
   deleteContact: (publicKey: string) =>
     fetchJson<{ status: string }>(`/contacts/${publicKey}`, {
       method: 'DELETE',

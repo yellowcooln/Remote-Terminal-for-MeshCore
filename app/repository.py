@@ -15,6 +15,8 @@ from app.models import (
     Favorite,
     Message,
     MessagePath,
+    RepeaterAdvertPath,
+    RepeaterAdvertPathSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -239,6 +241,113 @@ class ContactRepository:
         )
         rows = await cursor.fetchall()
         return [ContactRepository._row_to_contact(row) for row in rows]
+
+
+class RepeaterAdvertPathRepository:
+    """Repository for recent unique repeater advertisement paths."""
+
+    @staticmethod
+    def _row_to_path(row) -> RepeaterAdvertPath:
+        path = row["path_hex"] or ""
+        next_hop = path[:2].lower() if len(path) >= 2 else None
+        return RepeaterAdvertPath(
+            path=path,
+            path_len=row["path_len"],
+            next_hop=next_hop,
+            first_seen=row["first_seen"],
+            last_seen=row["last_seen"],
+            heard_count=row["heard_count"],
+        )
+
+    @staticmethod
+    async def record_observation(
+        repeater_key: str, path_hex: str, timestamp: int, max_paths_per_repeater: int = 10
+    ) -> None:
+        """
+        Upsert a unique advert path observation for a repeater and prune to N most recent.
+        """
+        if max_paths_per_repeater < 1:
+            max_paths_per_repeater = 1
+
+        normalized_key = repeater_key.lower()
+        normalized_path = path_hex.lower()
+        path_len = len(normalized_path) // 2
+
+        await db.conn.execute(
+            """
+            INSERT INTO repeater_advert_paths
+                (repeater_key, path_hex, path_len, first_seen, last_seen, heard_count)
+            VALUES (?, ?, ?, ?, ?, 1)
+            ON CONFLICT(repeater_key, path_hex) DO UPDATE SET
+                last_seen = MAX(repeater_advert_paths.last_seen, excluded.last_seen),
+                path_len = excluded.path_len,
+                heard_count = repeater_advert_paths.heard_count + 1
+            """,
+            (normalized_key, normalized_path, path_len, timestamp, timestamp),
+        )
+
+        # Keep only the N most recent unique paths per repeater.
+        await db.conn.execute(
+            """
+            DELETE FROM repeater_advert_paths
+            WHERE repeater_key = ?
+              AND path_hex NOT IN (
+                  SELECT path_hex
+                  FROM repeater_advert_paths
+                  WHERE repeater_key = ?
+                  ORDER BY last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
+                  LIMIT ?
+              )
+            """,
+            (normalized_key, normalized_key, max_paths_per_repeater),
+        )
+        await db.conn.commit()
+
+    @staticmethod
+    async def get_recent_for_repeater(
+        repeater_key: str, limit: int = 10
+    ) -> list[RepeaterAdvertPath]:
+        cursor = await db.conn.execute(
+            """
+            SELECT path_hex, path_len, first_seen, last_seen, heard_count
+            FROM repeater_advert_paths
+            WHERE repeater_key = ?
+            ORDER BY last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
+            LIMIT ?
+            """,
+            (repeater_key.lower(), limit),
+        )
+        rows = await cursor.fetchall()
+        return [RepeaterAdvertPathRepository._row_to_path(row) for row in rows]
+
+    @staticmethod
+    async def get_recent_for_all_repeaters(
+        limit_per_repeater: int = 10,
+    ) -> list[RepeaterAdvertPathSummary]:
+        cursor = await db.conn.execute(
+            """
+            SELECT repeater_key, path_hex, path_len, first_seen, last_seen, heard_count
+            FROM repeater_advert_paths
+            ORDER BY repeater_key ASC, last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
+            """
+        )
+        rows = await cursor.fetchall()
+
+        grouped: dict[str, list[RepeaterAdvertPath]] = {}
+        for row in rows:
+            repeater_key = row["repeater_key"]
+            paths = grouped.get(repeater_key)
+            if paths is None:
+                paths = []
+                grouped[repeater_key] = paths
+            if len(paths) >= limit_per_repeater:
+                continue
+            paths.append(RepeaterAdvertPathRepository._row_to_path(row))
+
+        return [
+            RepeaterAdvertPathSummary(repeater_key=repeater_key, paths=paths)
+            for repeater_key, paths in grouped.items()
+        ]
 
 
 class ChannelRepository:

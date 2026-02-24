@@ -16,7 +16,14 @@ import {
 } from 'd3-force-3d';
 import type { SimulationLinkDatum } from 'd3-force';
 import { PayloadType } from '@michaelhart/meshcore-decoder';
-import { CONTACT_TYPE_REPEATER, type Contact, type RawPacket, type RadioConfig } from '../types';
+import { api } from '../api';
+import {
+  CONTACT_TYPE_REPEATER,
+  type Contact,
+  type RawPacket,
+  type RadioConfig,
+  type RepeaterAdvertPathSummary,
+} from '../types';
 import { getRawPacketObservationKey } from '../utils/rawPacketIdentity';
 import { Checkbox } from './ui/checkbox';
 import {
@@ -50,6 +57,7 @@ interface GraphNode extends SimulationNodeDatum3D {
   isAmbiguous: boolean;
   lastActivity: number;
   lastSeen?: number | null;
+  probableIdentity?: string | null;
   ambiguousNames?: string[];
 }
 
@@ -110,8 +118,10 @@ interface UseVisualizerData3DOptions {
   packets: RawPacket[];
   contacts: Contact[];
   config: RadioConfig | null;
+  repeaterAdvertPaths: RepeaterAdvertPathSummary[];
   showAmbiguousPaths: boolean;
   showAmbiguousNodes: boolean;
+  useAdvertPathHints: boolean;
   splitAmbiguousByTraffic: boolean;
   chargeStrength: number;
   letEmDrift: boolean;
@@ -133,8 +143,10 @@ function useVisualizerData3D({
   packets,
   contacts,
   config,
+  repeaterAdvertPaths,
   showAmbiguousPaths,
   showAmbiguousNodes,
+  useAdvertPathHints,
   splitAmbiguousByTraffic,
   chargeStrength,
   letEmDrift,
@@ -181,6 +193,15 @@ function useVisualizerData3D({
 
     return { byPrefix12, byName, byPrefix };
   }, [contacts]);
+
+  const advertPathIndex = useMemo(() => {
+    const byRepeater = new Map<string, RepeaterAdvertPathSummary['paths']>();
+    for (const summary of repeaterAdvertPaths) {
+      const key = summary.repeater_key.slice(0, 12).toLowerCase();
+      byRepeater.set(key, summary.paths);
+    }
+    return { byRepeater };
+  }, [repeaterAdvertPaths]);
 
   // Keep refs in sync with props
   useEffect(() => {
@@ -304,7 +325,13 @@ function useVisualizerData3D({
     trafficPatternsRef.current.clear();
     setStats({ processed: 0, animated: 0, nodes: selfNode ? 1 : 0, links: 0 });
     syncSimulation();
-  }, [showAmbiguousPaths, showAmbiguousNodes, splitAmbiguousByTraffic, syncSimulation]);
+  }, [
+    showAmbiguousPaths,
+    showAmbiguousNodes,
+    useAdvertPathHints,
+    splitAmbiguousByTraffic,
+    syncSimulation,
+  ]);
 
   const addNode = useCallback(
     (
@@ -312,13 +339,15 @@ function useVisualizerData3D({
       name: string | null,
       type: NodeType,
       isAmbiguous: boolean,
+      probableIdentity?: string | null,
       ambiguousNames?: string[],
       lastSeen?: number | null
     ) => {
       const existing = nodesRef.current.get(id);
       if (existing) {
         existing.lastActivity = Date.now();
-        if (name && !existing.name) existing.name = name;
+        if (name) existing.name = name;
+        if (probableIdentity !== undefined) existing.probableIdentity = probableIdentity;
         if (ambiguousNames) existing.ambiguousNames = ambiguousNames;
         if (lastSeen !== undefined) existing.lastSeen = lastSeen;
       } else {
@@ -332,6 +361,7 @@ function useVisualizerData3D({
           type,
           isAmbiguous,
           lastActivity: Date.now(),
+          probableIdentity,
           lastSeen,
           ambiguousNames,
           x: r * Math.sin(phi) * Math.cos(theta),
@@ -378,6 +408,48 @@ function useVisualizerData3D({
     }
   }, []);
 
+  const pickLikelyRepeaterByAdvertPath = useCallback(
+    (candidates: Contact[], nextPrefix: string | null) => {
+      const nextHop = nextPrefix?.toLowerCase() ?? null;
+      const scored = candidates
+        .map((candidate) => {
+          const prefix12 = candidate.public_key.slice(0, 12).toLowerCase();
+          const paths = advertPathIndex.byRepeater.get(prefix12) ?? [];
+          let matchScore = 0;
+          let totalScore = 0;
+
+          for (const path of paths) {
+            totalScore += path.heard_count;
+            const pathNextHop = path.next_hop?.toLowerCase() ?? null;
+            if (pathNextHop === nextHop) {
+              matchScore += path.heard_count;
+            }
+          }
+
+          return { candidate, matchScore, totalScore };
+        })
+        .filter((entry) => entry.totalScore > 0)
+        .sort(
+          (a, b) =>
+            b.matchScore - a.matchScore ||
+            b.totalScore - a.totalScore ||
+            a.candidate.public_key.localeCompare(b.candidate.public_key)
+        );
+
+      if (scored.length === 0) return null;
+
+      const top = scored[0];
+      const second = scored[1] ?? null;
+
+      // Require stronger-than-trivial evidence and a clear winner.
+      if (top.matchScore < 2) return null;
+      if (second && top.matchScore < second.matchScore * 2) return null;
+
+      return top.candidate;
+    },
+    [advertPathIndex]
+  );
+
   const resolveNode = useCallback(
     (
       source: { type: 'prefix' | 'pubkey' | 'name'; value: string },
@@ -397,6 +469,7 @@ function useVisualizerData3D({
           getNodeType(contact),
           false,
           undefined,
+          undefined,
           contact?.last_seen
         );
         return nodeId;
@@ -407,11 +480,19 @@ function useVisualizerData3D({
         if (contact) {
           const nodeId = contact.public_key.slice(0, 12).toLowerCase();
           if (myPrefix && nodeId === myPrefix) return 'self';
-          addNode(nodeId, contact.name, getNodeType(contact), false, undefined, contact.last_seen);
+          addNode(
+            nodeId,
+            contact.name,
+            getNodeType(contact),
+            false,
+            undefined,
+            undefined,
+            contact.last_seen
+          );
           return nodeId;
         }
         const nodeId = `name:${source.value}`;
-        addNode(nodeId, source.value, 'client', false);
+        addNode(nodeId, source.value, 'client', false, undefined);
         return nodeId;
       }
 
@@ -421,7 +502,15 @@ function useVisualizerData3D({
       if (contact) {
         const nodeId = contact.public_key.slice(0, 12).toLowerCase();
         if (myPrefix && nodeId === myPrefix) return 'self';
-        addNode(nodeId, contact.name, getNodeType(contact), false, undefined, contact.last_seen);
+        addNode(
+          nodeId,
+          contact.name,
+          getNodeType(contact),
+          false,
+          undefined,
+          undefined,
+          contact.last_seen
+        );
         return nodeId;
       }
 
@@ -433,7 +522,7 @@ function useVisualizerData3D({
         if (filtered.length === 1) {
           const c = filtered[0];
           const nodeId = c.public_key.slice(0, 12).toLowerCase();
-          addNode(nodeId, c.name, getNodeType(c), false, undefined, c.last_seen);
+          addNode(nodeId, c.name, getNodeType(c), false, undefined, undefined, c.last_seen);
           return nodeId;
         }
 
@@ -446,6 +535,20 @@ function useVisualizerData3D({
 
           let nodeId = `?${source.value.toLowerCase()}`;
           let displayName = source.value.toUpperCase();
+          let probableIdentity: string | null = null;
+          let ambiguousNames = names.length > 0 ? names : undefined;
+
+          if (useAdvertPathHints && isRepeater && trafficContext) {
+            const likely = pickLikelyRepeaterByAdvertPath(filtered, trafficContext.nextPrefix);
+            if (likely) {
+              const likelyName = likely.name || likely.public_key.slice(0, 12).toUpperCase();
+              probableIdentity = likelyName;
+              displayName = likelyName;
+              ambiguousNames = filtered
+                .filter((c) => c.public_key !== likely.public_key)
+                .map((c) => c.name || c.public_key.slice(0, 8));
+            }
+          }
 
           if (splitAmbiguousByTraffic && isRepeater && trafficContext) {
             const prefix = source.value.toLowerCase();
@@ -465,7 +568,9 @@ function useVisualizerData3D({
               if (analysis.shouldSplit && trafficContext.nextPrefix) {
                 const nextShort = trafficContext.nextPrefix.slice(0, 2).toLowerCase();
                 nodeId = `?${prefix}:>${nextShort}`;
-                displayName = `${source.value.toUpperCase()}:>${nextShort}`;
+                if (!probableIdentity) {
+                  displayName = `${source.value.toUpperCase()}:>${nextShort}`;
+                }
               }
             }
           }
@@ -475,7 +580,8 @@ function useVisualizerData3D({
             displayName,
             isRepeater ? 'repeater' : 'client',
             true,
-            names.length > 0 ? names : undefined,
+            probableIdentity,
+            ambiguousNames,
             lastSeen
           );
           return nodeId;
@@ -484,7 +590,13 @@ function useVisualizerData3D({
 
       return null;
     },
-    [contactIndex, addNode, splitAmbiguousByTraffic]
+    [
+      contactIndex,
+      addNode,
+      useAdvertPathHints,
+      pickLikelyRepeaterByAdvertPath,
+      splitAmbiguousByTraffic,
+    ]
   );
 
   const buildPath = useCallback(
@@ -892,6 +1004,7 @@ export function PacketVisualizer3D({
   // Options
   const [showAmbiguousPaths, setShowAmbiguousPaths] = useState(true);
   const [showAmbiguousNodes, setShowAmbiguousNodes] = useState(false);
+  const [useAdvertPathHints, setUseAdvertPathHints] = useState(true);
   const [splitAmbiguousByTraffic, setSplitAmbiguousByTraffic] = useState(true);
   const [chargeStrength, setChargeStrength] = useState(-200);
   const [observationWindowSec, setObservationWindowSec] = useState(DEFAULT_OBSERVATION_WINDOW_SEC);
@@ -900,6 +1013,31 @@ export function PacketVisualizer3D({
   const [showControls, setShowControls] = useState(true);
   const [autoOrbit, setAutoOrbit] = useState(false);
   const [pruneStaleNodes, setPruneStaleNodes] = useState(false);
+  const [repeaterAdvertPaths, setRepeaterAdvertPaths] = useState<RepeaterAdvertPathSummary[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRepeaterAdvertPaths() {
+      try {
+        const data = await api.getRepeaterAdvertPaths(10);
+        if (!cancelled) {
+          setRepeaterAdvertPaths(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          // Best-effort hinting; keep visualizer fully functional without this data.
+          console.debug('Failed to load repeater advert path hints', error);
+          setRepeaterAdvertPaths([]);
+        }
+      }
+    }
+
+    loadRepeaterAdvertPaths();
+    return () => {
+      cancelled = true;
+    };
+  }, [contacts.length]);
 
   // Hover & click-to-pin
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -914,8 +1052,10 @@ export function PacketVisualizer3D({
     packets,
     contacts,
     config,
+    repeaterAdvertPaths,
     showAmbiguousPaths,
     showAmbiguousNodes,
+    useAdvertPathHints,
     splitAmbiguousByTraffic,
     chargeStrength,
     letEmDrift,
@@ -1228,9 +1368,7 @@ export function PacketVisualizer3D({
         if (nd.labelDiv.style.color !== labelColor) {
           nd.labelDiv.style.color = labelColor;
         }
-        const labelText = node.isAmbiguous
-          ? node.id
-          : node.name || (node.type === 'self' ? 'Me' : node.id.slice(0, 8));
+        const labelText = node.name || (node.type === 'self' ? 'Me' : node.id.slice(0, 8));
         if (nd.labelDiv.textContent !== labelText) {
           nd.labelDiv.textContent = labelText;
         }
@@ -1537,6 +1675,19 @@ export function PacketVisualizer3D({
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox
+                    checked={useAdvertPathHints}
+                    onCheckedChange={(c) => setUseAdvertPathHints(c === true)}
+                    disabled={!showAmbiguousPaths}
+                  />
+                  <span
+                    title="Use stored repeater advert paths to assign likely identity labels for ambiguous repeater nodes"
+                    className={!showAmbiguousPaths ? 'text-muted-foreground' : ''}
+                  >
+                    Use repeater advert-path identity hints
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
                     checked={splitAmbiguousByTraffic}
                     onCheckedChange={(c) => setSplitAmbiguousByTraffic(c === true)}
                     disabled={!showAmbiguousPaths}
@@ -1702,9 +1853,13 @@ export function PacketVisualizer3D({
                   Type: {node.type}
                   {node.isAmbiguous ? ' (ambiguous)' : ''}
                 </div>
+                {node.probableIdentity && (
+                  <div className="text-muted-foreground">Probably: {node.probableIdentity}</div>
+                )}
                 {node.ambiguousNames && node.ambiguousNames.length > 0 && (
                   <div className="text-muted-foreground">
-                    Possible: {node.ambiguousNames.join(', ')}
+                    {node.probableIdentity ? 'Other possible: ' : 'Possible: '}
+                    {node.ambiguousNames.join(', ')}
                   </div>
                 )}
                 {neighbors.length > 0 && (
