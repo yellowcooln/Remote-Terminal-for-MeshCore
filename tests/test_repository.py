@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.database import Database
-from app.repository import MessageRepository
+from app.repository import ContactRepository, MessageRepository, RepeaterAdvertPathRepository
 
 
 @pytest.fixture
@@ -296,6 +296,68 @@ class TestMessageRepositoryGetAckCount:
         result = await MessageRepository.get_ack_count(message_id=msg_id)
 
         assert result == 0
+
+
+class TestRepeaterAdvertPathRepository:
+    """Test storing and retrieving recent unique repeater advert paths."""
+
+    @pytest.mark.asyncio
+    async def test_record_observation_upserts_and_tracks_count(self, test_db):
+        repeater_key = "aa" * 32
+        await ContactRepository.upsert({"public_key": repeater_key, "name": "R1", "type": 2})
+
+        await RepeaterAdvertPathRepository.record_observation(repeater_key, "112233", 1000)
+        await RepeaterAdvertPathRepository.record_observation(repeater_key, "112233", 1010)
+
+        paths = await RepeaterAdvertPathRepository.get_recent_for_repeater(repeater_key, limit=10)
+        assert len(paths) == 1
+        assert paths[0].path == "112233"
+        assert paths[0].path_len == 3
+        assert paths[0].next_hop == "11"
+        assert paths[0].first_seen == 1000
+        assert paths[0].last_seen == 1010
+        assert paths[0].heard_count == 2
+
+    @pytest.mark.asyncio
+    async def test_prunes_to_most_recent_n_unique_paths(self, test_db):
+        repeater_key = "bb" * 32
+        await ContactRepository.upsert({"public_key": repeater_key, "name": "R2", "type": 2})
+
+        await RepeaterAdvertPathRepository.record_observation(
+            repeater_key, "aa", 1000, max_paths_per_repeater=2
+        )
+        await RepeaterAdvertPathRepository.record_observation(
+            repeater_key, "bb", 1001, max_paths_per_repeater=2
+        )
+        await RepeaterAdvertPathRepository.record_observation(
+            repeater_key, "cc", 1002, max_paths_per_repeater=2
+        )
+
+        paths = await RepeaterAdvertPathRepository.get_recent_for_repeater(repeater_key, limit=10)
+        assert [p.path for p in paths] == ["cc", "bb"]
+
+    @pytest.mark.asyncio
+    async def test_get_recent_for_all_repeaters_respects_limit(self, test_db):
+        repeater_a = "cc" * 32
+        repeater_b = "dd" * 32
+        await ContactRepository.upsert({"public_key": repeater_a, "name": "RA", "type": 2})
+        await ContactRepository.upsert({"public_key": repeater_b, "name": "RB", "type": 2})
+
+        await RepeaterAdvertPathRepository.record_observation(repeater_a, "01", 1000)
+        await RepeaterAdvertPathRepository.record_observation(repeater_a, "02", 1001)
+        await RepeaterAdvertPathRepository.record_observation(repeater_b, "", 1002)
+
+        grouped = await RepeaterAdvertPathRepository.get_recent_for_all_repeaters(
+            limit_per_repeater=1
+        )
+        by_key = {item.repeater_key: item.paths for item in grouped}
+
+        assert repeater_a in by_key
+        assert repeater_b in by_key
+        assert len(by_key[repeater_a]) == 1
+        assert by_key[repeater_a][0].path == "02"
+        assert by_key[repeater_b][0].path == ""
+        assert by_key[repeater_b][0].next_hop is None
 
 
 class TestAppSettingsRepository:

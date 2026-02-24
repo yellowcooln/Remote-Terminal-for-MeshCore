@@ -15,7 +15,7 @@ from meshcore import EventType
 
 from app.database import Database
 from app.radio import radio_manager
-from app.repository import ContactRepository, MessageRepository
+from app.repository import ContactRepository, MessageRepository, RepeaterAdvertPathRepository
 
 # Sample 64-char hex public keys for testing
 KEY_A = "aa" * 32  # aaaa...aa
@@ -206,6 +206,50 @@ class TestGetContact:
 
         assert response.status_code == 409
         assert "ambiguous" in response.json()["detail"].lower()
+
+
+class TestAdvertPaths:
+    """Test repeater advert path endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_list_repeater_advert_paths(self, test_db, client):
+        repeater_key = KEY_A
+        await _insert_contact(repeater_key, "R1", type=2)
+        await RepeaterAdvertPathRepository.record_observation(repeater_key, "1122", 1000)
+        await RepeaterAdvertPathRepository.record_observation(repeater_key, "3344", 1010)
+
+        response = await client.get("/api/contacts/repeaters/advert-paths?limit_per_repeater=1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["repeater_key"] == repeater_key
+        assert len(data[0]["paths"]) == 1
+        assert data[0]["paths"][0]["path"] == "3344"
+        assert data[0]["paths"][0]["next_hop"] == "33"
+
+    @pytest.mark.asyncio
+    async def test_get_contact_advert_paths_for_repeater(self, test_db, client):
+        repeater_key = KEY_A
+        await _insert_contact(repeater_key, "R1", type=2)
+        await RepeaterAdvertPathRepository.record_observation(repeater_key, "", 1000)
+
+        response = await client.get(f"/api/contacts/{repeater_key}/advert-paths")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["path"] == ""
+        assert data[0]["next_hop"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_contact_advert_paths_rejects_non_repeater(self, test_db, client):
+        await _insert_contact(KEY_A, "Alice", type=1)
+
+        response = await client.get(f"/api/contacts/{KEY_A}/advert-paths")
+
+        assert response.status_code == 400
+        assert "not a repeater" in response.json()["detail"].lower()
 
 
 class TestMarkRead:

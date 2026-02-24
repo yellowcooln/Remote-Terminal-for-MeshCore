@@ -106,6 +106,19 @@ describe('fetchJson (via api methods)', () => {
       const [url] = mockFetch.mock.calls[0];
       expect(url).toBe('/api/contacts?limit=100&offset=0');
     });
+
+    it('builds repeater advert path endpoint query', async () => {
+      installMockFetch();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+
+      await api.getRepeaterAdvertPaths(12);
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toBe('/api/contacts/repeaters/advert-paths?limit_per_repeater=12');
+    });
   });
 
   describe('error handling', () => {

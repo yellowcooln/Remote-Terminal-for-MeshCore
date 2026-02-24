@@ -52,6 +52,20 @@ export interface Contact {
   last_read_at: number | null;
 }
 
+export interface RepeaterAdvertPath {
+  path: string;
+  path_len: number;
+  next_hop: string | null;
+  first_seen: number;
+  last_seen: number;
+  heard_count: number;
+}
+
+export interface RepeaterAdvertPathSummary {
+  repeater_key: string;
+  paths: RepeaterAdvertPath[];
+}
+
 export interface Channel {
   key: string;
   name: string;

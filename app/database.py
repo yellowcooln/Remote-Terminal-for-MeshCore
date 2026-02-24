@@ -59,6 +59,18 @@ CREATE TABLE IF NOT EXISTS raw_packets (
     FOREIGN KEY (message_id) REFERENCES messages(id)
 );
 
+CREATE TABLE IF NOT EXISTS repeater_advert_paths (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repeater_key TEXT NOT NULL,
+    path_hex TEXT NOT NULL,
+    path_len INTEGER NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    heard_count INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(repeater_key, path_hex),
+    FOREIGN KEY (repeater_key) REFERENCES contacts(public_key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(type, conversation_key);
 CREATE INDEX IF NOT EXISTS idx_messages_received ON messages(received_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup_null_safe
@@ -66,6 +78,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup_null_safe
 CREATE INDEX IF NOT EXISTS idx_raw_packets_message_id ON raw_packets(message_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_raw_packets_payload_hash ON raw_packets(payload_hash);
 CREATE INDEX IF NOT EXISTS idx_contacts_on_radio ON contacts(on_radio);
+CREATE INDEX IF NOT EXISTS idx_repeater_advert_paths_recent
+    ON repeater_advert_paths(repeater_key, last_seen DESC);
 """
 
 
