@@ -158,7 +158,7 @@ Run both the backend and `npm run dev` for hot-reloading frontend development.
 
 ### Code Quality & Tests
 
-Please test, lint, format, and quality check your code before PRing or committing. At the least, run a lint + autoformat + pyright check on the bakend, and a lint + autoformat on the frontend.
+Please test, lint, format, and quality check your code before PRing or committing. At the least, run a lint + autoformat + pyright check on the backend, and a lint + autoformat on the frontend.
 
 <details>
 <summary>But how?</summary>
@@ -279,7 +279,7 @@ cd frontend
 npm run test:run
 ```
 
-**E2#:**
+**E2E:**
 
 Warning: these tests are only guaranteed to run correctly in a narrow subset of environments; they require a busy mesh with messages arriving constantly. E2E tests are generally not necessary to run for normal development work.
 
