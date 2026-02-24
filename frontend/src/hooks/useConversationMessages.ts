@@ -319,6 +319,10 @@ export function useConversationMessages(
     fetchingConversationIdRef.current = newId;
     prevConversationIdRef.current = newId;
 
+    // Reset loadingOlder — the previous conversation's in-flight older-message
+    // fetch is irrelevant now (its stale-check will discard the response).
+    setLoadingOlder(false);
+
     // Clear state for new conversation
     if (!activeConversation || activeConversation.type === 'raw') {
       setMessages([]);

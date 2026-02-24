@@ -64,8 +64,22 @@ test.describe('Channel messaging in #flightless', () => {
     const messageContainer = messageEl.locator(
       'xpath=ancestor::div[contains(@class,"break-words")][1]'
     );
-    const resendButton = messageContainer.getByTitle('Resend message');
-    await expect(resendButton).toBeVisible({ timeout: 15_000 });
+    // Resend actions now live in the outgoing message status/path modal.
+    // Open it from either pending status (?) or echo-path indicator (✓...).
+    const statusOrPathTrigger = messageContainer.locator(
+      '[title="Message status"], [title="View echo paths"]'
+    );
+    await expect(statusOrPathTrigger.first()).toBeVisible({ timeout: 15_000 });
+    await statusOrPathTrigger.first().click();
+
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible({ timeout: 10_000 });
+
+    // Byte-perfect resend option (within 30s) includes this helper text.
+    const resendButton = modal.getByRole('button', {
+      name: /Only repeated by new repeaters/i,
+    });
+    await expect(resendButton).toBeVisible({ timeout: 10_000 });
 
     const resendResponsePromise = page.waitForResponse(
       (response) =>

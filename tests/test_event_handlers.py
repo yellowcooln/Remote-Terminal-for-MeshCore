@@ -96,6 +96,36 @@ class TestAckTracking:
 
         assert "recent" in _pending_acks
 
+    def test_cleanup_handles_many_expired_acks_without_growth(self):
+        """Many tracked ACKs that all expire should all be cleaned up,
+        preventing unbounded memory growth when no ACKs ever arrive."""
+        now = time.time()
+        for i in range(100):
+            _pending_acks[f"ack_{i}"] = (i, now - 300, 5000)  # All expired (300s ago, 5s timeout)
+
+        assert len(_pending_acks) == 100
+
+        cleanup_expired_acks()
+
+        assert len(_pending_acks) == 0
+
+    def test_cleanup_preserves_valid_acks_among_expired(self):
+        """Cleanup removes only expired ACKs, preserving valid ones."""
+        now = time.time()
+        # 50 expired
+        for i in range(50):
+            _pending_acks[f"expired_{i}"] = (i, now - 300, 5000)
+        # 50 valid
+        for i in range(50):
+            _pending_acks[f"valid_{i}"] = (100 + i, now, 60000)
+
+        assert len(_pending_acks) == 100
+
+        cleanup_expired_acks()
+
+        assert len(_pending_acks) == 50
+        assert all(k.startswith("valid_") for k in _pending_acks)
+
 
 class TestAckEventHandler:
     """Test the on_ack event handler."""

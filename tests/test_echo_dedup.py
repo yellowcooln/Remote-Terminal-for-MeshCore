@@ -6,6 +6,7 @@ messages, accumulate multi-path routing info, and ensure the dual DM processing
 paths (packet_processor + event_handler fallback) don't double-store messages.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -689,3 +690,108 @@ class TestDirectMessageDirectionDetection:
 
         # Not our message - should return None without attempting decryption
         assert result is None
+
+
+class TestConcurrentDMDedup:
+    """Test that concurrent DM processing deduplicates via atomic INSERT OR IGNORE.
+
+    On a mesh network, the same DM packet can arrive via two RF paths nearly
+    simultaneously, causing two concurrent calls to create_dm_message_from_decrypted.
+    SQLite's INSERT OR IGNORE ensures only one message is stored.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_identical_dms_only_store_once(self, test_db, captured_broadcasts):
+        """Two concurrent create_dm_message_from_decrypted calls with identical content
+        should result in exactly one stored message."""
+        from app.packet_processor import create_dm_message_from_decrypted
+
+        pkt1, _ = await RawPacketRepository.create(b"concurrent_dm_1", SENDER_TIMESTAMP)
+        pkt2, _ = await RawPacketRepository.create(b"concurrent_dm_2", SENDER_TIMESTAMP + 1)
+
+        decrypted = DecryptedDirectMessage(
+            timestamp=SENDER_TIMESTAMP,
+            flags=0,
+            message="Concurrent dedup test",
+            dest_hash="fa",
+            src_hash="a1",
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            results = await asyncio.gather(
+                create_dm_message_from_decrypted(
+                    packet_id=pkt1,
+                    decrypted=decrypted,
+                    their_public_key=CONTACT_PUB,
+                    our_public_key=OUR_PUB,
+                    received_at=SENDER_TIMESTAMP,
+                    path="aa",
+                    outgoing=False,
+                ),
+                create_dm_message_from_decrypted(
+                    packet_id=pkt2,
+                    decrypted=decrypted,
+                    their_public_key=CONTACT_PUB,
+                    our_public_key=OUR_PUB,
+                    received_at=SENDER_TIMESTAMP + 1,
+                    path="bbcc",
+                    outgoing=False,
+                ),
+            )
+
+        # Exactly one should create, the other should return None (duplicate)
+        created = [r for r in results if r is not None]
+        duplicates = [r for r in results if r is None]
+        assert len(created) == 1
+        assert len(duplicates) == 1
+
+        # Only one message in DB
+        messages = await MessageRepository.get_all(
+            msg_type="PRIV", conversation_key=CONTACT_PUB.lower(), limit=10
+        )
+        assert len(messages) == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_channel_echoes_only_store_once(self, test_db, captured_broadcasts):
+        """Two concurrent create_message_from_decrypted calls with identical content
+        should result in exactly one stored message."""
+        from app.packet_processor import create_message_from_decrypted
+
+        pkt1, _ = await RawPacketRepository.create(b"concurrent_chan_1", SENDER_TIMESTAMP)
+        pkt2, _ = await RawPacketRepository.create(b"concurrent_chan_2", SENDER_TIMESTAMP + 1)
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            results = await asyncio.gather(
+                create_message_from_decrypted(
+                    packet_id=pkt1,
+                    channel_key=CHANNEL_KEY,
+                    sender="Alice",
+                    message_text="Concurrent channel test",
+                    timestamp=SENDER_TIMESTAMP,
+                    received_at=SENDER_TIMESTAMP,
+                    path="aa",
+                ),
+                create_message_from_decrypted(
+                    packet_id=pkt2,
+                    channel_key=CHANNEL_KEY,
+                    sender="Alice",
+                    message_text="Concurrent channel test",
+                    timestamp=SENDER_TIMESTAMP,
+                    received_at=SENDER_TIMESTAMP + 1,
+                    path="bbcc",
+                ),
+            )
+
+        created = [r for r in results if r is not None]
+        duplicates = [r for r in results if r is None]
+        assert len(created) == 1
+        assert len(duplicates) == 1
+
+        messages = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=CHANNEL_KEY, limit=10
+        )
+        assert len(messages) == 1

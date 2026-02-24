@@ -18,33 +18,47 @@ Keep it aligned with `frontend/src` source code.
 
 ```text
 frontend/src/
+├── main.tsx                # React entry point (StrictMode, root render)
 ├── App.tsx                 # App shell and orchestration
 ├── api.ts                  # Typed REST client
 ├── types.ts                # Shared TS contracts
 ├── useWebSocket.ts         # WS lifecycle + event dispatch
 ├── messageCache.ts         # Conversation-scoped cache
+├── prefetch.ts             # Consumes prefetched API promises started in index.html
 ├── index.css               # Global styles/utilities
 ├── styles.css              # Additional global app styles
+├── lib/
+│   └── utils.ts            # cn() — clsx + tailwind-merge helper
 ├── hooks/
-│   ├── useConversationMessages.ts
-│   ├── useUnreadCounts.ts
-│   ├── useRepeaterMode.ts
-│   └── useAirtimeTracking.ts
+│   ├── index.ts            # Central re-export of all hooks
+│   ├── useConversationMessages.ts  # Fetch, pagination, dedup, ACK buffering
+│   ├── useUnreadCounts.ts          # Unread counters, mentions, recent-sort timestamps
+│   ├── useRepeaterMode.ts          # Repeater login/command workflow
+│   ├── useAirtimeTracking.ts       # Repeater airtime stats polling
+│   ├── useRadioControl.ts          # Radio health/config state, reconnection
+│   ├── useAppSettings.ts           # Settings, favorites, preferences migration
+│   ├── useConversationRouter.ts    # URL hash → active conversation routing
+│   └── useContactsAndChannels.ts   # Contact/channel loading, creation, deletion
 ├── utils/
-│   ├── urlHash.ts
-│   ├── conversationState.ts
-│   ├── favorites.ts
-│   ├── messageParser.ts
-│   ├── pathUtils.ts
-│   ├── pubkey.ts
-│   └── contactAvatar.ts
+│   ├── urlHash.ts              # Hash parsing and encoding
+│   ├── conversationState.ts    # State keys, in-memory + localStorage helpers
+│   ├── favorites.ts            # LocalStorage migration for favorites
+│   ├── messageParser.ts        # Message text → rendered segments
+│   ├── pathUtils.ts            # Distance/validation helpers for paths + map
+│   ├── pubkey.ts               # getContactDisplayName (12-char prefix fallback)
+│   ├── contactAvatar.ts        # Avatar color derivation from public key
+│   ├── rawPacketIdentity.ts    # observation_id vs id dedup helpers
+│   ├── visualizerUtils.ts      # 3D visualizer node types, colors, particles
+│   └── lastViewedConversation.ts   # localStorage for last-viewed conversation
 ├── components/
 │   ├── StatusBar.tsx
 │   ├── Sidebar.tsx
+│   ├── ChatHeader.tsx          # Conversation header (trace, favorite, delete)
 │   ├── MessageList.tsx
 │   ├── MessageInput.tsx
 │   ├── NewMessageModal.tsx
 │   ├── SettingsModal.tsx
+│   ├── settingsConstants.ts    # Settings section ordering and labels
 │   ├── RawPacketList.tsx
 │   ├── MapView.tsx
 │   ├── VisualizerView.tsx
@@ -53,8 +67,12 @@ frontend/src/
 │   ├── CrackerPanel.tsx
 │   ├── BotCodeEditor.tsx
 │   ├── ContactAvatar.tsx
-│   └── ui/
+│   └── ui/                     # shadcn/ui primitives
+├── types/
+│   └── d3-force-3d.d.ts       # Type declarations for d3-force-3d
 └── test/
+    ├── setup.ts
+    ├── fixtures/websocket_events.json
     ├── api.test.ts
     ├── appFavorites.test.tsx
     ├── appStartupHash.test.tsx
@@ -64,26 +82,32 @@ frontend/src/
     ├── messageParser.test.ts
     ├── pathUtils.test.ts
     ├── radioPresets.test.ts
+    ├── rawPacketIdentity.test.ts
     ├── repeaterMode.test.ts
     ├── settingsModal.test.tsx
+    ├── sidebar.test.tsx
     ├── unreadCounts.test.ts
     ├── urlHash.test.ts
     ├── useConversationMessages.test.ts
+    ├── useConversationMessages.race.test.ts
     ├── useRepeaterMode.test.ts
     ├── useWebSocket.lifecycle.test.ts
-    ├── websocket.test.ts
-    └── setup.ts
+    └── websocket.test.ts
 ```
 
 ## Architecture Notes
 
 ### State ownership
 
-`App.tsx` orchestrates high-level state (health, config, contacts/channels, active conversation, UI flags).
-Specialized logic is delegated to hooks:
+`App.tsx` orchestrates high-level state and delegates to hooks:
+- `useRadioControl`: radio health/config state, reconnect/reboot polling
+- `useAppSettings`: settings CRUD, favorites, preferences migration
+- `useContactsAndChannels`: contact/channel lists, creation, deletion
+- `useConversationRouter`: URL hash → active conversation routing
 - `useConversationMessages`: fetch, pagination, dedup/update helpers
 - `useUnreadCounts`: unread counters, mention tracking, recent-sort timestamps
 - `useRepeaterMode`: repeater login/command workflow
+- `useAirtimeTracking`: repeater airtime stats polling
 
 ### Initial load + realtime
 

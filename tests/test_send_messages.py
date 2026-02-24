@@ -588,3 +588,102 @@ class TestResendChannelMessage:
 
         assert exc_info.value.status_code == 400
         assert "expired" in exc_info.value.detail.lower()
+
+
+class TestConcurrentChannelSends:
+    """Test that concurrent channel sends are serialized by the radio operation lock.
+
+    The send_channel_message endpoint uses set_channel (slot 0) then send_chan_msg.
+    Concurrent sends must be serialized so two messages don't clobber the same
+    temporary radio slot.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_sends_to_different_channels_both_succeed(self, test_db):
+        """Two concurrent send_channel_message calls to different channels
+        should both succeed — the radio_operation lock serializes them."""
+        mc = _make_mc(name="TestNode")
+        chan_key_a = "aa" * 16
+        chan_key_b = "bb" * 16
+        await ChannelRepository.upsert(key=chan_key_a, name="#alpha")
+        await ChannelRepository.upsert(key=chan_key_b, name="#bravo")
+
+        with (
+            patch("app.routers.messages.require_connected", return_value=mc),
+            patch.object(radio_manager, "_meshcore", mc),
+            patch("app.routers.messages.broadcast_event"),
+        ):
+            results = await asyncio.gather(
+                send_channel_message(
+                    SendChannelMessageRequest(channel_key=chan_key_a, text="Hello alpha")
+                ),
+                send_channel_message(
+                    SendChannelMessageRequest(channel_key=chan_key_b, text="Hello bravo")
+                ),
+            )
+
+        # Both should have returned Message objects with distinct IDs
+        assert results[0].id != results[1].id
+        assert results[0].conversation_key == chan_key_a.upper()
+        assert results[1].conversation_key == chan_key_b.upper()
+
+        # set_channel should have been called twice (once per send, serialized)
+        assert mc.commands.set_channel.await_count == 2
+
+        # send_chan_msg should have been called twice
+        assert mc.commands.send_chan_msg.await_count == 2
+
+        # Both messages should be in DB
+        msgs_a = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=chan_key_a.upper(), limit=10
+        )
+        msgs_b = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=chan_key_b.upper(), limit=10
+        )
+        assert len(msgs_a) == 1
+        assert len(msgs_b) == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_sends_to_same_channel_both_succeed(self, test_db):
+        """Two concurrent sends to the same channel should both succeed
+        with distinct timestamps (serialized, no slot clobber)."""
+        mc = _make_mc(name="TestNode")
+        chan_key = "cc" * 16
+        await ChannelRepository.upsert(key=chan_key, name="#charlie")
+
+        call_count = 0
+
+        # Mock time to return incrementing seconds so the two messages
+        # get distinct sender_timestamps (avoiding same-second collision).
+        original_time = time.time
+
+        def advancing_time():
+            nonlocal call_count
+            call_count += 1
+            return original_time() + call_count
+
+        with (
+            patch("app.routers.messages.require_connected", return_value=mc),
+            patch.object(radio_manager, "_meshcore", mc),
+            patch("app.routers.messages.broadcast_event"),
+            patch("app.routers.messages.time") as mock_time,
+        ):
+            mock_time.time = advancing_time
+            results = await asyncio.gather(
+                send_channel_message(
+                    SendChannelMessageRequest(channel_key=chan_key, text="Message one")
+                ),
+                send_channel_message(
+                    SendChannelMessageRequest(channel_key=chan_key, text="Message two")
+                ),
+            )
+
+        assert results[0].id != results[1].id
+        texts = {results[0].text, results[1].text}
+        assert "TestNode: Message one" in texts
+        assert "TestNode: Message two" in texts
+
+        msgs = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=chan_key.upper(), limit=10
+        )
+        assert len(msgs) == 2

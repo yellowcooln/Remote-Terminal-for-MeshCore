@@ -203,13 +203,37 @@ Run backend tests:
 PYTHONPATH=. uv run pytest tests/ -v
 ```
 
-High-signal suites:
-- `tests/test_packet_pipeline.py`
-- `tests/test_event_handlers.py`
-- `tests/test_send_messages.py`
-- `tests/test_radio.py`
-- `tests/test_api.py`
-- `tests/test_migrations.py`
+Test suites:
+
+```text
+tests/
+├── conftest.py                 # Shared fixtures
+├── test_api.py                 # REST endpoint integration tests
+├── test_bot.py                 # Bot execution and sandboxing
+├── test_config.py              # Configuration validation
+├── test_contacts_router.py     # Contacts router endpoints
+├── test_decoder.py             # Packet parsing/decryption
+├── test_echo_dedup.py          # Echo/repeat deduplication (incl. concurrent)
+├── test_event_handlers.py      # ACK tracking, event registration, cleanup
+├── test_frontend_static.py     # Frontend static file serving
+├── test_key_normalization.py   # Public key normalization
+├── test_keystore.py            # Ephemeral keystore
+├── test_message_pagination.py  # Cursor-based message pagination
+├── test_message_prefix_claim.py # Message prefix claim logic
+├── test_migrations.py          # Schema migration system
+├── test_packet_pipeline.py     # End-to-end packet processing
+├── test_radio.py               # RadioManager, serial detection
+├── test_radio_operation.py     # radio_operation() context manager
+├── test_radio_router.py        # Radio router endpoints
+├── test_radio_sync.py          # Polling, sync, advertisement
+├── test_repeater_routes.py     # Repeater command/telemetry/trace
+├── test_repository.py          # Data access layer
+├── test_send_messages.py       # Outgoing messages, bot triggers, concurrent sends
+├── test_settings_router.py     # Settings endpoints, advert validation
+├── test_statistics.py          # Statistics aggregation
+├── test_websocket.py           # WS manager broadcast/cleanup
+└── test_websocket_route.py     # WS endpoint lifecycle
+```
 
 ## Editing Checklist
 
