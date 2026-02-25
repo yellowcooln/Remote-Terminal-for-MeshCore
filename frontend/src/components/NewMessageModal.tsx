@@ -133,7 +133,15 @@ export function NewMessageModal({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="w-full">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => {
+            setTab(v as Tab);
+            setName('');
+            setError('');
+          }}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="existing">Existing</TabsTrigger>
             <TabsTrigger value="new-contact">Contact</TabsTrigger>

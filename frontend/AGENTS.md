@@ -236,6 +236,12 @@ When touching cross-layer contracts, also run backend tests from repo root:
 PYTHONPATH=. uv run pytest tests/ -v
 ```
 
+## Errata & Known Non-Issues
+
+### RawPacketList always scrolls to bottom
+
+`RawPacketList` unconditionally scrolls to the latest packet on every update. This is intentional — the packet feed is a live status display, not an interactive log meant for lingering or long-term analysis. Users watching it want to see the newest packet, not hold a scroll position.
+
 ## Editing Checklist
 
 1. If API/WS payloads change, update `types.ts`, handlers, and tests.
