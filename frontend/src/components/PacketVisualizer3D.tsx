@@ -1830,7 +1830,7 @@ export function PacketVisualizer3D({
 
       {/* Hovered/pinned node tooltip */}
       {(pinnedNodeId ?? hoveredNodeId) && (
-        <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10 max-w-72">
+        <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10 max-w-72 max-h-[calc(100%-2rem)] overflow-y-auto">
           {(() => {
             const tooltipNodeId = pinnedNodeId ?? hoveredNodeId;
             const node = tooltipNodeId ? data.nodes.get(tooltipNodeId) : null;
