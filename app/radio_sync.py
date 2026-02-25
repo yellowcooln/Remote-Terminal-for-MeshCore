@@ -116,6 +116,30 @@ async def sync_and_offload_contacts(mc: MeshCore) -> dict:
                 remove_result = await mc.commands.remove_contact(contact_data)
                 if remove_result.type == EventType.OK:
                     removed += 1
+
+                    # LIBRARY INTERNAL FIXUP: The MeshCore library's
+                    # commands.remove_contact() sends the remove command over
+                    # the wire but does NOT update the library's in-memory
+                    # contact cache (mc._contacts). This is a gap in the
+                    # library — there's no public API to clear a single
+                    # contact from the cache, and the library only refreshes
+                    # it on a full get_contacts() call.
+                    #
+                    # Why this matters: sync_recent_contacts_to_radio() uses
+                    # mc.get_contact_by_key_prefix() to check whether a
+                    # contact is already loaded on the radio. That method
+                    # searches mc._contacts. If we don't evict the removed
+                    # contact from the cache here, get_contact_by_key_prefix()
+                    # will still find it and skip the add_contact() call —
+                    # meaning contacts never get loaded back onto the radio
+                    # after offload. The result: no DM ACKs, degraded routing
+                    # for potentially minutes until the next periodic sync
+                    # refreshes the cache from the (now-empty) radio.
+                    #
+                    # We access mc._contacts directly because the library
+                    # exposes it as a read-only property (mc.contacts) with
+                    # no removal API. The dict is keyed by public_key string.
+                    mc._contacts.pop(public_key, None)
                 else:
                     logger.warning(
                         "Failed to remove contact %s: %s", public_key[:12], remove_result.payload

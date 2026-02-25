@@ -555,6 +555,79 @@ class TestSyncAndOffloadContacts:
         assert contact is not None
         assert contact.on_radio is False
 
+    @pytest.mark.asyncio
+    async def test_evicts_removed_contacts_from_library_cache(self, test_db):
+        """Successfully removed contacts are evicted from mc._contacts.
+
+        The MeshCore library's remove_contact() command does not update the
+        library's in-memory _contacts cache. If we don't evict manually,
+        sync_recent_contacts_to_radio() will find stale entries via
+        get_contact_by_key_prefix() and skip re-adding contacts to the radio.
+        """
+        from app.radio_sync import sync_and_offload_contacts
+
+        contact_payload = {
+            KEY_A: {"adv_name": "Alice", "type": 1, "flags": 0},
+            KEY_B: {"adv_name": "Bob", "type": 1, "flags": 0},
+        }
+
+        mock_get_result = MagicMock()
+        mock_get_result.type = EventType.NEW_CONTACT
+        mock_get_result.payload = contact_payload
+
+        mock_remove_result = MagicMock()
+        mock_remove_result.type = EventType.OK
+
+        mock_mc = MagicMock()
+        mock_mc.commands.get_contacts = AsyncMock(return_value=mock_get_result)
+        mock_mc.commands.remove_contact = AsyncMock(return_value=mock_remove_result)
+        # Seed the library's in-memory cache with the same contacts —
+        # simulating what happens after get_contacts() populates it.
+        mock_mc._contacts = {
+            KEY_A: {"public_key": KEY_A, "adv_name": "Alice"},
+            KEY_B: {"public_key": KEY_B, "adv_name": "Bob"},
+        }
+
+        await sync_and_offload_contacts(mock_mc)
+
+        # Both contacts should have been evicted from the library cache
+        assert KEY_A not in mock_mc._contacts
+        assert KEY_B not in mock_mc._contacts
+        assert mock_mc._contacts == {}
+
+    @pytest.mark.asyncio
+    async def test_failed_remove_does_not_evict_from_library_cache(self, test_db):
+        """Contacts that fail to remove from radio stay in mc._contacts.
+
+        We only evict from the cache on successful removal — if the radio
+        still has the contact, the cache should reflect that.
+        """
+        from app.radio_sync import sync_and_offload_contacts
+
+        contact_payload = {
+            KEY_A: {"adv_name": "Alice", "type": 1, "flags": 0},
+        }
+
+        mock_get_result = MagicMock()
+        mock_get_result.type = EventType.NEW_CONTACT
+        mock_get_result.payload = contact_payload
+
+        mock_fail_result = MagicMock()
+        mock_fail_result.type = EventType.ERROR
+        mock_fail_result.payload = {"error": "busy"}
+
+        mock_mc = MagicMock()
+        mock_mc.commands.get_contacts = AsyncMock(return_value=mock_get_result)
+        mock_mc.commands.remove_contact = AsyncMock(return_value=mock_fail_result)
+        mock_mc._contacts = {
+            KEY_A: {"public_key": KEY_A, "adv_name": "Alice"},
+        }
+
+        await sync_and_offload_contacts(mock_mc)
+
+        # Contact should still be in the cache since removal failed
+        assert KEY_A in mock_mc._contacts
+
 
 class TestSyncAndOffloadChannels:
     """Test sync_and_offload_channels: pull channels from radio, save to DB, clear from radio."""
