@@ -619,13 +619,6 @@ class MessageRepository:
         return row["acked"] if row else 1
 
     @staticmethod
-    async def get_ack_count(message_id: int) -> int:
-        """Get the current ack count for a message."""
-        cursor = await db.conn.execute("SELECT acked FROM messages WHERE id = ?", (message_id,))
-        row = await cursor.fetchone()
-        return row["acked"] if row else 0
-
-    @staticmethod
     async def get_ack_and_paths(message_id: int) -> tuple[int, list[MessagePath] | None]:
         """Get the current ack count and paths for a message."""
         cursor = await db.conn.execute(

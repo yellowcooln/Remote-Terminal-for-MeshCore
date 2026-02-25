@@ -155,7 +155,7 @@ class TestAckEventHandler:
             await on_ack(MockEvent())
 
             # Verify ack count incremented (real DB)
-            ack_count = await MessageRepository.get_ack_count(msg_id)
+            ack_count, _ = await MessageRepository.get_ack_and_paths(msg_id)
             assert ack_count == 1
 
             # Verify broadcast sent with ack_count
@@ -188,7 +188,7 @@ class TestAckEventHandler:
             await on_ack(MockEvent())
 
             # Ack count should remain 0
-            ack_count = await MessageRepository.get_ack_count(msg_id)
+            ack_count, _ = await MessageRepository.get_ack_and_paths(msg_id)
             assert ack_count == 0
 
             mock_broadcast.assert_not_called()

@@ -210,21 +210,6 @@ export function getLinkId<
   };
 }
 
-export function findContactByPrefix(prefix: string, contacts: Contact[]): Contact | null {
-  const normalized = prefix.toLowerCase();
-  const matches = contacts.filter((c) => c.public_key.toLowerCase().startsWith(normalized));
-  return matches.length === 1 ? matches[0] : null;
-}
-
-export function findContactsByPrefix(prefix: string, contacts: Contact[]): Contact[] {
-  const normalized = prefix.toLowerCase();
-  return contacts.filter((c) => c.public_key.toLowerCase().startsWith(normalized));
-}
-
-export function findContactByName(name: string, contacts: Contact[]): Contact | null {
-  return contacts.find((c) => c.name === name) || null;
-}
-
 export function getNodeType(contact: Contact | null | undefined): NodeType {
   return contact?.type === CONTACT_TYPE_REPEATER ? 'repeater' : 'client';
 }

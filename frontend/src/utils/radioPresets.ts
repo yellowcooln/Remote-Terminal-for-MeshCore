@@ -25,17 +25,3 @@ export const RADIO_PRESETS: RadioPreset[] = [
   { name: 'Vietnam', freq: 920.25, bw: 250, sf: 11, cr: 5 },
 ];
 
-/** Detect which preset matches the given radio parameters, or 'custom' if none match. */
-export function detectPreset(freq: number, bw: number, sf: number, cr: number): string {
-  for (const preset of RADIO_PRESETS) {
-    if (preset.freq === freq && preset.bw === bw && preset.sf === sf && preset.cr === cr) {
-      return preset.name;
-    }
-  }
-  return 'custom';
-}
-
-/** Find a preset by exact name. */
-export function findPreset(name: string): RadioPreset | undefined {
-  return RADIO_PRESETS.find((p) => p.name === name);
-}

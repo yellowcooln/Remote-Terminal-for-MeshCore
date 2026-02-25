@@ -267,37 +267,6 @@ class TestMessageRepositoryGetByContent:
         assert result.paths is None
 
 
-class TestMessageRepositoryGetAckCount:
-    """Test MessageRepository.get_ack_count against a real SQLite database."""
-
-    @pytest.mark.asyncio
-    async def test_get_ack_count_returns_count(self, test_db):
-        """Returns ack count for existing message."""
-        msg_id = await _create_message(test_db)
-        # Simulate acking by directly updating
-        await test_db.conn.execute("UPDATE messages SET acked = ? WHERE id = ?", (3, msg_id))
-
-        result = await MessageRepository.get_ack_count(message_id=msg_id)
-
-        assert result == 3
-
-    @pytest.mark.asyncio
-    async def test_get_ack_count_returns_zero_for_nonexistent(self, test_db):
-        """Returns 0 for nonexistent message."""
-        result = await MessageRepository.get_ack_count(message_id=999999)
-
-        assert result == 0
-
-    @pytest.mark.asyncio
-    async def test_get_ack_count_returns_zero_for_unacked(self, test_db):
-        """Returns 0 for message with no acks."""
-        msg_id = await _create_message(test_db)
-
-        result = await MessageRepository.get_ack_count(message_id=msg_id)
-
-        assert result == 0
-
-
 class TestRepeaterAdvertPathRepository:
     """Test storing and retrieving recent unique repeater advert paths."""
 
