@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { HealthStatus, Contact, Message, MessagePath, RawPacket } from './types';
 
 interface WebSocketMessage {
@@ -30,7 +30,6 @@ export function useWebSocket(options: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(true);
-  const [connected, setConnected] = useState(false);
 
   // Store options in ref to avoid stale closures in WebSocket handlers.
   // The onmessage callback captures this ref, and we keep the ref updated
@@ -58,7 +57,6 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
     ws.onopen = () => {
       console.log('WebSocket connected');
-      setConnected(true);
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
@@ -67,7 +65,6 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
     ws.onclose = () => {
       console.log('WebSocket disconnected');
-      setConnected(false);
       wsRef.current = null;
 
       if (!shouldReconnectRef.current) {
@@ -160,5 +157,4 @@ export function useWebSocket(options: UseWebSocketOptions) {
     };
   }, [connect]);
 
-  return { connected };
 }
