@@ -12,7 +12,7 @@ import type { Message, MessagePath } from './types';
 export const MAX_CACHED_CONVERSATIONS = 20;
 export const MAX_MESSAGES_PER_ENTRY = 200;
 
-export interface CacheEntry {
+interface CacheEntry {
   messages: Message[];
   seenContent: Set<string>;
   hasOlderMessages: boolean;
@@ -138,9 +138,4 @@ export function remove(id: string): void {
 /** Clear the entire cache. */
 export function clear(): void {
   cache.clear();
-}
-
-/** Get current cache size (for testing). */
-export function size(): number {
-  return cache.size;
 }

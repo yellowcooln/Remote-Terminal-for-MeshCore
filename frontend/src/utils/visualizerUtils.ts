@@ -6,7 +6,7 @@ import { CONTACT_TYPE_REPEATER, type Contact, type RawPacket } from '../types';
 // =============================================================================
 
 export type NodeType = 'self' | 'repeater' | 'client';
-export type PacketLabel = 'AD' | 'GT' | 'DM' | 'ACK' | 'TR' | 'RQ' | 'RS' | '?';
+type PacketLabel = 'AD' | 'GT' | 'DM' | 'ACK' | 'TR' | 'RQ' | 'RS' | '?';
 
 export interface Particle {
   linkKey: string;
@@ -18,7 +18,7 @@ export interface Particle {
   toNodeId: string;
 }
 
-export interface ObservedPath {
+interface ObservedPath {
   nodes: string[];
   snr: number | null;
   timestamp: number;
@@ -32,7 +32,7 @@ export interface PendingPacket {
   expiresAt: number;
 }
 
-export interface ParsedPacket {
+interface ParsedPacket {
   payloadType: number;
   messageHash: string | null;
   pathBytes: string[];
@@ -44,7 +44,7 @@ export interface ParsedPacket {
 }
 
 // Traffic pattern tracking for smarter repeater disambiguation
-export interface TrafficObservation {
+interface TrafficObservation {
   source: string; // Node that originated traffic (could be resolved node ID or ambiguous)
   nextHop: string | null; // Next hop after this repeater (null if final hop before self)
   timestamp: number;
@@ -56,7 +56,7 @@ export interface RepeaterTrafficData {
 }
 
 // Analysis result for whether to split an ambiguous repeater
-export interface RepeaterSplitAnalysis {
+interface RepeaterSplitAnalysis {
   shouldSplit: boolean;
   // If shouldSplit, maps nextHop -> the sources that exclusively route through it
   disjointGroups: Map<string, Set<string>> | null;
@@ -95,9 +95,9 @@ export const PARTICLE_SPEED = 0.008;
 export const DEFAULT_OBSERVATION_WINDOW_SEC = 15;
 // Traffic pattern analysis thresholds
 // Be conservative - once split, we can't unsplit, so require strong evidence
-export const MIN_OBSERVATIONS_TO_SPLIT = 20; // Need at least this many unique sources per next-hop group
-export const MAX_TRAFFIC_OBSERVATIONS = 200; // Per ambiguous prefix, to limit memory
-export const TRAFFIC_OBSERVATION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes - old observations are pruned
+const MIN_OBSERVATIONS_TO_SPLIT = 20; // Need at least this many unique sources per next-hop group
+const MAX_TRAFFIC_OBSERVATIONS = 200; // Per ambiguous prefix, to limit memory
+const TRAFFIC_OBSERVATION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes - old observations are pruned
 
 export const PACKET_LEGEND_ITEMS = [
   { label: 'AD', color: COLORS.particleAD, description: 'Advertisement' },
@@ -114,7 +114,7 @@ export const PACKET_LEGEND_ITEMS = [
 // UTILITY FUNCTIONS (Data Layer)
 // =============================================================================
 
-export function simpleHash(str: string): string {
+function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = (hash << 5) - hash + str.charCodeAt(i);

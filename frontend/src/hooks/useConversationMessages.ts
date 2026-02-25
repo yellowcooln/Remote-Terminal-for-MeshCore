@@ -57,13 +57,12 @@ export function getMessageContentKey(msg: Message): string {
   return `${msg.type}-${msg.conversation_key}-${msg.text}-${ts}`;
 }
 
-export interface UseConversationMessagesResult {
+interface UseConversationMessagesResult {
   messages: Message[];
   messagesLoading: boolean;
   loadingOlder: boolean;
   hasOlderMessages: boolean;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  fetchMessages: (showLoading?: boolean) => Promise<void>;
   fetchOlderMessages: () => Promise<void>;
   addMessageIfNew: (msg: Message) => boolean;
   updateMessageAck: (messageId: number, ackCount: number, paths?: MessagePath[]) => void;
@@ -433,7 +432,6 @@ export function useConversationMessages(
     loadingOlder,
     hasOlderMessages,
     setMessages,
-    fetchMessages,
     fetchOlderMessages,
     addMessageIfNew,
     updateMessageAck,

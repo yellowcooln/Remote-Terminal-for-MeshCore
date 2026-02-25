@@ -26,13 +26,7 @@ import {
 } from '../utils/lastViewedConversation';
 import { RADIO_PRESETS } from '../utils/radioPresets';
 
-// Import for local use + re-export so existing imports from this file still work
-import {
-  SETTINGS_SECTION_ORDER,
-  SETTINGS_SECTION_LABELS,
-  type SettingsSection,
-} from './settingsConstants';
-export { SETTINGS_SECTION_ORDER, SETTINGS_SECTION_LABELS, type SettingsSection };
+import { SETTINGS_SECTION_LABELS, type SettingsSection } from './settingsConstants';
 
 interface SettingsModalBaseProps {
   open: boolean;

@@ -12,7 +12,7 @@ import { CONTACT_TYPE_REPEATER } from '../types';
 import { useAirtimeTracking } from './useAirtimeTracking';
 
 // Format seconds into human-readable duration (e.g., 1d17h2m, 1h5m, 3m)
-export function formatDuration(seconds: number): string {
+function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
 
   const days = Math.floor(seconds / 86400);
@@ -32,7 +32,7 @@ export function formatDuration(seconds: number): string {
 }
 
 // Format telemetry response as human-readable text
-export function formatTelemetry(telemetry: TelemetryResponse): string {
+function formatTelemetry(telemetry: TelemetryResponse): string {
   const lines = [
     `Telemetry`,
     `Battery Voltage: ${telemetry.battery_volts.toFixed(3)}V`,
@@ -57,7 +57,7 @@ export function formatTelemetry(telemetry: TelemetryResponse): string {
 }
 
 // Format neighbors list as human-readable text
-export function formatNeighbors(neighbors: NeighborInfo[]): string {
+function formatNeighbors(neighbors: NeighborInfo[]): string {
   if (neighbors.length === 0) {
     return 'Neighbors\nNo neighbors reported';
   }
@@ -73,7 +73,7 @@ export function formatNeighbors(neighbors: NeighborInfo[]): string {
 }
 
 // Format ACL list as human-readable text
-export function formatAcl(acl: AclEntry[]): string {
+function formatAcl(acl: AclEntry[]): string {
   if (acl.length === 0) {
     return 'ACL\nNo ACL entries';
   }
@@ -108,7 +108,7 @@ function createLocalMessage(
   };
 }
 
-export interface UseRepeaterModeResult {
+interface UseRepeaterModeResult {
   repeaterLoggedIn: boolean;
   activeContactIsRepeater: boolean;
   handleTelemetryRequest: (password: string) => Promise<void>;

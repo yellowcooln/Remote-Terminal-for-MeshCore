@@ -1,5 +1,5 @@
 // Radio presets for common LoRa configurations
-export interface RadioPreset {
+interface RadioPreset {
   name: string;
   freq: number;
   bw: number;

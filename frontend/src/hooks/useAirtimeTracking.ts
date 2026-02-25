@@ -108,7 +108,7 @@ function createLocalMessage(conversationKey: string, text: string, outgoing: boo
   };
 }
 
-export interface UseAirtimeTrackingResult {
+interface UseAirtimeTrackingResult {
   /** Returns true if this was an airtime command that was handled */
   handleAirtimeCommand: (command: string, conversationId: string) => Promise<boolean>;
   /** Stop any active airtime tracking */

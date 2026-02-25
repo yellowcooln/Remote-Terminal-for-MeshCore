@@ -10,7 +10,7 @@ import type {
   RadioConfigUpdate,
   StatisticsResponse,
 } from '../types';
-import type { SettingsSection } from '../components/SettingsModal';
+import type { SettingsSection } from '../components/settingsConstants';
 import {
   LAST_VIEWED_CONVERSATION_KEY,
   REOPEN_LAST_CONVERSATION_KEY,

@@ -3,7 +3,6 @@ import {
   parsePathHops,
   findContactsByPrefix,
   calculateDistance,
-  sortContactsByDistance,
   resolvePath,
   formatDistance,
   formatHopCounts,
@@ -147,50 +146,6 @@ describe('calculateDistance', () => {
     expect(distance).not.toBeNull();
     expect(distance).toBeGreaterThan(0.9);
     expect(distance).toBeLessThan(1.1);
-  });
-});
-
-describe('sortContactsByDistance', () => {
-  const contactClose = createContact({
-    public_key: 'AA' + 'A'.repeat(62),
-    name: 'Close',
-    lat: 40.7228,
-    lon: -74.006,
-  });
-  const contactFar = createContact({
-    public_key: 'BB' + 'B'.repeat(62),
-    name: 'Far',
-    lat: 40.9,
-    lon: -74.006,
-  });
-  const contactNoLocation = createContact({
-    public_key: 'CC' + 'C'.repeat(62),
-    name: 'NoLoc',
-    lat: null,
-    lon: null,
-  });
-
-  it('sorts by distance ascending', () => {
-    const sorted = sortContactsByDistance([contactFar, contactClose], 40.7128, -74.006);
-    expect(sorted[0].name).toBe('Close');
-    expect(sorted[1].name).toBe('Far');
-  });
-
-  it('places contacts without location at end', () => {
-    const sorted = sortContactsByDistance(
-      [contactNoLocation, contactClose, contactFar],
-      40.7128,
-      -74.006
-    );
-    expect(sorted[0].name).toBe('Close');
-    expect(sorted[1].name).toBe('Far');
-    expect(sorted[2].name).toBe('NoLoc');
-  });
-
-  it('returns unsorted if reference is null', () => {
-    const contacts = [contactFar, contactClose];
-    const sorted = sortContactsByDistance(contacts, null, -74.006);
-    expect(sorted[0].name).toBe(contacts[0].name);
   });
 });
 

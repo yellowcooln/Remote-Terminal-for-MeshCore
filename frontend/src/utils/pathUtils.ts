@@ -123,7 +123,7 @@ export function formatDistance(km: number): string {
  * Sort contacts by distance from a reference point
  * Contacts without location are placed at the end
  */
-export function sortContactsByDistance(
+function sortContactsByDistance(
   contacts: Contact[],
   fromLat: number | null,
   fromLon: number | null

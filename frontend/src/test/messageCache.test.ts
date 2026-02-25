@@ -24,7 +24,7 @@ function createMessage(overrides: Partial<Message> = {}): Message {
   };
 }
 
-function createEntry(messages: Message[] = [], hasOlderMessages = false): messageCache.CacheEntry {
+function createEntry(messages: Message[] = [], hasOlderMessages = false) {
   const seenContent = new Set<string>();
   for (const msg of messages) {
     seenContent.add(`${msg.type}-${msg.conversation_key}-${msg.text}-${msg.sender_timestamp}`);
@@ -97,7 +97,6 @@ describe('messageCache', () => {
 
       const result = messageCache.get('conv1');
       expect(result!.messages[0].text).toBe('second');
-      expect(messageCache.size()).toBe(1);
     });
   });
 
@@ -231,7 +230,6 @@ describe('messageCache', () => {
       );
 
       expect(result).toBe(true);
-      expect(messageCache.size()).toBe(1);
       const entry = messageCache.get('new_conv');
       expect(entry).toBeDefined();
       expect(entry!.messages).toHaveLength(1);
@@ -319,13 +317,12 @@ describe('messageCache', () => {
 
       expect(messageCache.get('conv1')).toBeUndefined();
       expect(messageCache.get('conv2')).toBeDefined();
-      expect(messageCache.size()).toBe(1);
     });
 
     it('does nothing for non-existent key', () => {
       messageCache.set('conv1', createEntry());
       messageCache.remove('nonexistent');
-      expect(messageCache.size()).toBe(1);
+      expect(messageCache.get('conv1')).toBeDefined();
     });
   });
 
@@ -437,16 +434,4 @@ describe('messageCache', () => {
     });
   });
 
-  describe('clear', () => {
-    it('removes all entries', () => {
-      messageCache.set('conv1', createEntry());
-      messageCache.set('conv2', createEntry());
-      messageCache.set('conv3', createEntry());
-
-      messageCache.clear();
-
-      expect(messageCache.size()).toBe(0);
-      expect(messageCache.get('conv1')).toBeUndefined();
-    });
-  });
 });

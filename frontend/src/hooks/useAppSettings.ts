@@ -144,7 +144,6 @@ export function useAppSettings() {
 
   return {
     appSettings,
-    setAppSettings,
     favorites,
     fetchAppSettings,
     handleSaveAppSettings,

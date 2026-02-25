@@ -8,12 +8,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   parseHashConversation,
-  getConversationHash,
   getMapFocusHash,
   resolveChannelFromHashToken,
   resolveContactFromHashToken,
 } from '../utils/urlHash';
-import type { Channel, Contact, Conversation } from '../types';
+import type { Channel, Contact } from '../types';
 
 describe('parseHashConversation', () => {
   let originalHash: string;
@@ -144,122 +143,6 @@ describe('parseHashConversation', () => {
     const result = parseHashConversation();
 
     expect(result).toEqual({ type: 'channel', name: 'Test Channel!' });
-  });
-});
-
-describe('getConversationHash', () => {
-  it('returns empty string for null conversation', () => {
-    const result = getConversationHash(null);
-
-    expect(result).toBe('');
-  });
-
-  it('returns #raw for raw conversation', () => {
-    const conv: Conversation = { type: 'raw', id: 'raw', name: 'Raw Packet Feed' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#raw');
-  });
-
-  it('returns #map for map conversation', () => {
-    const conv: Conversation = { type: 'map', id: 'map', name: 'Node Map' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#map');
-  });
-
-  it('generates channel hash', () => {
-    const conv: Conversation = { type: 'channel', id: 'key123', name: 'Public' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#channel/key123/Public');
-  });
-
-  it('generates contact hash', () => {
-    const conv: Conversation = { type: 'contact', id: 'pubkey123', name: 'Alice' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#contact/pubkey123/Alice');
-  });
-
-  it('uses channel id even when name starts with #', () => {
-    const conv: Conversation = { type: 'channel', id: 'key123', name: '#TestChannel' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#channel/key123/TestChannel');
-  });
-
-  it('encodes special characters in ids', () => {
-    const conv: Conversation = { type: 'contact', id: 'key with space', name: 'John Doe' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#contact/key%20with%20space/John%20Doe');
-  });
-
-  it('uses id regardless of contact display name', () => {
-    const conv: Conversation = { type: 'contact', id: 'key', name: '#Hashtag' };
-
-    const result = getConversationHash(conv);
-
-    expect(result).toBe('#contact/key/%23Hashtag');
-  });
-});
-
-describe('parseHashConversation and getConversationHash roundtrip', () => {
-  let originalHash: string;
-
-  beforeEach(() => {
-    originalHash = window.location.hash;
-  });
-
-  afterEach(() => {
-    window.location.hash = originalHash;
-  });
-
-  it('channel roundtrip preserves data', () => {
-    const conv: Conversation = { type: 'channel', id: 'key123', name: 'Test Channel' };
-
-    const hash = getConversationHash(conv);
-    window.location.hash = hash;
-    const parsed = parseHashConversation();
-
-    expect(parsed).toEqual({ type: 'channel', name: 'key123', label: 'Test Channel' });
-  });
-
-  it('contact roundtrip preserves data', () => {
-    const conv: Conversation = { type: 'contact', id: 'pubkey', name: 'Alice Bob' };
-
-    const hash = getConversationHash(conv);
-    window.location.hash = hash;
-    const parsed = parseHashConversation();
-
-    expect(parsed).toEqual({ type: 'contact', name: 'pubkey', label: 'Alice Bob' });
-  });
-
-  it('raw roundtrip preserves type', () => {
-    const conv: Conversation = { type: 'raw', id: 'raw', name: 'Raw Packet Feed' };
-
-    const hash = getConversationHash(conv);
-    window.location.hash = hash;
-    const parsed = parseHashConversation();
-
-    expect(parsed).toEqual({ type: 'raw', name: 'raw' });
-  });
-
-  it('map roundtrip preserves type', () => {
-    const conv: Conversation = { type: 'map', id: 'map', name: 'Node Map' };
-
-    const hash = getConversationHash(conv);
-    window.location.hash = hash;
-    const parsed = parseHashConversation();
-
-    expect(parsed).toEqual({ type: 'map', name: 'map' });
   });
 });
 

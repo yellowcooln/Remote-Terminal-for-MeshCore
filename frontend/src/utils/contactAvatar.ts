@@ -38,7 +38,7 @@ const emojiRegex =
  * 2. First letter + first letter after first space (initials)
  * 3. First letter only
  */
-export function getAvatarText(name: string | null, publicKey: string): string {
+function getAvatarText(name: string | null, publicKey: string): string {
   if (!name) {
     // Use first 2 chars of public key as fallback
     return publicKey.slice(0, 2).toUpperCase();
@@ -76,7 +76,7 @@ export function getAvatarText(name: string | null, publicKey: string): string {
  * Generate a consistent HSL color from a public key.
  * Uses saturation and lightness ranges that work well for backgrounds.
  */
-export function getAvatarColor(publicKey: string): {
+function getAvatarColor(publicKey: string): {
   background: string;
   text: string;
 } {

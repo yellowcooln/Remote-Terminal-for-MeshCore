@@ -102,7 +102,7 @@ export function getMapFocusHash(publicKeyPrefix: string): string {
 }
 
 // Generate URL hash from conversation
-export function getConversationHash(conv: Conversation | null): string {
+function getConversationHash(conv: Conversation | null): string {
   if (!conv) return '';
   if (conv.type === 'raw') return '#raw';
   if (conv.type === 'map') return '#map';

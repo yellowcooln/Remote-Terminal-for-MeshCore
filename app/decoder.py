@@ -327,7 +327,6 @@ def parse_advertisement(payload: bytes) -> ParsedAdvertisement | None:
     # Parse fixed-position fields
     public_key = payload[0:32].hex()
     timestamp = int.from_bytes(payload[32:36], byteorder="little")
-    # signature = payload[36:100]  # Not currently verified
     flags = payload[100]
 
     # Parse flags

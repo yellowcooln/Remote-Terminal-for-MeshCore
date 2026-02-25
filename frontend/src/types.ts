@@ -1,4 +1,4 @@
-export interface RadioSettings {
+interface RadioSettings {
   freq: number;
   bw: number;
   sf: number;
@@ -99,7 +99,7 @@ export interface Message {
   acked: number;
 }
 
-export type ConversationType = 'contact' | 'channel' | 'raw' | 'map' | 'visualizer';
+type ConversationType = 'contact' | 'channel' | 'raw' | 'map' | 'visualizer';
 
 export interface Conversation {
   type: ConversationType;
@@ -228,13 +228,13 @@ export interface UnreadCounts {
   last_message_times: Record<string, number>;
 }
 
-export interface BusyChannel {
+interface BusyChannel {
   channel_key: string;
   channel_name: string;
   message_count: number;
 }
 
-export interface ContactActivityCounts {
+interface ContactActivityCounts {
   last_hour: number;
   last_24_hours: number;
   last_week: number;

@@ -9,7 +9,7 @@ import {
 import type { Channel, Contact, Conversation, Message, UnreadCounts } from '../types';
 import { takePrefetch } from '../prefetch';
 
-export interface UseUnreadCountsResult {
+interface UseUnreadCountsResult {
   unreadCounts: Record<string, number>;
   /** Tracks which conversations have unread messages that mention the user */
   mentions: Record<string, boolean>;
