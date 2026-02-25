@@ -174,7 +174,9 @@ export function getPacketLabel(payloadType: number): PacketLabel {
 }
 
 export function generatePacketKey(parsed: ParsedPacket, rawPacket: RawPacket): string {
-  const contentHash = (parsed.messageHash || hashString(rawPacket.data).toString(16).padStart(8, '0')).slice(0, 8);
+  const contentHash = (
+    parsed.messageHash || hashString(rawPacket.data).toString(16).padStart(8, '0')
+  ).slice(0, 8);
 
   if (parsed.payloadType === PayloadType.Advert && parsed.advertPubkey) {
     return `ad:${parsed.advertPubkey.slice(0, 12)}`;

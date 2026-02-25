@@ -433,5 +433,4 @@ describe('messageCache', () => {
       expect(messageCache.reconcile(current, fetched)).toBeNull();
     });
   });
-
 });

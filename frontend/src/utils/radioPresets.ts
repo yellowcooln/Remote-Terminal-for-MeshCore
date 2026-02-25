@@ -24,4 +24,3 @@ export const RADIO_PRESETS: RadioPreset[] = [
   { name: 'Portugal 868MHz', freq: 869.618, bw: 62.5, sf: 7, cr: 6 },
   { name: 'Vietnam', freq: 920.25, bw: 250, sf: 11, cr: 5 },
 ];
-

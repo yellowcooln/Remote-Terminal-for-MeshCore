@@ -24,12 +24,14 @@ interface UseWebSocketOptions {
   onMessageAcked?: (messageId: number, ackCount: number, paths?: MessagePath[]) => void;
   onError?: (error: ErrorEvent) => void;
   onSuccess?: (success: SuccessEvent) => void;
+  onReconnect?: () => void;
 }
 
 export function useWebSocket(options: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(true);
+  const hasConnectedRef = useRef(false);
 
   // Store options in ref to avoid stale closures in WebSocket handlers.
   // The onmessage callback captures this ref, and we keep the ref updated
@@ -61,6 +63,10 @@ export function useWebSocket(options: UseWebSocketOptions) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
+      if (hasConnectedRef.current) {
+        optionsRef.current.onReconnect?.();
+      }
+      hasConnectedRef.current = true;
     };
 
     ws.onclose = () => {
@@ -156,5 +162,4 @@ export function useWebSocket(options: UseWebSocketOptions) {
       }
     };
   }, [connect]);
-
 }

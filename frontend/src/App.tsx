@@ -220,6 +220,12 @@ export function App() {
           description: success.details,
         });
       },
+      onReconnect: () => {
+        toast.warning('Unstable connection', {
+          description: 'Please refresh the page to ensure all messages are correctly loaded.',
+          duration: 10000,
+        });
+      },
       onMessage: (msg: Message) => {
         const activeConv = activeConversationRef.current;
 
