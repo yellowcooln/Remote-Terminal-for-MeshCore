@@ -2,7 +2,7 @@ import asyncio
 import glob
 import logging
 import platform
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 
 from meshcore import MeshCore
@@ -22,12 +22,6 @@ class RadioOperationBusyError(RadioOperationError):
 
 class RadioDisconnectedError(RadioOperationError):
     """Raised when the radio disconnects between pre-check and lock acquisition."""
-
-
-@asynccontextmanager
-async def _noop_context():
-    """No-op async context manager for optional nesting."""
-    yield
 
 
 def detect_serial_devices() -> list[str]:
@@ -196,7 +190,7 @@ class RadioManager:
             self._release_operation_lock(name)
             raise RadioDisconnectedError("Radio disconnected")
 
-        poll_context = _noop_context()
+        poll_context = nullcontext()
         if pause_polling:
             from app.radio_sync import pause_polling as pause_polling_context
 

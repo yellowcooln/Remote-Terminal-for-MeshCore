@@ -13,7 +13,7 @@ const LAST_MESSAGE_KEY = 'remoteterm-lastMessageTime';
 const SORT_ORDER_KEY = 'remoteterm-sortOrder';
 
 export type ConversationTimes = Record<string, number>;
-type SortOrder = 'recent' | 'alpha';
+export type SortOrder = 'recent' | 'alpha';
 
 // In-memory cache of last message times (loaded from server on init)
 let lastMessageTimesCache: ConversationTimes = {};

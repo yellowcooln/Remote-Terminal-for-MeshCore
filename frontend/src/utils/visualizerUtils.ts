@@ -1,5 +1,6 @@
 import { MeshCoreDecoder, PayloadType } from '@michaelhart/meshcore-decoder';
 import { CONTACT_TYPE_REPEATER, type Contact, type RawPacket } from '../types';
+import { hashString } from './contactAvatar';
 
 // =============================================================================
 // TYPES
@@ -114,15 +115,6 @@ export const PACKET_LEGEND_ITEMS = [
 // UTILITY FUNCTIONS (Data Layer)
 // =============================================================================
 
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(8, '0');
-}
-
 export function parsePacket(hexData: string): ParsedPacket | null {
   try {
     const decoded = MeshCoreDecoder.decode(hexData);
@@ -182,7 +174,7 @@ export function getPacketLabel(payloadType: number): PacketLabel {
 }
 
 export function generatePacketKey(parsed: ParsedPacket, rawPacket: RawPacket): string {
-  const contentHash = (parsed.messageHash || simpleHash(rawPacket.data)).slice(0, 8);
+  const contentHash = (parsed.messageHash || hashString(rawPacket.data).toString(16).padStart(8, '0')).slice(0, 8);
 
   if (parsed.payloadType === PayloadType.Advert && parsed.advertPubkey) {
     return `ad:${parsed.advertPubkey.slice(0, 12)}`;

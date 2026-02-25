@@ -177,6 +177,33 @@ async def send_advertisement() -> dict:
     return {"status": "ok"}
 
 
+async def _attempt_reconnect() -> dict:
+    """Shared reconnection logic for reboot and reconnect endpoints."""
+    if radio_manager.is_reconnecting:
+        return {
+            "status": "pending",
+            "message": "Reconnection already in progress",
+            "connected": False,
+        }
+
+    success = await radio_manager.reconnect()
+    if not success:
+        raise HTTPException(
+            status_code=503, detail="Failed to reconnect. Check radio connection and power."
+        )
+
+    try:
+        await radio_manager.post_connect_setup()
+    except Exception as e:
+        logger.exception("Post-connect setup failed after reconnect")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Radio connected but setup failed: {e}",
+        ) from e
+
+    return {"status": "ok", "message": "Reconnected successfully", "connected": True}
+
+
 @router.post("/reboot")
 async def reboot_radio() -> dict:
     """Reboot the radio, or reconnect if not currently connected.
@@ -184,7 +211,6 @@ async def reboot_radio() -> dict:
     If connected: sends reboot command, connection will temporarily drop and auto-reconnect.
     If not connected: attempts to reconnect (same as /reconnect endpoint).
     """
-    # If connected, send reboot command
     if radio_manager.is_connected:
         logger.info("Rebooting radio")
         async with radio_manager.radio_operation("reboot_radio") as mc:
@@ -194,32 +220,8 @@ async def reboot_radio() -> dict:
             "message": "Reboot command sent. Radio will reconnect automatically.",
         }
 
-    # Not connected - attempt to reconnect
-    if radio_manager.is_reconnecting:
-        return {
-            "status": "pending",
-            "message": "Reconnection already in progress",
-            "connected": False,
-        }
-
     logger.info("Radio not connected, attempting reconnect")
-    success = await radio_manager.reconnect()
-
-    if success:
-        try:
-            await radio_manager.post_connect_setup()
-        except Exception as e:
-            logger.exception("Post-connect setup failed after reconnect")
-            raise HTTPException(
-                status_code=503,
-                detail=f"Radio connected but setup failed: {e}",
-            ) from e
-
-        return {"status": "ok", "message": "Reconnected successfully", "connected": True}
-    else:
-        raise HTTPException(
-            status_code=503, detail="Failed to reconnect. Check radio connection and power."
-        )
+    return await _attempt_reconnect()
 
 
 @router.post("/reconnect")
@@ -234,7 +236,6 @@ async def reconnect_radio() -> dict:
         if radio_manager.is_setup_complete:
             return {"status": "ok", "message": "Already connected", "connected": True}
 
-        # Connected but setup incomplete — retry setup
         logger.info("Radio connected but setup incomplete, retrying setup")
         try:
             await radio_manager.post_connect_setup()
@@ -246,28 +247,5 @@ async def reconnect_radio() -> dict:
                 detail=f"Radio connected but setup failed: {e}",
             ) from e
 
-    if radio_manager.is_reconnecting:
-        return {
-            "status": "pending",
-            "message": "Reconnection already in progress",
-            "connected": False,
-        }
-
     logger.info("Manual reconnect requested")
-    success = await radio_manager.reconnect()
-
-    if success:
-        try:
-            await radio_manager.post_connect_setup()
-        except Exception as e:
-            logger.exception("Post-connect setup failed after reconnect")
-            raise HTTPException(
-                status_code=503,
-                detail=f"Radio connected but setup failed: {e}",
-            ) from e
-
-        return {"status": "ok", "message": "Reconnected successfully", "connected": True}
-    else:
-        raise HTTPException(
-            status_code=503, detail="Failed to reconnect. Check radio connection and power."
-        )
+    return await _attempt_reconnect()

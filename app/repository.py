@@ -59,16 +59,14 @@ class ContactRepository:
             """,
             (
                 contact.get("public_key", "").lower(),
-                contact.get("name") or contact.get("adv_name"),
+                contact.get("name"),
                 contact.get("type", 0),
                 contact.get("flags", 0),
-                contact.get("last_path") or contact.get("out_path"),
-                contact.get("last_path_len")
-                if "last_path_len" in contact
-                else contact.get("out_path_len", -1),
+                contact.get("last_path"),
+                contact.get("last_path_len", -1),
                 contact.get("last_advert"),
-                contact.get("lat") if contact.get("lat") is not None else contact.get("adv_lat"),
-                contact.get("lon") if contact.get("lon") is not None else contact.get("adv_lon"),
+                contact.get("lat"),
+                contact.get("lon"),
                 contact.get("last_seen", int(time.time())),
                 contact.get("on_radio", False),
                 contact.get("last_contacted"),

@@ -6,15 +6,13 @@ import {
   type Conversation,
   type Favorite,
 } from '../types';
-import { getStateKey, type ConversationTimes } from '../utils/conversationState';
+import { getStateKey, type ConversationTimes, type SortOrder } from '../utils/conversationState';
 import { getContactDisplayName } from '../utils/pubkey';
 import { ContactAvatar } from './ContactAvatar';
 import { isFavorite } from '../utils/favorites';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
-
-type SortOrder = 'alpha' | 'recent';
 
 type FavoriteItem = { type: 'channel'; channel: Channel } | { type: 'contact'; contact: Contact };
 

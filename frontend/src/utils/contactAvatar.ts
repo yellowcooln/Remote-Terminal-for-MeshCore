@@ -15,8 +15,8 @@ const REPEATER_AVATAR = {
   textColor: '#ffffff',
 };
 
-// Simple hash function for strings
-function hashString(str: string): number {
+// DJB2 hash function for strings
+export function hashString(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
