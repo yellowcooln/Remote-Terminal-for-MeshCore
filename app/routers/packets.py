@@ -278,9 +278,17 @@ async def run_maintenance(request: MaintenanceRequest) -> MaintenanceResult:
         deleted += purged_linked
         logger.info("Deleted %d linked raw packets", purged_linked)
 
-    # Run VACUUM to reclaim space on a dedicated connection
-    async with aiosqlite.connect(db.db_path) as vacuum_conn:
-        await vacuum_conn.executescript("VACUUM;")
-    logger.info("Database vacuumed")
+    # Run VACUUM to reclaim space on a dedicated connection.
+    # VACUUM requires exclusive access — if the main connection is actively
+    # writing (background sync, message processing, etc.) it fails with
+    # SQLITE_BUSY. This is expected; we just report vacuumed=False.
+    vacuumed = False
+    try:
+        async with aiosqlite.connect(db.db_path) as vacuum_conn:
+            await vacuum_conn.executescript("VACUUM;")
+        vacuumed = True
+        logger.info("Database vacuumed")
+    except Exception as e:
+        logger.warning("VACUUM skipped (database busy): %s", e)
 
-    return MaintenanceResult(packets_deleted=deleted, vacuumed=True)
+    return MaintenanceResult(packets_deleted=deleted, vacuumed=vacuumed)
