@@ -724,7 +724,6 @@ class MessageRepository:
             """
             SELECT m.conversation_key,
                    COUNT(*) as unread_count,
-                   MAX(m.received_at) as last_message_time,
                    SUM(CASE
                            WHEN ? <> '' AND INSTR(LOWER(m.text), LOWER(?)) > 0 THEN 1
                            ELSE 0
@@ -749,7 +748,6 @@ class MessageRepository:
             """
             SELECT m.conversation_key,
                    COUNT(*) as unread_count,
-                   MAX(m.received_at) as last_message_time,
                    SUM(CASE
                            WHEN ? <> '' AND INSTR(LOWER(m.text), LOWER(?)) > 0 THEN 1
                            ELSE 0

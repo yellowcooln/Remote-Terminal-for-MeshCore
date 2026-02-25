@@ -38,6 +38,13 @@ async def lifespan(app: FastAPI):
     await db.connect()
     logger.info("Database connected")
 
+    # Ensure default channels exist in the database even before the radio
+    # connects. Without this, a fresh or disconnected instance would return
+    # zero channels from GET /channels until the first successful radio sync.
+    from app.radio_sync import ensure_default_channels
+
+    await ensure_default_channels()
+
     try:
         await radio_manager.connect()
         logger.info("Connected to radio")

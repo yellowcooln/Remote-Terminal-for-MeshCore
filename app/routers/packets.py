@@ -1,5 +1,6 @@
 import logging
 from hashlib import sha256
+from sqlite3 import OperationalError
 
 import aiosqlite
 from fastapi import APIRouter, BackgroundTasks
@@ -288,7 +289,9 @@ async def run_maintenance(request: MaintenanceRequest) -> MaintenanceResult:
             await vacuum_conn.executescript("VACUUM;")
         vacuumed = True
         logger.info("Database vacuumed")
-    except Exception as e:
+    except OperationalError as e:
         logger.warning("VACUUM skipped (database busy): %s", e)
+    except Exception as e:
+        logger.error("VACUUM failed unexpectedly: %s", e)
 
     return MaintenanceResult(packets_deleted=deleted, vacuumed=vacuumed)

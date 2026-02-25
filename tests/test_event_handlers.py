@@ -463,6 +463,38 @@ class TestContactMessageCLIFiltering:
             _, payload = mock_broadcast.call_args.args
             assert payload["conversation_key"] == "abc123"
 
+    @pytest.mark.asyncio
+    async def test_repeater_message_skipped_not_stored(self, test_db):
+        """Messages from repeater contacts (type=2) are dropped, not stored."""
+        from app.event_handlers import on_contact_message
+
+        repeater_key = "dd" * 32
+        await ContactRepository.upsert(
+            {
+                "public_key": repeater_key,
+                "name": "MyRepeater",
+                "type": 2,  # CONTACT_TYPE_REPEATER
+                "flags": 0,
+            }
+        )
+
+        with patch("app.event_handlers.broadcast_event") as mock_broadcast:
+
+            class MockEvent:
+                payload = {
+                    "public_key": repeater_key,
+                    "text": "Some repeater noise",
+                    "txt_type": 0,
+                    "sender_timestamp": 1700000000,
+                }
+
+            await on_contact_message(MockEvent())
+
+            mock_broadcast.assert_not_called()
+
+            messages = await MessageRepository.get_all()
+            assert len(messages) == 0
+
 
 class TestEventHandlerRegistration:
     """Test event handler registration and cleanup."""

@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from app.dependencies import require_connected
 from app.models import Channel
 from app.radio import radio_manager
-from app.radio_sync import ensure_default_channels
 from app.repository import ChannelRepository
 
 logger = logging.getLogger(__name__)
@@ -26,8 +25,6 @@ class CreateChannelRequest(BaseModel):
 @router.get("", response_model=list[Channel])
 async def list_channels() -> list[Channel]:
     """List all channels from the database."""
-    # Ensure Public channel always exists (self-healing)
-    await ensure_default_channels()
     return await ChannelRepository.get_all()
 
 
