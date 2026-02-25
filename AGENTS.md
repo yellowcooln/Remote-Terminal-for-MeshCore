@@ -140,7 +140,7 @@ To improve repeater disambiguation in the network visualizer, the backend stores
 
 **Direct messages**: Expected ACK code is tracked. When ACK event arrives, message marked as acked.
 
-**Channel messages**: Flood messages echo back through repeaters. Repeats are identified by the database UNIQUE constraint on `(type, conversation_key, text, sender_timestamp)` — when an INSERT hits a duplicate, `_handle_duplicate_message()` in `packet_processor.py` increments the ack count on the original and adds the new path. There is no timestamp-windowed matching; deduplication is exact-match only.
+**Channel messages**: Flood messages echo back through repeaters. Repeats are identified by the database UNIQUE constraint on `(type, conversation_key, text, sender_timestamp)` — when an INSERT hits a duplicate, `_handle_duplicate_message()` in `packet_processor.py` adds the new path and, for outgoing messages only, increments the ack count. Incoming repeats add path data but do not change the ack count. There is no timestamp-windowed matching; deduplication is exact-match only.
 
 This message-layer echo/path handling is independent of raw-packet storage deduplication.
 

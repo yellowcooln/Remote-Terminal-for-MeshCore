@@ -78,7 +78,7 @@ app/
 ### Echo/repeat dedup
 
 - Message uniqueness: `(type, conversation_key, text, sender_timestamp)`.
-- Duplicate insert is treated as an echo/repeat; ACK count/path list is updated.
+- Duplicate insert is treated as an echo/repeat: the new path (if any) is appended, and the ACK count is incremented **only for outgoing messages**. Incoming repeats add path data but do not change the ACK count.
 
 ### Raw packet dedup policy
 
@@ -240,6 +240,22 @@ tests/
 ├── test_websocket.py           # WS manager broadcast/cleanup
 └── test_websocket_route.py     # WS endpoint lifecycle
 ```
+
+## Errata & Known Non-Issues
+
+### Sender timestamps are 1-second resolution (protocol constraint)
+
+The MeshCore radio protocol encodes `sender_timestamp` as a 4-byte little-endian integer (Unix seconds). This is a firmware-level wire format — the radio, the Python library (`commands/messaging.py`), and the decoder (`decoder.py`) all read/write exactly 4 bytes. Millisecond Unix timestamps would overflow 4 bytes, so higher resolution is not possible without a firmware change.
+
+**Consequence:** The dedup index `(type, conversation_key, text, COALESCE(sender_timestamp, 0))` operates at 1-second granularity. Sending identical text to the same conversation twice within one second will hit the UNIQUE constraint on the second insert, returning HTTP 500 *after* the radio has already transmitted. The message is sent over the air but not stored in the database. Do not attempt to fix this by switching to millisecond timestamps — it will break echo dedup (the echo's 4-byte timestamp won't match the stored value) and overflow `to_bytes(4, "little")`.
+
+### Outgoing DM echoes remain undecrypted
+
+When our own outgoing DM is heard back via `RX_LOG_DATA` (self-echo, loopback), `_process_direct_message` passes `our_public_key=None` for the outgoing direction, disabling the outbound hash check in the decoder. The decoder's inbound check (`src_hash == their_first_byte`) fails because the source is us, not the contact — so decryption returns `None`. This is by design: outgoing DMs are stored directly by the send endpoint, so no message is lost.
+
+### Contact lat/lon 0.0 vs NULL
+
+MeshCore uses `0.0` as the sentinel for "no GPS coordinates" (see `models.py` `to_radio_dict`). The upsert SQL uses `COALESCE(excluded.lat, contacts.lat)`, which preserves existing values when the new value is `NULL` — but `0.0` is not `NULL`, so it overwrites previously valid coordinates. This is intentional: we always want the most recent location data. If a device stops broadcasting GPS, the old coordinates are presumably stale/wrong, so overwriting with "not available" (`0.0`) is the correct behavior.
 
 ## Editing Checklist
 
