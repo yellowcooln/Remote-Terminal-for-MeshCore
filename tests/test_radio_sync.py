@@ -843,6 +843,8 @@ def _make_connected_manager() -> tuple[RadioManager, MagicMock]:
     rm = RadioManager()
     mock_mc = MagicMock(name="lock_scoped_mc")
     mock_mc.is_connected = True
+    mock_mc.stop_auto_message_fetching = AsyncMock()
+    mock_mc.start_auto_message_fetching = AsyncMock()
     rm._meshcore = mock_mc
     return rm, mock_mc
 
