@@ -278,9 +278,17 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/contacts/{key}/add-to-radio` | Push contact to radio |
 | POST | `/api/contacts/{key}/remove-from-radio` | Remove contact from radio |
 | POST | `/api/contacts/{key}/mark-read` | Mark contact conversation as read |
-| POST | `/api/contacts/{key}/telemetry` | Request telemetry from repeater |
 | POST | `/api/contacts/{key}/command` | Send CLI command to repeater |
 | POST | `/api/contacts/{key}/trace` | Trace route to contact |
+| POST | `/api/contacts/{key}/repeater/login` | Log in to a repeater |
+| POST | `/api/contacts/{key}/repeater/status` | Fetch repeater status telemetry |
+| POST | `/api/contacts/{key}/repeater/lpp-telemetry` | Fetch CayenneLPP sensor data |
+| POST | `/api/contacts/{key}/repeater/neighbors` | Fetch repeater neighbors |
+| POST | `/api/contacts/{key}/repeater/acl` | Fetch repeater ACL |
+| POST | `/api/contacts/{key}/repeater/radio-settings` | Fetch radio settings via CLI |
+| POST | `/api/contacts/{key}/repeater/advert-intervals` | Fetch advert intervals |
+| POST | `/api/contacts/{key}/repeater/owner-info` | Fetch owner info |
+| POST | `/api/contacts/{key}/repeater/clock` | Fetch repeater clock |
 | GET | `/api/channels` | List channels |
 | GET | `/api/channels/{key}` | Get channel by key |
 | POST | `/api/channels` | Create channel |
