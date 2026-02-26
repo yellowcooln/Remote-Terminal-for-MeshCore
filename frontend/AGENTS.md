@@ -33,8 +33,7 @@ frontend/src/
 │   ├── index.ts            # Central re-export of all hooks
 │   ├── useConversationMessages.ts  # Fetch, pagination, dedup, ACK buffering
 │   ├── useUnreadCounts.ts          # Unread counters, mentions, recent-sort timestamps
-│   ├── useRepeaterMode.ts          # Repeater login/command workflow
-│   ├── useAirtimeTracking.ts       # Repeater airtime stats polling
+│   ├── useRepeaterDashboard.ts      # Repeater dashboard state (login, panes, console, retries)
 │   ├── useRadioControl.ts          # Radio health/config state, reconnection
 │   ├── useAppSettings.ts           # Settings, favorites, preferences migration
 │   ├── useConversationRouter.ts    # URL hash → active conversation routing
@@ -68,6 +67,8 @@ frontend/src/
 │   ├── BotCodeEditor.tsx
 │   ├── ContactAvatar.tsx
 │   ├── ContactInfoPane.tsx     # Contact detail sheet (stats, name history, paths)
+│   ├── RepeaterDashboard.tsx   # Repeater pane-based dashboard (telemetry, neighbors, ACL, etc.)
+│   ├── RepeaterLogin.tsx       # Repeater login form (password + guest)
 │   └── ui/                     # shadcn/ui primitives
 ├── types/
 │   └── d3-force-3d.d.ts       # Type declarations for d3-force-3d
@@ -75,7 +76,6 @@ frontend/src/
     ├── setup.ts
     ├── fixtures/websocket_events.json
     ├── api.test.ts
-    ├── useAirtimeTracking.test.ts
     ├── appFavorites.test.tsx
     ├── appStartupHash.test.tsx
     ├── contactAvatar.test.ts
@@ -85,6 +85,7 @@ frontend/src/
     ├── pathUtils.test.ts
     ├── radioPresets.test.ts
     ├── rawPacketIdentity.test.ts
+    ├── repeaterDashboard.test.tsx
     ├── repeaterMode.test.ts
     ├── settingsModal.test.tsx
     ├── sidebar.test.tsx
@@ -92,7 +93,7 @@ frontend/src/
     ├── urlHash.test.ts
     ├── useConversationMessages.test.ts
     ├── useConversationMessages.race.test.ts
-    ├── useRepeaterMode.test.ts
+    ├── useRepeaterDashboard.test.ts
     ├── useWebSocket.dispatch.test.ts
     └── useWebSocket.lifecycle.test.ts
 ```
@@ -108,12 +109,7 @@ frontend/src/
 - `useConversationRouter`: URL hash → active conversation routing
 - `useConversationMessages`: fetch, pagination, dedup/update helpers
 - `useUnreadCounts`: unread counters, mention tracking, recent-sort timestamps
-- `useRepeaterMode`: repeater login/command workflow
-- `useAirtimeTracking`: repeater airtime stats polling
-
-### Local message IDs
-
-`useRepeaterMode` and `useAirtimeTracking` each have a `createLocalMessage` that generates ephemeral (non-persisted) message IDs via `-Date.now()`. Both hooks write to the same `setMessages`, so a same-millisecond call would produce duplicate IDs. In practice this requires a repeater command response and an airtime poll to land in the exact same ms — staggeringly unlikely and cosmetic-only (React duplicate key warning). Not worth fixing.
+- `useRepeaterDashboard`: repeater dashboard state (login, pane data/retries, console, actions)
 
 ### Initial load + realtime
 
@@ -204,13 +200,19 @@ LocalStorage migration helpers for favorites; canonical favorites are server-sid
 - `last_advert_time`
 - `bots`
 
-## Repeater Mode
+## Repeater Dashboard
 
-For repeater contacts (`type=2`):
-1. Telemetry/login phase (`POST /api/contacts/{key}/telemetry`)
-2. Command phase (`POST /api/contacts/{key}/command`)
+For repeater contacts (`type=2`), App.tsx renders `RepeaterDashboard` instead of the normal chat UI (ChatHeader + MessageList + MessageInput).
 
-CLI responses are rendered as local-only messages (not persisted to DB).
+**Login**: `RepeaterLogin` component — password or guest login via `POST /api/contacts/{key}/repeater/login`.
+
+**Dashboard panes** (after login): Telemetry, Neighbors, ACL, Radio Settings, Advert Intervals, Owner Info, Clock — each fetched via granular `POST /api/contacts/{key}/repeater/{pane}` endpoints. Panes retry up to 3 times client-side. "Load All" fetches all panes serially (parallel would queue behind the radio lock).
+
+**Actions pane**: Send Advert, Sync Clock, Reboot — all send CLI commands via `POST /api/contacts/{key}/command`.
+
+**Console pane**: Full CLI access via the same command endpoint. History is ephemeral (not persisted to DB).
+
+All state is managed by `useRepeaterDashboard` hook. State resets on conversation change.
 
 ## Styling
 
