@@ -12,6 +12,7 @@ from app.radio import radio_manager
 from app.repository import ContactRepository
 from app.routers.contacts import (
     _fetch_repeater_response,
+    prepare_repeater_connection,
     request_telemetry,
     request_trace,
     send_repeater_command,
@@ -495,6 +496,78 @@ class TestTelemetryRoute:
         assert response.neighbors == []
         assert response.acl == []
         assert response.clock_output == "12:00"
+
+
+class TestAddContactNonFatal:
+    """add_contact failure should warn and continue, not abort the operation."""
+
+    @pytest.mark.asyncio
+    async def test_prepare_repeater_connection_continues_on_add_contact_error(self, test_db):
+        mc = _mock_mc()
+        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
+        mc.commands.add_contact = AsyncMock(
+            return_value=_radio_result(EventType.ERROR, {"reason": "no_event_received"})
+        )
+        mc.commands.send_login = AsyncMock(return_value=_radio_result(EventType.OK))
+        contact = await ContactRepository.get_by_key(KEY_A)
+
+        with patch("app.routers.contacts.broadcast_error") as mock_broadcast:
+            await prepare_repeater_connection(mc, contact, "pw")
+
+        # Login was still attempted despite add_contact failure
+        mc.commands.send_login.assert_awaited_once()
+        mock_broadcast.assert_called_once()
+        assert "attempting to continue" in mock_broadcast.call_args[0][0].lower()
+
+    @pytest.mark.asyncio
+    async def test_command_continues_on_add_contact_error(self, test_db):
+        mc = _mock_mc()
+        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
+        mc.commands.add_contact = AsyncMock(
+            return_value=_radio_result(EventType.ERROR, {"reason": "no_event_received"})
+        )
+        mc.commands.send_cmd = AsyncMock(return_value=_radio_result(EventType.OK))
+        mc.commands.get_msg = AsyncMock(
+            return_value=_radio_result(
+                EventType.CONTACT_MSG_RECV,
+                {"pubkey_prefix": KEY_A[:12], "text": "ver 1.0", "txt_type": 1},
+            )
+        )
+
+        with (
+            patch("app.routers.contacts.require_connected", return_value=mc),
+            patch.object(radio_manager, "_meshcore", mc),
+            patch("app.routers.contacts.broadcast_error") as mock_broadcast,
+            patch(_MONOTONIC, side_effect=_advancing_clock()),
+        ):
+            response = await send_repeater_command(KEY_A, CommandRequest(command="ver"))
+
+        assert response.response == "ver 1.0"
+        mock_broadcast.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_trace_continues_on_add_contact_error(self, test_db):
+        mc = _mock_mc()
+        await _insert_contact(KEY_A, name="Client", contact_type=1)
+        mc.commands.add_contact = AsyncMock(
+            return_value=_radio_result(EventType.ERROR, {"reason": "no_event_received"})
+        )
+        mc.commands.send_trace = AsyncMock(return_value=_radio_result(EventType.OK))
+        mc.wait_for_event = AsyncMock(
+            return_value=MagicMock(payload={"path": [{"snr": 5.5}], "path_len": 1})
+        )
+
+        with (
+            patch("app.routers.contacts.require_connected", return_value=mc),
+            patch.object(radio_manager, "_meshcore", mc),
+            patch("app.routers.contacts.random.randint", return_value=1234),
+            patch("app.routers.contacts.broadcast_error") as mock_broadcast,
+        ):
+            response = await request_trace(KEY_A)
+
+        assert response.remote_snr == 5.5
+        assert response.path_len == 1
+        mock_broadcast.assert_called_once()
 
 
 class TestRepeaterCommandRoute:

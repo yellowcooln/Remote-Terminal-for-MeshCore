@@ -30,6 +30,7 @@ from app.repository import (
     MessageRepository,
     RepeaterAdvertPathRepository,
 )
+from app.websocket import broadcast_error
 
 if TYPE_CHECKING:
     from meshcore.events import Event
@@ -160,12 +161,18 @@ async def prepare_repeater_connection(mc, contact: Contact, password: str) -> No
     Raises:
         HTTPException: If login fails
     """
-    # Add contact to radio with path from DB
+    # Add contact to radio with path from DB (non-fatal — contact may already be loaded)
     logger.info("Adding repeater %s to radio", contact.public_key[:12])
     add_result = await mc.commands.add_contact(contact.to_radio_dict())
     if add_result is not None and add_result.type == EventType.ERROR:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to add repeater contact: {add_result.payload}"
+        logger.warning(
+            "Failed to add repeater %s to radio: %s — continuing anyway",
+            contact.public_key[:12],
+            add_result.payload,
+        )
+        broadcast_error(
+            "Failed to add repeater contact to radio, attempting to continue",
+            str(add_result.payload),
         )
 
     # Send login with password
@@ -603,12 +610,18 @@ async def send_repeater_command(public_key: str, request: CommandRequest) -> Com
         pause_polling=True,
         suspend_auto_fetch=True,
     ) as mc:
-        # Add contact to radio with path from DB
+        # Add contact to radio with path from DB (non-fatal — contact may already be loaded)
         logger.info("Adding repeater %s to radio", contact.public_key[:12])
         add_result = await mc.commands.add_contact(contact.to_radio_dict())
         if add_result is not None and add_result.type == EventType.ERROR:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to add repeater contact: {add_result.payload}"
+            logger.warning(
+                "Failed to add repeater %s to radio: %s — continuing anyway",
+                contact.public_key[:12],
+                add_result.payload,
+            )
+            broadcast_error(
+                "Failed to add repeater contact to radio, attempting to continue",
+                str(add_result.payload),
             )
 
         # Send the command
@@ -669,11 +682,17 @@ async def request_trace(public_key: str) -> TraceResponse:
     # Trace does not need auto-fetch suspension: response arrives as TRACE_DATA
     # from the reader loop, not via get_msg().
     async with radio_manager.radio_operation("request_trace", pause_polling=True) as mc:
-        # Ensure contact is on radio so the trace can reach them
+        # Ensure contact is on radio so the trace can reach them (non-fatal)
         add_result = await mc.commands.add_contact(contact.to_radio_dict())
         if add_result is not None and add_result.type == EventType.ERROR:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to add contact for trace: {add_result.payload}"
+            logger.warning(
+                "Failed to add contact %s to radio for trace: %s — continuing anyway",
+                contact.public_key[:12],
+                add_result.payload,
+            )
+            broadcast_error(
+                "Failed to add contact to radio for trace, attempting to continue",
+                str(add_result.payload),
             )
 
         logger.info(
