@@ -390,6 +390,11 @@ function useVisualizerData3D({
     pendingRef.current.delete(packetKey);
     timersRef.current.delete(packetKey);
 
+    // Skip particle creation when tab is hidden — nobody is watching, and
+    // creating them now would cause a burst of animations when the tab
+    // becomes visible again (since rAF is paused while hidden).
+    if (document.hidden) return;
+
     for (const path of pending.paths) {
       const dedupedPath = dedupeConsecutive(path.nodes);
       if (dedupedPath.length < 2) continue;
