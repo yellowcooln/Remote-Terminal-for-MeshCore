@@ -378,11 +378,14 @@ async def run_historical_dm_decryption(
     our_public_key_bytes = derive_public_key(private_key_bytes)
 
     for packet_id, packet_data, packet_timestamp in packets:
-        # Note: passing our_public_key=None means outgoing DMs won't be matched
-        # by try_decrypt_dm (the inbound check requires src_hash == their_first_byte,
-        # which fails for our outgoing packets). This is acceptable because outgoing
-        # DMs are stored directly by the send endpoint. Historical decryption only
-        # recovers incoming messages.
+        # Note: passing our_public_key=None disables the outbound hash check in
+        # try_decrypt_dm (only the inbound check src_hash == their_first_byte runs).
+        # For the 255/256 case where our first byte differs from the contact's,
+        # outgoing packets fail the inbound check and are skipped — which is correct
+        # since outgoing DMs are stored directly by the send endpoint.
+        # For the 1/256 case where bytes match, an outgoing packet may decrypt
+        # successfully, but the dual-hash direction check below correctly identifies
+        # it and the DB dedup constraint prevents a duplicate insert.
         result = try_decrypt_dm(
             packet_data,
             private_key_bytes,
@@ -391,10 +394,20 @@ async def run_historical_dm_decryption(
         )
 
         if result is not None:
-            # Determine direction by checking src_hash
+            # Determine direction using both hashes (mirrors _process_direct_message
+            # logic at lines 806-818) to handle the 1/256 case where our first
+            # public key byte matches the contact's.
             src_hash = result.src_hash.lower()
+            dest_hash = result.dest_hash.lower()
             our_first_byte = format(our_public_key_bytes[0], "02x").lower()
-            outgoing = src_hash == our_first_byte
+
+            if src_hash == our_first_byte and dest_hash != our_first_byte:
+                outgoing = True
+            else:
+                # Incoming, ambiguous (both match), or neither matches.
+                # Default to incoming — outgoing DMs are stored by the send
+                # endpoint, so historical decryption only recovers incoming.
+                outgoing = False
 
             # Extract path from the raw packet for storage
             packet_info = parse_packet(packet_data)
