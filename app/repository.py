@@ -12,11 +12,12 @@ from app.models import (
     BotConfig,
     Channel,
     Contact,
+    ContactAdvertPath,
+    ContactAdvertPathSummary,
+    ContactNameHistory,
     Favorite,
     Message,
     MessagePath,
-    RepeaterAdvertPath,
-    RepeaterAdvertPathSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,9 @@ class ContactRepository:
         await db.conn.execute(
             """
             INSERT INTO contacts (public_key, name, type, flags, last_path, last_path_len,
-                                  last_advert, lat, lon, last_seen, on_radio, last_contacted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                  last_advert, lat, lon, last_seen, on_radio, last_contacted,
+                                  first_seen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(public_key) DO UPDATE SET
                 name = COALESCE(excluded.name, contacts.name),
                 type = CASE WHEN excluded.type = 0 THEN contacts.type ELSE excluded.type END,
@@ -54,8 +56,9 @@ class ContactRepository:
                 lat = COALESCE(excluded.lat, contacts.lat),
                 lon = COALESCE(excluded.lon, contacts.lon),
                 last_seen = excluded.last_seen,
-                on_radio = excluded.on_radio,
-                last_contacted = COALESCE(excluded.last_contacted, contacts.last_contacted)
+                on_radio = COALESCE(excluded.on_radio, contacts.on_radio),
+                last_contacted = COALESCE(excluded.last_contacted, contacts.last_contacted),
+                first_seen = COALESCE(contacts.first_seen, excluded.first_seen)
             """,
             (
                 contact.get("public_key", "").lower(),
@@ -68,8 +71,9 @@ class ContactRepository:
                 contact.get("lat"),
                 contact.get("lon"),
                 contact.get("last_seen", int(time.time())),
-                contact.get("on_radio", False),
+                contact.get("on_radio"),
                 contact.get("last_contacted"),
+                contact.get("first_seen"),
             ),
         )
         await db.conn.commit()
@@ -91,6 +95,7 @@ class ContactRepository:
             on_radio=bool(row["on_radio"]),
             last_contacted=row["last_contacted"],
             last_read_at=row["last_read_at"],
+            first_seen=row["first_seen"],
         )
 
     @staticmethod
@@ -149,6 +154,42 @@ class ContactRepository:
         return None
 
     @staticmethod
+    async def get_by_name(name: str) -> list[Contact]:
+        """Get all contacts with the given exact name."""
+        cursor = await db.conn.execute("SELECT * FROM contacts WHERE name = ?", (name,))
+        rows = await cursor.fetchall()
+        return [ContactRepository._row_to_contact(row) for row in rows]
+
+    @staticmethod
+    async def resolve_prefixes(prefixes: list[str]) -> dict[str, Contact]:
+        """Resolve multiple key prefixes to contacts in a single query.
+
+        Returns a dict mapping each prefix to its Contact, only for prefixes
+        that resolve uniquely (exactly one match). Ambiguous or unmatched
+        prefixes are omitted.
+        """
+        if not prefixes:
+            return {}
+        normalized = [p.lower() for p in prefixes]
+        conditions = " OR ".join(["public_key LIKE ?"] * len(normalized))
+        params = [f"{p}%" for p in normalized]
+        cursor = await db.conn.execute(f"SELECT * FROM contacts WHERE {conditions}", params)
+        rows = await cursor.fetchall()
+        # Group by which prefix each row matches
+        prefix_to_rows: dict[str, list] = {p: [] for p in normalized}
+        for row in rows:
+            pk = row["public_key"]
+            for p in normalized:
+                if pk.startswith(p):
+                    prefix_to_rows[p].append(row)
+        # Only include uniquely-resolved prefixes
+        result: dict[str, Contact] = {}
+        for p in normalized:
+            if len(prefix_to_rows[p]) == 1:
+                result[p] = ContactRepository._row_to_contact(prefix_to_rows[p][0])
+        return result
+
+    @staticmethod
     async def get_all(limit: int = 100, offset: int = 0) -> list[Contact]:
         cursor = await db.conn.execute(
             "SELECT * FROM contacts ORDER BY COALESCE(name, public_key) LIMIT ? OFFSET ?",
@@ -194,10 +235,14 @@ class ContactRepository:
 
     @staticmethod
     async def delete(public_key: str) -> None:
+        normalized = public_key.lower()
         await db.conn.execute(
-            "DELETE FROM contacts WHERE public_key = ?",
-            (public_key.lower(),),
+            "DELETE FROM contact_name_history WHERE public_key = ?", (normalized,)
         )
+        await db.conn.execute(
+            "DELETE FROM contact_advert_paths WHERE public_key = ?", (normalized,)
+        )
+        await db.conn.execute("DELETE FROM contacts WHERE public_key = ?", (normalized,))
         await db.conn.commit()
 
     @staticmethod
@@ -241,14 +286,14 @@ class ContactRepository:
         return [ContactRepository._row_to_contact(row) for row in rows]
 
 
-class RepeaterAdvertPathRepository:
-    """Repository for recent unique repeater advertisement paths."""
+class ContactAdvertPathRepository:
+    """Repository for recent unique advertisement paths per contact."""
 
     @staticmethod
-    def _row_to_path(row) -> RepeaterAdvertPath:
+    def _row_to_path(row) -> ContactAdvertPath:
         path = row["path_hex"] or ""
         next_hop = path[:2].lower() if len(path) >= 2 else None
-        return RepeaterAdvertPath(
+        return ContactAdvertPath(
             path=path,
             path_len=row["path_len"],
             next_hop=next_hop,
@@ -259,92 +304,129 @@ class RepeaterAdvertPathRepository:
 
     @staticmethod
     async def record_observation(
-        repeater_key: str, path_hex: str, timestamp: int, max_paths_per_repeater: int = 10
+        public_key: str,
+        path_hex: str,
+        timestamp: int,
+        max_paths: int = 10,
     ) -> None:
         """
-        Upsert a unique advert path observation for a repeater and prune to N most recent.
+        Upsert a unique advert path observation for a contact and prune to N most recent.
         """
-        if max_paths_per_repeater < 1:
-            max_paths_per_repeater = 1
+        if max_paths < 1:
+            max_paths = 1
 
-        normalized_key = repeater_key.lower()
+        normalized_key = public_key.lower()
         normalized_path = path_hex.lower()
         path_len = len(normalized_path) // 2
 
         await db.conn.execute(
             """
-            INSERT INTO repeater_advert_paths
-                (repeater_key, path_hex, path_len, first_seen, last_seen, heard_count)
+            INSERT INTO contact_advert_paths
+                (public_key, path_hex, path_len, first_seen, last_seen, heard_count)
             VALUES (?, ?, ?, ?, ?, 1)
-            ON CONFLICT(repeater_key, path_hex) DO UPDATE SET
-                last_seen = MAX(repeater_advert_paths.last_seen, excluded.last_seen),
+            ON CONFLICT(public_key, path_hex) DO UPDATE SET
+                last_seen = MAX(contact_advert_paths.last_seen, excluded.last_seen),
                 path_len = excluded.path_len,
-                heard_count = repeater_advert_paths.heard_count + 1
+                heard_count = contact_advert_paths.heard_count + 1
             """,
             (normalized_key, normalized_path, path_len, timestamp, timestamp),
         )
 
-        # Keep only the N most recent unique paths per repeater.
+        # Keep only the N most recent unique paths per contact.
         await db.conn.execute(
             """
-            DELETE FROM repeater_advert_paths
-            WHERE repeater_key = ?
+            DELETE FROM contact_advert_paths
+            WHERE public_key = ?
               AND path_hex NOT IN (
                   SELECT path_hex
-                  FROM repeater_advert_paths
-                  WHERE repeater_key = ?
+                  FROM contact_advert_paths
+                  WHERE public_key = ?
                   ORDER BY last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
                   LIMIT ?
               )
             """,
-            (normalized_key, normalized_key, max_paths_per_repeater),
+            (normalized_key, normalized_key, max_paths),
         )
         await db.conn.commit()
 
     @staticmethod
-    async def get_recent_for_repeater(
-        repeater_key: str, limit: int = 10
-    ) -> list[RepeaterAdvertPath]:
+    async def get_recent_for_contact(public_key: str, limit: int = 10) -> list[ContactAdvertPath]:
         cursor = await db.conn.execute(
             """
             SELECT path_hex, path_len, first_seen, last_seen, heard_count
-            FROM repeater_advert_paths
-            WHERE repeater_key = ?
+            FROM contact_advert_paths
+            WHERE public_key = ?
             ORDER BY last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
             LIMIT ?
             """,
-            (repeater_key.lower(), limit),
+            (public_key.lower(), limit),
         )
         rows = await cursor.fetchall()
-        return [RepeaterAdvertPathRepository._row_to_path(row) for row in rows]
+        return [ContactAdvertPathRepository._row_to_path(row) for row in rows]
 
     @staticmethod
-    async def get_recent_for_all_repeaters(
-        limit_per_repeater: int = 10,
-    ) -> list[RepeaterAdvertPathSummary]:
+    async def get_recent_for_all_contacts(
+        limit_per_contact: int = 10,
+    ) -> list[ContactAdvertPathSummary]:
         cursor = await db.conn.execute(
             """
-            SELECT repeater_key, path_hex, path_len, first_seen, last_seen, heard_count
-            FROM repeater_advert_paths
-            ORDER BY repeater_key ASC, last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
+            SELECT public_key, path_hex, path_len, first_seen, last_seen, heard_count
+            FROM contact_advert_paths
+            ORDER BY public_key ASC, last_seen DESC, heard_count DESC, path_len ASC, path_hex ASC
             """
         )
         rows = await cursor.fetchall()
 
-        grouped: dict[str, list[RepeaterAdvertPath]] = {}
+        grouped: dict[str, list[ContactAdvertPath]] = {}
         for row in rows:
-            repeater_key = row["repeater_key"]
-            paths = grouped.get(repeater_key)
+            key = row["public_key"]
+            paths = grouped.get(key)
             if paths is None:
                 paths = []
-                grouped[repeater_key] = paths
-            if len(paths) >= limit_per_repeater:
+                grouped[key] = paths
+            if len(paths) >= limit_per_contact:
                 continue
-            paths.append(RepeaterAdvertPathRepository._row_to_path(row))
+            paths.append(ContactAdvertPathRepository._row_to_path(row))
 
         return [
-            RepeaterAdvertPathSummary(repeater_key=repeater_key, paths=paths)
-            for repeater_key, paths in grouped.items()
+            ContactAdvertPathSummary(public_key=key, paths=paths) for key, paths in grouped.items()
+        ]
+
+
+class ContactNameHistoryRepository:
+    """Repository for contact name change history."""
+
+    @staticmethod
+    async def record_name(public_key: str, name: str, timestamp: int) -> None:
+        """Record a name observation. Upserts: updates last_seen if name already known."""
+        await db.conn.execute(
+            """
+            INSERT INTO contact_name_history (public_key, name, first_seen, last_seen)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(public_key, name) DO UPDATE SET
+                last_seen = MAX(contact_name_history.last_seen, excluded.last_seen)
+            """,
+            (public_key.lower(), name, timestamp, timestamp),
+        )
+        await db.conn.commit()
+
+    @staticmethod
+    async def get_history(public_key: str) -> list[ContactNameHistory]:
+        cursor = await db.conn.execute(
+            """
+            SELECT name, first_seen, last_seen
+            FROM contact_name_history
+            WHERE public_key = ?
+            ORDER BY last_seen DESC
+            """,
+            (public_key.lower(),),
+        )
+        rows = await cursor.fetchall()
+        return [
+            ContactNameHistory(
+                name=row["name"], first_seen=row["first_seen"], last_seen=row["last_seen"]
+            )
+            for row in rows
         ]
 
 
@@ -453,6 +535,8 @@ class MessageRepository:
         txt_type: int = 0,
         signature: str | None = None,
         outgoing: bool = False,
+        sender_name: str | None = None,
+        sender_key: str | None = None,
     ) -> int | None:
         """Create a message, returning the ID or None if duplicate.
 
@@ -470,8 +554,9 @@ class MessageRepository:
         cursor = await db.conn.execute(
             """
             INSERT OR IGNORE INTO messages (type, conversation_key, text, sender_timestamp,
-                                            received_at, paths, txt_type, signature, outgoing)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                            received_at, paths, txt_type, signature, outgoing,
+                                            sender_name, sender_key)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 msg_type,
@@ -483,6 +568,8 @@ class MessageRepository:
                 txt_type,
                 signature,
                 outgoing,
+                sender_name,
+                sender_key,
             ),
         )
         await db.conn.commit()
@@ -786,6 +873,48 @@ class MessageRepository:
             "mentions": mention_flags,
             "last_message_times": last_message_times,
         }
+
+    @staticmethod
+    async def count_dm_messages(contact_key: str) -> int:
+        """Count total DM messages for a contact."""
+        cursor = await db.conn.execute(
+            "SELECT COUNT(*) as cnt FROM messages WHERE type = 'PRIV' AND conversation_key = ?",
+            (contact_key.lower(),),
+        )
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
+
+    @staticmethod
+    async def count_channel_messages_by_sender(sender_key: str) -> int:
+        """Count channel messages sent by a specific contact."""
+        cursor = await db.conn.execute(
+            "SELECT COUNT(*) as cnt FROM messages WHERE type = 'CHAN' AND sender_key = ?",
+            (sender_key.lower(),),
+        )
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
+
+    @staticmethod
+    async def get_most_active_rooms(sender_key: str, limit: int = 5) -> list[tuple[str, str, int]]:
+        """Get channels where a contact has sent the most messages.
+
+        Returns list of (channel_key, channel_name, message_count) tuples.
+        """
+        cursor = await db.conn.execute(
+            """
+            SELECT m.conversation_key, COALESCE(c.name, m.conversation_key) as channel_name,
+                   COUNT(*) as cnt
+            FROM messages m
+            LEFT JOIN channels c ON m.conversation_key = c.key
+            WHERE m.type = 'CHAN' AND m.sender_key = ?
+            GROUP BY m.conversation_key
+            ORDER BY cnt DESC
+            LIMIT ?
+            """,
+            (sender_key.lower(), limit),
+        )
+        rows = await cursor.fetchall()
+        return [(row["conversation_key"], row["channel_name"], row["cnt"]) for row in rows]
 
 
 class RawPacketRepository:

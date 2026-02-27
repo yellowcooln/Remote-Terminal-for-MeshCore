@@ -5,14 +5,21 @@ interface ContactAvatarProps {
   publicKey: string;
   size?: number;
   contactType?: number;
+  clickable?: boolean;
 }
 
-export function ContactAvatar({ name, publicKey, size = 28, contactType }: ContactAvatarProps) {
+export function ContactAvatar({
+  name,
+  publicKey,
+  size = 28,
+  contactType,
+  clickable,
+}: ContactAvatarProps) {
   const avatar = getContactAvatar(name, publicKey, contactType);
 
   return (
     <div
-      className="flex items-center justify-center rounded-full font-semibold flex-shrink-0 select-none"
+      className={`flex items-center justify-center rounded-full font-semibold flex-shrink-0 select-none${clickable ? ' cursor-pointer' : ''}`}
       style={{
         backgroundColor: avatar.background,
         color: avatar.textColor,

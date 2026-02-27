@@ -26,6 +26,7 @@ function createContact(overrides: Partial<Contact> = {}): Contact {
     on_radio: false,
     last_contacted: null,
     last_read_at: null,
+    first_seen: null,
     ...overrides,
   };
 }

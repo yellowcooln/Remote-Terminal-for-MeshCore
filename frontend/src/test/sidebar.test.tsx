@@ -30,6 +30,7 @@ function makeContact(public_key: string, name: string, type = 1): Contact {
     on_radio: false,
     last_contacted: null,
     last_read_at: null,
+    first_seen: null,
   };
 }
 

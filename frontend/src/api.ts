@@ -4,6 +4,9 @@ import type {
   Channel,
   CommandResponse,
   Contact,
+  ContactAdvertPath,
+  ContactAdvertPathSummary,
+  ContactDetail,
   Favorite,
   HealthStatus,
   MaintenanceResult,
@@ -12,8 +15,6 @@ import type {
   MigratePreferencesResponse,
   RadioConfig,
   RadioConfigUpdate,
-  RepeaterAdvertPath,
-  RepeaterAdvertPathSummary,
   StatisticsResponse,
   TelemetryResponse,
   TraceResponse,
@@ -97,11 +98,13 @@ export const api = {
   getContacts: (limit = 100, offset = 0) =>
     fetchJson<Contact[]>(`/contacts?limit=${limit}&offset=${offset}`),
   getRepeaterAdvertPaths: (limitPerRepeater = 10) =>
-    fetchJson<RepeaterAdvertPathSummary[]>(
+    fetchJson<ContactAdvertPathSummary[]>(
       `/contacts/repeaters/advert-paths?limit_per_repeater=${limitPerRepeater}`
     ),
   getContactAdvertPaths: (publicKey: string, limit = 10) =>
-    fetchJson<RepeaterAdvertPath[]>(`/contacts/${publicKey}/advert-paths?limit=${limit}`),
+    fetchJson<ContactAdvertPath[]>(`/contacts/${publicKey}/advert-paths?limit=${limit}`),
+  getContactDetail: (publicKey: string) =>
+    fetchJson<ContactDetail>(`/contacts/${publicKey}/detail`),
   deleteContact: (publicKey: string) =>
     fetchJson<{ status: string }>(`/contacts/${publicKey}`, {
       method: 'DELETE',

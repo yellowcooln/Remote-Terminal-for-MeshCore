@@ -5,7 +5,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.database import Database
-from app.repository import ContactRepository, MessageRepository, RepeaterAdvertPathRepository
+from app.repository import (
+    ContactAdvertPathRepository,
+    ContactNameHistoryRepository,
+    ContactRepository,
+    MessageRepository,
+)
 
 
 @pytest.fixture
@@ -267,18 +272,18 @@ class TestMessageRepositoryGetByContent:
         assert result.paths is None
 
 
-class TestRepeaterAdvertPathRepository:
-    """Test storing and retrieving recent unique repeater advert paths."""
+class TestContactAdvertPathRepository:
+    """Test storing and retrieving recent unique advert paths."""
 
     @pytest.mark.asyncio
     async def test_record_observation_upserts_and_tracks_count(self, test_db):
         repeater_key = "aa" * 32
         await ContactRepository.upsert({"public_key": repeater_key, "name": "R1", "type": 2})
 
-        await RepeaterAdvertPathRepository.record_observation(repeater_key, "112233", 1000)
-        await RepeaterAdvertPathRepository.record_observation(repeater_key, "112233", 1010)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "112233", 1000)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "112233", 1010)
 
-        paths = await RepeaterAdvertPathRepository.get_recent_for_repeater(repeater_key, limit=10)
+        paths = await ContactAdvertPathRepository.get_recent_for_contact(repeater_key, limit=10)
         assert len(paths) == 1
         assert paths[0].path == "112233"
         assert paths[0].path_len == 3
@@ -292,17 +297,11 @@ class TestRepeaterAdvertPathRepository:
         repeater_key = "bb" * 32
         await ContactRepository.upsert({"public_key": repeater_key, "name": "R2", "type": 2})
 
-        await RepeaterAdvertPathRepository.record_observation(
-            repeater_key, "aa", 1000, max_paths_per_repeater=2
-        )
-        await RepeaterAdvertPathRepository.record_observation(
-            repeater_key, "bb", 1001, max_paths_per_repeater=2
-        )
-        await RepeaterAdvertPathRepository.record_observation(
-            repeater_key, "cc", 1002, max_paths_per_repeater=2
-        )
+        await ContactAdvertPathRepository.record_observation(repeater_key, "aa", 1000, max_paths=2)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "bb", 1001, max_paths=2)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "cc", 1002, max_paths=2)
 
-        paths = await RepeaterAdvertPathRepository.get_recent_for_repeater(repeater_key, limit=10)
+        paths = await ContactAdvertPathRepository.get_recent_for_contact(repeater_key, limit=10)
         assert [p.path for p in paths] == ["cc", "bb"]
 
     @pytest.mark.asyncio
@@ -312,14 +311,12 @@ class TestRepeaterAdvertPathRepository:
         await ContactRepository.upsert({"public_key": repeater_a, "name": "RA", "type": 2})
         await ContactRepository.upsert({"public_key": repeater_b, "name": "RB", "type": 2})
 
-        await RepeaterAdvertPathRepository.record_observation(repeater_a, "01", 1000)
-        await RepeaterAdvertPathRepository.record_observation(repeater_a, "02", 1001)
-        await RepeaterAdvertPathRepository.record_observation(repeater_b, "", 1002)
+        await ContactAdvertPathRepository.record_observation(repeater_a, "01", 1000)
+        await ContactAdvertPathRepository.record_observation(repeater_a, "02", 1001)
+        await ContactAdvertPathRepository.record_observation(repeater_b, "", 1002)
 
-        grouped = await RepeaterAdvertPathRepository.get_recent_for_all_repeaters(
-            limit_per_repeater=1
-        )
-        by_key = {item.repeater_key: item.paths for item in grouped}
+        grouped = await ContactAdvertPathRepository.get_recent_for_all_contacts(limit_per_contact=1)
+        by_key = {item.public_key: item.paths for item in grouped}
 
         assert repeater_a in by_key
         assert repeater_b in by_key
@@ -327,6 +324,173 @@ class TestRepeaterAdvertPathRepository:
         assert by_key[repeater_a][0].path == "02"
         assert by_key[repeater_b][0].path == ""
         assert by_key[repeater_b][0].next_hop is None
+
+
+class TestContactNameHistoryRepository:
+    """Test contact name history tracking."""
+
+    @pytest.mark.asyncio
+    async def test_record_and_retrieve_name_history(self, test_db):
+        key = "aa" * 32
+        await ContactRepository.upsert({"public_key": key, "name": "Alice", "type": 1})
+
+        await ContactNameHistoryRepository.record_name(key, "Alice", 1000)
+        await ContactNameHistoryRepository.record_name(key, "AliceV2", 2000)
+
+        history = await ContactNameHistoryRepository.get_history(key)
+        assert len(history) == 2
+        assert history[0].name == "AliceV2"  # most recent first
+        assert history[1].name == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_record_name_upserts_last_seen(self, test_db):
+        key = "bb" * 32
+        await ContactRepository.upsert({"public_key": key, "name": "Bob", "type": 1})
+
+        await ContactNameHistoryRepository.record_name(key, "Bob", 1000)
+        await ContactNameHistoryRepository.record_name(key, "Bob", 2000)
+
+        history = await ContactNameHistoryRepository.get_history(key)
+        assert len(history) == 1
+        assert history[0].first_seen == 1000
+        assert history[0].last_seen == 2000
+
+
+class TestMessageRepositoryContactStats:
+    """Test per-contact message counting methods."""
+
+    @pytest.mark.asyncio
+    async def test_count_dm_messages(self, test_db):
+        key = "aa" * 32
+        await ContactRepository.upsert({"public_key": key, "name": "Alice", "type": 1})
+
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="hi",
+            conversation_key=key,
+            sender_timestamp=1000,
+            received_at=1000,
+            sender_key=key,
+        )
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="hello back",
+            conversation_key=key,
+            sender_timestamp=1001,
+            received_at=1001,
+            outgoing=True,
+        )
+        # Different contact's DM should not be counted
+        other_key = "bb" * 32
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="hey",
+            conversation_key=other_key,
+            sender_timestamp=1002,
+            received_at=1002,
+            sender_key=other_key,
+        )
+
+        count = await MessageRepository.count_dm_messages(key)
+        assert count == 2
+
+    @pytest.mark.asyncio
+    async def test_count_channel_messages_by_sender(self, test_db):
+        key = "aa" * 32
+        chan_key = "CC" * 16
+
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Alice: msg1",
+            conversation_key=chan_key,
+            sender_timestamp=1000,
+            received_at=1000,
+            sender_name="Alice",
+            sender_key=key,
+        )
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Alice: msg2",
+            conversation_key=chan_key,
+            sender_timestamp=1001,
+            received_at=1001,
+            sender_name="Alice",
+            sender_key=key,
+        )
+
+        count = await MessageRepository.count_channel_messages_by_sender(key)
+        assert count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_most_active_rooms(self, test_db):
+        key = "aa" * 32
+        chan_a = "AA" * 16
+        chan_b = "BB" * 16
+
+        from app.repository import ChannelRepository
+
+        await ChannelRepository.upsert(chan_a, "General")
+        await ChannelRepository.upsert(chan_b, "Random")
+
+        # 3 messages in chan_a, 1 in chan_b
+        for i in range(3):
+            await MessageRepository.create(
+                msg_type="CHAN",
+                text=f"Alice: msg{i}",
+                conversation_key=chan_a,
+                sender_timestamp=1000 + i,
+                received_at=1000 + i,
+                sender_name="Alice",
+                sender_key=key,
+            )
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Alice: hi",
+            conversation_key=chan_b,
+            sender_timestamp=2000,
+            received_at=2000,
+            sender_name="Alice",
+            sender_key=key,
+        )
+
+        rooms = await MessageRepository.get_most_active_rooms(key, limit=5)
+        assert len(rooms) == 2
+        assert rooms[0][0] == chan_a  # most active first
+        assert rooms[0][1] == "General"
+        assert rooms[0][2] == 3
+        assert rooms[1][2] == 1
+
+
+class TestContactRepositoryResolvePrefixes:
+    """Test batch prefix resolution."""
+
+    @pytest.mark.asyncio
+    async def test_resolves_unique_prefixes(self, test_db):
+        key_a = "aa" * 32
+        key_b = "bb" * 32
+        await ContactRepository.upsert({"public_key": key_a, "name": "Alice", "type": 1})
+        await ContactRepository.upsert({"public_key": key_b, "name": "Bob", "type": 1})
+
+        result = await ContactRepository.resolve_prefixes(["aa", "bb"])
+        assert "aa" in result
+        assert "bb" in result
+        assert result["aa"].public_key == key_a
+        assert result["bb"].public_key == key_b
+
+    @pytest.mark.asyncio
+    async def test_omits_ambiguous_prefixes(self, test_db):
+        key_a = "aa" + "11" * 31
+        key_b = "aa" + "22" * 31
+        await ContactRepository.upsert({"public_key": key_a, "name": "A1", "type": 1})
+        await ContactRepository.upsert({"public_key": key_b, "name": "A2", "type": 1})
+
+        result = await ContactRepository.resolve_prefixes(["aa"])
+        assert "aa" not in result  # ambiguous — two matches
+
+    @pytest.mark.asyncio
+    async def test_empty_prefixes_returns_empty(self, test_db):
+        result = await ContactRepository.resolve_prefixes([])
+        assert result == {}
 
 
 class TestAppSettingsRepository:

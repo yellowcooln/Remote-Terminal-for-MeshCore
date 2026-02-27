@@ -50,9 +50,10 @@ export interface Contact {
   on_radio: boolean;
   last_contacted: number | null;
   last_read_at: number | null;
+  first_seen: number | null;
 }
 
-export interface RepeaterAdvertPath {
+export interface ContactAdvertPath {
   path: string;
   path_len: number;
   next_hop: string | null;
@@ -61,9 +62,40 @@ export interface RepeaterAdvertPath {
   heard_count: number;
 }
 
-export interface RepeaterAdvertPathSummary {
-  repeater_key: string;
-  paths: RepeaterAdvertPath[];
+export interface ContactAdvertPathSummary {
+  public_key: string;
+  paths: ContactAdvertPath[];
+}
+
+export interface ContactNameHistory {
+  name: string;
+  first_seen: number;
+  last_seen: number;
+}
+
+export interface ContactActiveRoom {
+  channel_key: string;
+  channel_name: string;
+  message_count: number;
+}
+
+export interface NearestRepeater {
+  public_key: string;
+  name: string | null;
+  path_len: number;
+  last_seen: number;
+  heard_count: number;
+}
+
+export interface ContactDetail {
+  contact: Contact;
+  name_history: ContactNameHistory[];
+  dm_message_count: number;
+  channel_message_count: number;
+  most_active_rooms: ContactActiveRoom[];
+  advert_paths: ContactAdvertPath[];
+  advert_frequency: number | null;
+  nearest_repeaters: NearestRepeater[];
 }
 
 export interface Channel {

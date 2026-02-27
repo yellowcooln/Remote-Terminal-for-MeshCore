@@ -191,6 +191,41 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 22)
         applied += 1
 
+    # Migration 23: Add first_seen column to contacts
+    if version < 23:
+        logger.info("Applying migration 23: add first_seen column to contacts")
+        await _migrate_023_add_first_seen(conn)
+        await set_version(conn, 23)
+        applied += 1
+
+    # Migration 24: Create contact_name_history table
+    if version < 24:
+        logger.info("Applying migration 24: create contact_name_history table")
+        await _migrate_024_create_contact_name_history(conn)
+        await set_version(conn, 24)
+        applied += 1
+
+    # Migration 25: Add sender_name and sender_key to messages
+    if version < 25:
+        logger.info("Applying migration 25: add sender_name and sender_key to messages")
+        await _migrate_025_add_sender_columns(conn)
+        await set_version(conn, 25)
+        applied += 1
+
+    # Migration 26: Rename repeater_advert_paths to contact_advert_paths
+    if version < 26:
+        logger.info("Applying migration 26: rename repeater_advert_paths to contact_advert_paths")
+        await _migrate_026_rename_advert_paths_table(conn)
+        await set_version(conn, 26)
+        applied += 1
+
+    # Migration 27: Backfill first_seen from advert paths
+    if version < 27:
+        logger.info("Applying migration 27: backfill first_seen from advert paths")
+        await _migrate_027_backfill_first_seen_from_advert_paths(conn)
+        await set_version(conn, 27)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -1318,3 +1353,332 @@ async def _migrate_022_add_repeater_advert_paths(conn: aiosqlite.Connection) -> 
     )
     await conn.commit()
     logger.debug("Ensured repeater_advert_paths table and indexes exist")
+
+
+async def _migrate_023_add_first_seen(conn: aiosqlite.Connection) -> None:
+    """
+    Add first_seen column to contacts table.
+
+    Backfill strategy:
+    1. Set first_seen = last_seen for all contacts (baseline).
+    2. For contacts with PRIV messages, set first_seen = MIN(messages.received_at)
+       if that timestamp is earlier.
+    """
+    # Guard: skip if contacts table doesn't exist (e.g. partial test schemas)
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+    )
+    if not await cursor.fetchone():
+        return
+
+    try:
+        await conn.execute("ALTER TABLE contacts ADD COLUMN first_seen INTEGER")
+        logger.debug("Added first_seen to contacts table")
+    except aiosqlite.OperationalError as e:
+        if "duplicate column name" in str(e).lower():
+            logger.debug("contacts.first_seen already exists, skipping")
+        else:
+            raise
+
+    # Baseline: set first_seen = last_seen for all contacts
+    # Check if last_seen column exists (should in production, may not in minimal test schemas)
+    cursor = await conn.execute("PRAGMA table_info(contacts)")
+    columns = {row[1] for row in await cursor.fetchall()}
+    if "last_seen" in columns:
+        await conn.execute("UPDATE contacts SET first_seen = last_seen WHERE first_seen IS NULL")
+
+    # Refine: for contacts with PRIV messages, use earliest message timestamp if earlier
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
+    )
+    if await cursor.fetchone():
+        await conn.execute(
+            """
+            UPDATE contacts SET first_seen = (
+                SELECT MIN(m.received_at) FROM messages m
+                WHERE m.type = 'PRIV' AND m.conversation_key = contacts.public_key
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM messages m
+                WHERE m.type = 'PRIV' AND m.conversation_key = contacts.public_key
+                  AND m.received_at < COALESCE(contacts.first_seen, 9999999999)
+            )
+            """
+        )
+
+    await conn.commit()
+    logger.debug("Added and backfilled first_seen column")
+
+
+async def _migrate_024_create_contact_name_history(conn: aiosqlite.Connection) -> None:
+    """
+    Create contact_name_history table and seed with current contact names.
+    """
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS contact_name_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            public_key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            first_seen INTEGER NOT NULL,
+            last_seen INTEGER NOT NULL,
+            UNIQUE(public_key, name),
+            FOREIGN KEY (public_key) REFERENCES contacts(public_key)
+        )
+        """
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_contact_name_history_key "
+        "ON contact_name_history(public_key, last_seen DESC)"
+    )
+
+    # Seed: one row per contact from current data (skip if contacts table doesn't exist
+    # or lacks needed columns)
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+    )
+    if await cursor.fetchone():
+        cursor = await conn.execute("PRAGMA table_info(contacts)")
+        cols = {row[1] for row in await cursor.fetchall()}
+        if "name" in cols and "public_key" in cols:
+            first_seen_expr = "first_seen" if "first_seen" in cols else "0"
+            last_seen_expr = "last_seen" if "last_seen" in cols else "0"
+            await conn.execute(
+                f"""
+                INSERT OR IGNORE INTO contact_name_history (public_key, name, first_seen, last_seen)
+                SELECT public_key, name,
+                       COALESCE({first_seen_expr}, {last_seen_expr}, 0),
+                       COALESCE({last_seen_expr}, 0)
+                FROM contacts
+                WHERE name IS NOT NULL AND name != ''
+                """
+            )
+
+    await conn.commit()
+    logger.debug("Created contact_name_history table and seeded from contacts")
+
+
+async def _migrate_025_add_sender_columns(conn: aiosqlite.Connection) -> None:
+    """
+    Add sender_name and sender_key columns to messages table.
+
+    Backfill:
+    - sender_name for CHAN messages: extract from "Name: message" format
+    - sender_key for CHAN messages: match name to contact (skip ambiguous)
+    - sender_key for incoming PRIV messages: set to conversation_key
+    """
+    # Guard: skip if messages table doesn't exist
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
+    )
+    if not await cursor.fetchone():
+        return
+
+    for column in ["sender_name", "sender_key"]:
+        try:
+            await conn.execute(f"ALTER TABLE messages ADD COLUMN {column} TEXT")
+            logger.debug("Added %s to messages table", column)
+        except aiosqlite.OperationalError as e:
+            if "duplicate column name" in str(e).lower():
+                logger.debug("messages.%s already exists, skipping", column)
+            else:
+                raise
+
+    # Check which columns the messages table has (may be minimal in test environments)
+    cursor = await conn.execute("PRAGMA table_info(messages)")
+    msg_cols = {row[1] for row in await cursor.fetchall()}
+
+    # Only backfill if the required columns exist
+    if "type" in msg_cols and "text" in msg_cols:
+        # Count messages to backfill for progress reporting
+        cursor = await conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE type = 'CHAN' AND sender_name IS NULL"
+        )
+        row = await cursor.fetchone()
+        chan_count = row[0] if row else 0
+        if chan_count > 0:
+            logger.info("Backfilling sender_name for %d channel messages...", chan_count)
+
+        # Backfill sender_name for CHAN messages from "Name: message" format
+        # Only extract if colon position is valid (> 1 and < 51, i.e. name is 1-50 chars)
+        cursor = await conn.execute(
+            """
+            UPDATE messages SET sender_name = SUBSTR(text, 1, INSTR(text, ': ') - 1)
+            WHERE type = 'CHAN' AND sender_name IS NULL
+              AND INSTR(text, ': ') > 1 AND INSTR(text, ': ') < 52
+            """
+        )
+        if cursor.rowcount > 0:
+            logger.info("Backfilled sender_name for %d channel messages", cursor.rowcount)
+
+        # Backfill sender_key for incoming PRIV messages
+        if "outgoing" in msg_cols and "conversation_key" in msg_cols:
+            cursor = await conn.execute(
+                """
+                UPDATE messages SET sender_key = conversation_key
+                WHERE type = 'PRIV' AND outgoing = 0 AND sender_key IS NULL
+                """
+            )
+            if cursor.rowcount > 0:
+                logger.info("Backfilled sender_key for %d DM messages", cursor.rowcount)
+
+        # Backfill sender_key for CHAN messages: match sender_name to contacts
+        # Build name->key map, skip ambiguous names (multiple contacts with same name)
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+        )
+        if await cursor.fetchone():
+            cursor = await conn.execute(
+                "SELECT public_key, name FROM contacts WHERE name IS NOT NULL AND name != ''"
+            )
+            rows = await cursor.fetchall()
+
+            name_to_keys: dict[str, list[str]] = {}
+            for row in rows:
+                name = row["name"]
+                key = row["public_key"]
+                if name not in name_to_keys:
+                    name_to_keys[name] = []
+                name_to_keys[name].append(key)
+
+            # Only use unambiguous names (single contact per name)
+            unambiguous = {n: ks[0] for n, ks in name_to_keys.items() if len(ks) == 1}
+            if unambiguous:
+                logger.info(
+                    "Matching sender_key for %d unique contact names...",
+                    len(unambiguous),
+                )
+                # Use a temp table for a single bulk UPDATE instead of N individual queries
+                await conn.execute(
+                    "CREATE TEMP TABLE _name_key_map (name TEXT PRIMARY KEY, public_key TEXT NOT NULL)"
+                )
+                await conn.executemany(
+                    "INSERT INTO _name_key_map (name, public_key) VALUES (?, ?)",
+                    list(unambiguous.items()),
+                )
+                cursor = await conn.execute(
+                    """
+                    UPDATE messages SET sender_key = (
+                        SELECT public_key FROM _name_key_map WHERE _name_key_map.name = messages.sender_name
+                    )
+                    WHERE type = 'CHAN' AND sender_key IS NULL
+                      AND sender_name IN (SELECT name FROM _name_key_map)
+                    """
+                )
+                updated = cursor.rowcount
+                await conn.execute("DROP TABLE _name_key_map")
+                if updated > 0:
+                    logger.info("Backfilled sender_key for %d channel messages", updated)
+
+    # Create index on sender_key for per-contact channel message counts
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_sender_key ON messages(sender_key)")
+
+    await conn.commit()
+    logger.debug("Added sender_name and sender_key columns with backfill")
+
+
+async def _migrate_026_rename_advert_paths_table(conn: aiosqlite.Connection) -> None:
+    """
+    Rename repeater_advert_paths to contact_advert_paths with column
+    repeater_key -> public_key.
+
+    Uses table rebuild since ALTER TABLE RENAME COLUMN may not be available
+    in older SQLite versions.
+    """
+    # Check if old table exists
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='repeater_advert_paths'"
+    )
+    if not await cursor.fetchone():
+        # Already renamed or doesn't exist — ensure new table exists
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contact_advert_paths (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                public_key TEXT NOT NULL,
+                path_hex TEXT NOT NULL,
+                path_len INTEGER NOT NULL,
+                first_seen INTEGER NOT NULL,
+                last_seen INTEGER NOT NULL,
+                heard_count INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(public_key, path_hex),
+                FOREIGN KEY (public_key) REFERENCES contacts(public_key)
+            )
+            """
+        )
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_contact_advert_paths_recent "
+            "ON contact_advert_paths(public_key, last_seen DESC)"
+        )
+        await conn.commit()
+        logger.debug("contact_advert_paths already exists or old table missing, skipping rename")
+        return
+
+    # Create new table (IF NOT EXISTS in case SCHEMA already created it)
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS contact_advert_paths (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            public_key TEXT NOT NULL,
+            path_hex TEXT NOT NULL,
+            path_len INTEGER NOT NULL,
+            first_seen INTEGER NOT NULL,
+            last_seen INTEGER NOT NULL,
+            heard_count INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(public_key, path_hex),
+            FOREIGN KEY (public_key) REFERENCES contacts(public_key)
+        )
+        """
+    )
+
+    # Copy data (INSERT OR IGNORE in case of duplicates)
+    await conn.execute(
+        """
+        INSERT OR IGNORE INTO contact_advert_paths (public_key, path_hex, path_len, first_seen, last_seen, heard_count)
+        SELECT repeater_key, path_hex, path_len, first_seen, last_seen, heard_count
+        FROM repeater_advert_paths
+        """
+    )
+
+    # Drop old table
+    await conn.execute("DROP TABLE repeater_advert_paths")
+
+    # Create index
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_contact_advert_paths_recent "
+        "ON contact_advert_paths(public_key, last_seen DESC)"
+    )
+
+    await conn.commit()
+    logger.info("Renamed repeater_advert_paths to contact_advert_paths")
+
+
+async def _migrate_027_backfill_first_seen_from_advert_paths(conn: aiosqlite.Connection) -> None:
+    """
+    Backfill contacts.first_seen from contact_advert_paths where advert path
+    first_seen is earlier than the contact's current first_seen.
+    """
+    # Guard: skip if either table doesn't exist
+    for table in ("contacts", "contact_advert_paths"):
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        )
+        if not await cursor.fetchone():
+            return
+
+    await conn.execute(
+        """
+        UPDATE contacts SET first_seen = (
+            SELECT MIN(cap.first_seen) FROM contact_advert_paths cap
+            WHERE cap.public_key = contacts.public_key
+        )
+        WHERE EXISTS (
+            SELECT 1 FROM contact_advert_paths cap
+            WHERE cap.public_key = contacts.public_key
+              AND cap.first_seen < COALESCE(contacts.first_seen, 9999999999)
+        )
+        """
+    )
+
+    await conn.commit()
+    logger.debug("Backfilled first_seen from contact_advert_paths")

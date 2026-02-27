@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Literal
 
@@ -137,10 +138,19 @@ async def toggle_favorite(request: FavoriteRequest) -> AppSettings:
 
     if is_favorited:
         logger.info("Removing favorite: %s %s", request.type, request.id[:12])
-        return await AppSettingsRepository.remove_favorite(request.type, request.id)
+        result = await AppSettingsRepository.remove_favorite(request.type, request.id)
     else:
         logger.info("Adding favorite: %s %s", request.type, request.id[:12])
-        return await AppSettingsRepository.add_favorite(request.type, request.id)
+        result = await AppSettingsRepository.add_favorite(request.type, request.id)
+
+    # When a contact favorite changes, sync the radio so the contact is
+    # loaded/unloaded immediately rather than waiting for the next advert.
+    if request.type == "contact":
+        from app.radio_sync import sync_recent_contacts_to_radio
+
+        asyncio.create_task(sync_recent_contacts_to_radio(force=True))
+
+    return result
 
 
 @router.post("/migrate", response_model=MigratePreferencesResponse)

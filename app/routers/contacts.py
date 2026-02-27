@@ -14,10 +14,13 @@ from app.models import (
     CommandRequest,
     CommandResponse,
     Contact,
+    ContactActiveRoom,
+    ContactAdvertPath,
+    ContactAdvertPathSummary,
+    ContactDetail,
     CreateContactRequest,
+    NearestRepeater,
     NeighborInfo,
-    RepeaterAdvertPath,
-    RepeaterAdvertPathSummary,
     TelemetryRequest,
     TelemetryResponse,
     TraceResponse,
@@ -26,9 +29,10 @@ from app.packet_processor import start_historical_dm_decryption
 from app.radio import radio_manager
 from app.repository import (
     AmbiguousPublicKeyPrefixError,
+    ContactAdvertPathRepository,
+    ContactNameHistoryRepository,
     ContactRepository,
     MessageRepository,
-    RepeaterAdvertPathRepository,
 )
 from app.websocket import broadcast_error
 
@@ -196,13 +200,17 @@ async def list_contacts(
     return await ContactRepository.get_all(limit=limit, offset=offset)
 
 
-@router.get("/repeaters/advert-paths", response_model=list[RepeaterAdvertPathSummary])
+@router.get("/repeaters/advert-paths", response_model=list[ContactAdvertPathSummary])
 async def list_repeater_advert_paths(
     limit_per_repeater: int = Query(default=10, ge=1, le=50),
-) -> list[RepeaterAdvertPathSummary]:
-    """List recent unique advert paths for all repeaters."""
-    return await RepeaterAdvertPathRepository.get_recent_for_all_repeaters(
-        limit_per_repeater=limit_per_repeater
+) -> list[ContactAdvertPathSummary]:
+    """List recent unique advert paths for all repeaters.
+
+    Note: This endpoint now returns paths for all contacts (table was renamed).
+    The route is kept for backward compatibility.
+    """
+    return await ContactAdvertPathRepository.get_recent_for_all_contacts(
+        limit_per_contact=limit_per_repeater
     )
 
 
@@ -283,25 +291,98 @@ async def create_contact(
     return Contact(**contact_data)
 
 
+@router.get("/{public_key}/detail", response_model=ContactDetail)
+async def get_contact_detail(public_key: str) -> ContactDetail:
+    """Get comprehensive contact profile data.
+
+    Returns contact info, name history, message counts, most active rooms,
+    advertisement paths, advert frequency, and nearest repeaters.
+    """
+    contact = await _resolve_contact_or_404(public_key)
+
+    name_history = await ContactNameHistoryRepository.get_history(contact.public_key)
+    dm_count = await MessageRepository.count_dm_messages(contact.public_key)
+    chan_count = await MessageRepository.count_channel_messages_by_sender(contact.public_key)
+    active_rooms_raw = await MessageRepository.get_most_active_rooms(contact.public_key)
+    advert_paths = await ContactAdvertPathRepository.get_recent_for_contact(contact.public_key)
+
+    most_active_rooms = [
+        ContactActiveRoom(channel_key=key, channel_name=name, message_count=count)
+        for key, name, count in active_rooms_raw
+    ]
+
+    # Compute advert observation rate (observations/hour) from path data.
+    # Note: a single advertisement can arrive via multiple paths, so this counts
+    # RF observations, not unique advertisement broadcasts.
+    advert_frequency: float | None = None
+    if advert_paths:
+        total_observations = sum(p.heard_count for p in advert_paths)
+        earliest = min(p.first_seen for p in advert_paths)
+        latest = max(p.last_seen for p in advert_paths)
+        span_hours = (latest - earliest) / 3600.0
+        if span_hours > 0:
+            advert_frequency = round(total_observations / span_hours, 2)
+
+    # Compute nearest repeaters from first-hop prefixes in advert paths
+    first_hop_stats: dict[str, dict] = {}  # prefix -> {heard_count, path_len, last_seen}
+    for p in advert_paths:
+        if p.path and len(p.path) >= 2:
+            prefix = p.path[:2].lower()
+            if prefix not in first_hop_stats:
+                first_hop_stats[prefix] = {
+                    "heard_count": 0,
+                    "path_len": p.path_len,
+                    "last_seen": p.last_seen,
+                }
+            first_hop_stats[prefix]["heard_count"] += p.heard_count
+            first_hop_stats[prefix]["last_seen"] = max(
+                first_hop_stats[prefix]["last_seen"], p.last_seen
+            )
+
+    # Resolve all first-hop prefixes to contacts in a single query
+    resolved_contacts = await ContactRepository.resolve_prefixes(list(first_hop_stats.keys()))
+
+    nearest_repeaters: list[NearestRepeater] = []
+    for prefix, stats in first_hop_stats.items():
+        resolved = resolved_contacts.get(prefix)
+        nearest_repeaters.append(
+            NearestRepeater(
+                public_key=resolved.public_key if resolved else prefix,
+                name=resolved.name if resolved else None,
+                path_len=stats["path_len"],
+                last_seen=stats["last_seen"],
+                heard_count=stats["heard_count"],
+            )
+        )
+
+    nearest_repeaters.sort(key=lambda r: r.heard_count, reverse=True)
+
+    return ContactDetail(
+        contact=contact,
+        name_history=name_history,
+        dm_message_count=dm_count,
+        channel_message_count=chan_count,
+        most_active_rooms=most_active_rooms,
+        advert_paths=advert_paths,
+        advert_frequency=advert_frequency,
+        nearest_repeaters=nearest_repeaters,
+    )
+
+
 @router.get("/{public_key}", response_model=Contact)
 async def get_contact(public_key: str) -> Contact:
     """Get a specific contact by public key or prefix."""
     return await _resolve_contact_or_404(public_key)
 
 
-@router.get("/{public_key}/advert-paths", response_model=list[RepeaterAdvertPath])
+@router.get("/{public_key}/advert-paths", response_model=list[ContactAdvertPath])
 async def get_contact_advert_paths(
     public_key: str,
     limit: int = Query(default=10, ge=1, le=50),
-) -> list[RepeaterAdvertPath]:
-    """List recent unique advert paths for a single repeater contact."""
+) -> list[ContactAdvertPath]:
+    """List recent unique advert paths for a contact."""
     contact = await _resolve_contact_or_404(public_key)
-    if contact.type != CONTACT_TYPE_REPEATER:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Contact is not a repeater (type={contact.type}, expected {CONTACT_TYPE_REPEATER})",
-        )
-    return await RepeaterAdvertPathRepository.get_recent_for_repeater(contact.public_key, limit)
+    return await ContactAdvertPathRepository.get_recent_for_contact(contact.public_key, limit)
 
 
 @router.post("/sync")

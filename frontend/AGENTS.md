@@ -67,6 +67,7 @@ frontend/src/
 │   ├── CrackerPanel.tsx
 │   ├── BotCodeEditor.tsx
 │   ├── ContactAvatar.tsx
+│   ├── ContactInfoPane.tsx     # Contact detail sheet (stats, name history, paths)
 │   └── ui/                     # shadcn/ui primitives
 ├── types/
 │   └── d3-force-3d.d.ts       # Type declarations for d3-force-3d

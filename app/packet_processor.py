@@ -31,10 +31,11 @@ from app.keystore import get_private_key, get_public_key, has_private_key
 from app.models import CONTACT_TYPE_REPEATER, RawPacketBroadcast, RawPacketDecryptedInfo
 from app.repository import (
     ChannelRepository,
+    ContactAdvertPathRepository,
+    ContactNameHistoryRepository,
     ContactRepository,
     MessageRepository,
     RawPacketRepository,
-    RepeaterAdvertPathRepository,
 )
 from app.websocket import broadcast_error, broadcast_event
 
@@ -150,6 +151,13 @@ async def create_message_from_decrypted(
     # Normalize channel key to uppercase for consistency
     channel_key_normalized = channel_key.upper()
 
+    # Resolve sender_key: look up contact by exact name match
+    resolved_sender_key: str | None = None
+    if sender:
+        candidates = await ContactRepository.get_by_name(sender)
+        if len(candidates) == 1:
+            resolved_sender_key = candidates[0].public_key
+
     # Try to create message - INSERT OR IGNORE handles duplicates atomically
     msg_id = await MessageRepository.create(
         msg_type="CHAN",
@@ -158,6 +166,8 @@ async def create_message_from_decrypted(
         sender_timestamp=timestamp,
         received_at=received,
         path=path,
+        sender_name=sender,
+        sender_key=resolved_sender_key,
     )
 
     if msg_id is None:
@@ -270,6 +280,7 @@ async def create_dm_message_from_decrypted(
         received_at=received,
         path=path,
         outgoing=outgoing,
+        sender_key=conversation_key if not outgoing else None,
     )
 
     if msg_id is None:
@@ -689,13 +700,20 @@ async def _process_advertisement(
         advert.device_role if advert.device_role > 0 else (existing.type if existing else 0)
     )
 
-    # Keep recent unique advert paths for repeaters to improve frontend identity hints.
-    if contact_type == CONTACT_TYPE_REPEATER:
-        await RepeaterAdvertPathRepository.record_observation(
-            repeater_key=advert.public_key.lower(),
-            path_hex=new_path_hex,
+    # Keep recent unique advert paths for all contacts.
+    await ContactAdvertPathRepository.record_observation(
+        public_key=advert.public_key.lower(),
+        path_hex=new_path_hex,
+        timestamp=timestamp,
+        max_paths=10,
+    )
+
+    # Record name history
+    if advert.name:
+        await ContactNameHistoryRepository.record_name(
+            public_key=advert.public_key.lower(),
+            name=advert.name,
             timestamp=timestamp,
-            max_paths_per_repeater=10,
         )
 
     contact_data = {
@@ -708,6 +726,7 @@ async def _process_advertisement(
         "last_seen": timestamp,
         "last_path": path_hex,
         "last_path_len": path_len,
+        "first_seen": timestamp,  # COALESCE in upsert preserves existing value
     }
 
     await ContactRepository.upsert(contact_data)

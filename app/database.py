@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS contacts (
     lon REAL,
     last_seen INTEGER,
     on_radio INTEGER DEFAULT 0,
-    last_contacted INTEGER
+    last_contacted INTEGER,
+    first_seen INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS channels (
@@ -41,7 +42,9 @@ CREATE TABLE IF NOT EXISTS messages (
     txt_type INTEGER DEFAULT 0,
     signature TEXT,
     outgoing INTEGER DEFAULT 0,
-    acked INTEGER DEFAULT 0
+    acked INTEGER DEFAULT 0,
+    sender_name TEXT,
+    sender_key TEXT
     -- Deduplication: identical text + timestamp in the same conversation is treated as a
     -- mesh echo/repeat. Second-precision timestamps mean two intentional identical messages
     -- within the same second would collide, but this is not feasible in practice — LoRa
@@ -59,16 +62,26 @@ CREATE TABLE IF NOT EXISTS raw_packets (
     FOREIGN KEY (message_id) REFERENCES messages(id)
 );
 
-CREATE TABLE IF NOT EXISTS repeater_advert_paths (
+CREATE TABLE IF NOT EXISTS contact_advert_paths (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    repeater_key TEXT NOT NULL,
+    public_key TEXT NOT NULL,
     path_hex TEXT NOT NULL,
     path_len INTEGER NOT NULL,
     first_seen INTEGER NOT NULL,
     last_seen INTEGER NOT NULL,
     heard_count INTEGER NOT NULL DEFAULT 1,
-    UNIQUE(repeater_key, path_hex),
-    FOREIGN KEY (repeater_key) REFERENCES contacts(public_key)
+    UNIQUE(public_key, path_hex),
+    FOREIGN KEY (public_key) REFERENCES contacts(public_key)
+);
+
+CREATE TABLE IF NOT EXISTS contact_name_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    public_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    UNIQUE(public_key, name),
+    FOREIGN KEY (public_key) REFERENCES contacts(public_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(type, conversation_key);
@@ -78,8 +91,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup_null_safe
 CREATE INDEX IF NOT EXISTS idx_raw_packets_message_id ON raw_packets(message_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_raw_packets_payload_hash ON raw_packets(payload_hash);
 CREATE INDEX IF NOT EXISTS idx_contacts_on_radio ON contacts(on_radio);
-CREATE INDEX IF NOT EXISTS idx_repeater_advert_paths_recent
-    ON repeater_advert_paths(repeater_key, last_seen DESC);
+-- idx_messages_sender_key is created by migration 25 (after adding the sender_key column)
+CREATE INDEX IF NOT EXISTS idx_contact_advert_paths_recent
+    ON contact_advert_paths(public_key, last_seen DESC);
+CREATE INDEX IF NOT EXISTS idx_contact_name_history_key
+    ON contact_name_history(public_key, last_seen DESC);
 """
 
 

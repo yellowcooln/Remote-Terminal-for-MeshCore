@@ -17,6 +17,7 @@ class Contact(BaseModel):
     on_radio: bool = False
     last_contacted: int | None = None  # Last time we sent/received a message
     last_read_at: int | None = None  # Server-side read state tracking
+    first_seen: int | None = None
 
     def to_radio_dict(self) -> dict:
         """Convert to the dict format expected by meshcore radio commands.
@@ -72,8 +73,8 @@ class CreateContactRequest(BaseModel):
 CONTACT_TYPE_REPEATER = 2
 
 
-class RepeaterAdvertPath(BaseModel):
-    """A unique advert path observed for a repeater."""
+class ContactAdvertPath(BaseModel):
+    """A unique advert path observed for a contact."""
 
     path: str = Field(description="Hex-encoded routing path (empty string for direct)")
     path_len: int = Field(description="Number of hops in the path")
@@ -85,13 +86,55 @@ class RepeaterAdvertPath(BaseModel):
     heard_count: int = Field(description="Number of times this unique path was heard")
 
 
-class RepeaterAdvertPathSummary(BaseModel):
-    """Recent unique advertisement paths for a single repeater."""
+class ContactAdvertPathSummary(BaseModel):
+    """Recent unique advertisement paths for a single contact."""
 
-    repeater_key: str = Field(description="Repeater public key (64-char hex)")
-    paths: list[RepeaterAdvertPath] = Field(
+    public_key: str = Field(description="Contact public key (64-char hex)")
+    paths: list[ContactAdvertPath] = Field(
         default_factory=list, description="Most recent unique advert paths"
     )
+
+
+class ContactNameHistory(BaseModel):
+    """A historical name used by a contact."""
+
+    name: str
+    first_seen: int
+    last_seen: int
+
+
+class ContactActiveRoom(BaseModel):
+    """A channel/room where a contact has been active."""
+
+    channel_key: str
+    channel_name: str
+    message_count: int
+
+
+class NearestRepeater(BaseModel):
+    """A repeater that has relayed a contact's advertisements."""
+
+    public_key: str
+    name: str | None = None
+    path_len: int
+    last_seen: int
+    heard_count: int
+
+
+class ContactDetail(BaseModel):
+    """Comprehensive contact profile data."""
+
+    contact: Contact
+    name_history: list[ContactNameHistory] = Field(default_factory=list)
+    dm_message_count: int = 0
+    channel_message_count: int = 0
+    most_active_rooms: list[ContactActiveRoom] = Field(default_factory=list)
+    advert_paths: list[ContactAdvertPath] = Field(default_factory=list)
+    advert_frequency: float | None = Field(
+        default=None,
+        description="Advert observations per hour (includes multi-path arrivals of same advert)",
+    )
+    nearest_repeaters: list[NearestRepeater] = Field(default_factory=list)
 
 
 class Channel(BaseModel):

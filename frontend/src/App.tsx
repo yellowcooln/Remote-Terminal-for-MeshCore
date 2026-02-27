@@ -34,6 +34,7 @@ import {
   type SettingsSection,
 } from './components/settingsConstants';
 import { RawPacketList } from './components/RawPacketList';
+import { ContactInfoPane } from './components/ContactInfoPane';
 
 // Lazy-load heavy components to reduce initial bundle
 const MapView = lazy(() => import('./components/MapView').then((m) => ({ default: m.MapView })));
@@ -68,6 +69,7 @@ export function App() {
   const [showCracker, setShowCracker] = useState(false);
   const [crackerRunning, setCrackerRunning] = useState(false);
   const [localLabel, setLocalLabel] = useState(getLocalLabel);
+  const [infoPaneContactKey, setInfoPaneContactKey] = useState<string | null>(null);
 
   // Defer CrackerPanel mount until first opened (lazy-loaded, but keep mounted after for state)
   const crackerMounted = useRef(false);
@@ -410,6 +412,25 @@ export function App() {
     setShowCracker((prev) => !prev);
   }, []);
 
+  const handleOpenContactInfo = useCallback((publicKey: string) => {
+    setInfoPaneContactKey(publicKey);
+  }, []);
+
+  const handleCloseContactInfo = useCallback(() => {
+    setInfoPaneContactKey(null);
+  }, []);
+
+  const handleNavigateToChannel = useCallback(
+    (channelKey: string) => {
+      const channel = channels.find((c) => c.key === channelKey);
+      if (channel) {
+        handleSelectConversation({ type: 'channel', id: channel.key, name: channel.name });
+        setInfoPaneContactKey(null);
+      }
+    },
+    [channels, handleSelectConversation]
+  );
+
   // Sidebar content (shared between desktop and mobile)
   const sidebarContent = (
     <Sidebar
@@ -552,6 +573,7 @@ export function App() {
                     onToggleFavorite={handleToggleFavorite}
                     onDeleteChannel={handleDeleteChannel}
                     onDeleteContact={handleDeleteContact}
+                    onOpenContactInfo={handleOpenContactInfo}
                   />
                   <MessageList
                     key={activeConversation.id}
@@ -569,6 +591,7 @@ export function App() {
                     }
                     radioName={config?.name}
                     config={config}
+                    onOpenContactInfo={handleOpenContactInfo}
                   />
                   <MessageInput
                     ref={messageInputRef}
@@ -690,6 +713,16 @@ export function App() {
         onCreateContact={handleCreateContact}
         onCreateChannel={handleCreateChannel}
         onCreateHashtagChannel={handleCreateHashtagChannel}
+      />
+
+      <ContactInfoPane
+        contactKey={infoPaneContactKey}
+        onClose={handleCloseContactInfo}
+        contacts={contacts}
+        config={config}
+        favorites={favorites}
+        onToggleFavorite={handleToggleFavorite}
+        onNavigateToChannel={handleNavigateToChannel}
       />
 
       <Toaster position="top-right" />
