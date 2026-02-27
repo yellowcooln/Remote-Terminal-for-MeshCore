@@ -8,7 +8,7 @@ Keep it aligned with `app/` source files and router behavior.
 - FastAPI
 - aiosqlite
 - Pydantic
-- MeshCore Python library (`references/meshcore_py`)
+- MeshCore Python library (`meshcore` from PyPI)
 - PyCryptodome
 
 ## Backend Map

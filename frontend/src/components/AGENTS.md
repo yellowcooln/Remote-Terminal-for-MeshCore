@@ -52,7 +52,7 @@ Types, constants, and pure functions shared across the codebase:
 
 - Types: `NodeType`, `PacketLabel`, `Particle`, `ObservedPath`, `PendingPacket`, `ParsedPacket`, `TrafficObservation`, `RepeaterTrafficData`, `RepeaterSplitAnalysis`
 - Constants: `COLORS`, `PARTICLE_COLOR_MAP`, `PARTICLE_SPEED`, `DEFAULT_OBSERVATION_WINDOW_SEC`, traffic thresholds, `PACKET_LEGEND_ITEMS`
-- Functions: `simpleHash`, `parsePacket`, `getPacketLabel`, `generatePacketKey`, `getLinkId`, `getNodeType`, `dedupeConsecutive`, `analyzeRepeaterTraffic`, `recordTrafficObservation`
+- Functions: `hashString` (from `utils/contactAvatar.ts`), `parsePacket`, `getPacketLabel`, `generatePacketKey`, `getLinkId`, `getNodeType`, `dedupeConsecutive`, `analyzeRepeaterTraffic`, `recordTrafficObservation`
 
 `GraphNode` and `GraphLink` are defined locally in the component — they extend `SimulationNodeDatum3D` and `SimulationLinkDatum` from `d3-force-3d`.
 

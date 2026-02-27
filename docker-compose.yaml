@@ -26,4 +26,7 @@ services:
       # TCP
       # MESHCORE_TCP_HOST: 192.168.1.100
       # MESHCORE_TCP_PORT: 4000
+
+      # Logging
+      # MESHCORE_LOG_LEVEL: INFO
     restart: unless-stopped

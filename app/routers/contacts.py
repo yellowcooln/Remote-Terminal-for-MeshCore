@@ -539,7 +539,9 @@ async def create_contact(
                     "last_contacted": existing.last_contacted,
                 }
             )
-            existing.name = request.name
+            refreshed = await ContactRepository.get_by_key(request.public_key)
+            if refreshed is not None:
+                existing = refreshed
 
         # Trigger historical decryption if requested (even for existing contacts)
         if request.try_historical:

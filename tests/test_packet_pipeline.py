@@ -2075,3 +2075,133 @@ class TestRunHistoricalDmDecryption:
 
         assert len(success_calls) == 1
         assert "2 messages" in success_calls[0]["details"]
+
+
+class TestHistoricalDMDirectionDetection:
+    """Test direction detection in run_historical_dm_decryption.
+
+    Verifies the BUG-2 fix: when first public key bytes of our key and the
+    contact's key collide (1/256 chance), the function must default to
+    outgoing=False rather than mis-classifying the message.
+    """
+
+    # Our key: first byte is 0xAA
+    OUR_PUB_HEX = "AA" + "00" * 31
+    OUR_PUB = bytes.fromhex(OUR_PUB_HEX)
+    OUR_PRIV = b"\x01" * 64  # Dummy, won't be used (try_decrypt_dm is mocked)
+
+    # Contact key: first byte differs (0xBB) — normal case
+    CONTACT_DIFF_PUB_HEX = "bb" + "11" * 31
+    CONTACT_DIFF_PUB = bytes.fromhex(CONTACT_DIFF_PUB_HEX)
+
+    # Contact key: first byte same as ours (0xAA) — the 1/256 collision case
+    CONTACT_SAME_PUB_HEX = "aa" + "22" * 31
+    CONTACT_SAME_PUB = bytes.fromhex(CONTACT_SAME_PUB_HEX)
+
+    def _make_text_message_bytes(self, unique_suffix: bytes = b"") -> bytes:
+        """Build a minimal raw packet with TEXT_MESSAGE payload type."""
+        header = 0x09  # route_type=FLOOD(0x01), payload_type=TEXT_MESSAGE(0x02)
+        path_length = 0
+        payload = bytes([0xAA, 0xBB]) + b"\x00\x00" + b"\xab" * 16 + unique_suffix
+        return bytes([header, path_length]) + payload
+
+    @pytest.mark.asyncio
+    async def test_incoming_dm_marked_as_incoming(self, test_db, captured_broadcasts):
+        """Normal case: src_hash differs from our first byte -> outgoing=False (incoming)."""
+        from app.packet_processor import run_historical_dm_decryption
+
+        raw = self._make_text_message_bytes(b"\x60")
+        await RawPacketRepository.create(raw, 7000)
+
+        mock_packet_info = PacketInfo(
+            route_type=1,
+            payload_type=PayloadType.TEXT_MESSAGE,
+            payload_version=0,
+            path_length=0,
+            path=b"",
+            payload=b"\xaa\xbb" + b"\x00" * 18,
+        )
+
+        # src_hash="bb" (contact), dest_hash="aa" (us) -> incoming
+        mock_decrypted = DecryptedDirectMessage(
+            timestamp=7000,
+            flags=0,
+            message="Hello from contact",
+            dest_hash="aa",
+            src_hash="bb",
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            with patch("app.packet_processor.try_decrypt_dm", return_value=mock_decrypted):
+                with patch("app.packet_processor.parse_packet", return_value=mock_packet_info):
+                    with patch("app.packet_processor.derive_public_key", return_value=self.OUR_PUB):
+                        with patch(
+                            "app.packet_processor.create_dm_message_from_decrypted",
+                            new_callable=AsyncMock,
+                            return_value=100,
+                        ) as mock_create:
+                            with patch("app.websocket.broadcast_success"):
+                                await run_historical_dm_decryption(
+                                    self.OUR_PRIV,
+                                    self.CONTACT_DIFF_PUB,
+                                    self.CONTACT_DIFF_PUB_HEX,
+                                )
+
+        mock_create.assert_awaited_once()
+        call_kwargs = mock_create.call_args[1]
+        assert call_kwargs["outgoing"] is False
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_first_bytes_defaults_to_incoming(self, test_db, captured_broadcasts):
+        """1/256 case: our_public_key_bytes[0] == contact_public_key_bytes[0].
+
+        Both src_hash and dest_hash match our first byte. The function must
+        default to outgoing=False (incoming) because outgoing DMs are stored
+        by the send endpoint, so historical decryption only recovers incoming.
+        """
+        from app.packet_processor import run_historical_dm_decryption
+
+        raw = self._make_text_message_bytes(b"\x61")
+        await RawPacketRepository.create(raw, 7100)
+
+        mock_packet_info = PacketInfo(
+            route_type=1,
+            payload_type=PayloadType.TEXT_MESSAGE,
+            payload_version=0,
+            path_length=0,
+            path=b"",
+            payload=b"\xaa\xaa" + b"\x00" * 18,
+        )
+
+        # Both hashes are "aa" — matches our first byte (0xAA)
+        mock_decrypted = DecryptedDirectMessage(
+            timestamp=7100,
+            flags=0,
+            message="Ambiguous direction msg",
+            dest_hash="aa",
+            src_hash="aa",
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            with patch("app.packet_processor.try_decrypt_dm", return_value=mock_decrypted):
+                with patch("app.packet_processor.parse_packet", return_value=mock_packet_info):
+                    with patch("app.packet_processor.derive_public_key", return_value=self.OUR_PUB):
+                        with patch(
+                            "app.packet_processor.create_dm_message_from_decrypted",
+                            new_callable=AsyncMock,
+                            return_value=101,
+                        ) as mock_create:
+                            with patch("app.websocket.broadcast_success"):
+                                await run_historical_dm_decryption(
+                                    self.OUR_PRIV,
+                                    self.CONTACT_SAME_PUB,
+                                    self.CONTACT_SAME_PUB_HEX,
+                                )
+
+        mock_create.assert_awaited_once()
+        call_kwargs = mock_create.call_args[1]
+        assert call_kwargs["outgoing"] is False

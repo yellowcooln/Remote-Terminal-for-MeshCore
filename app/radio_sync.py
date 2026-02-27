@@ -443,6 +443,8 @@ async def _periodic_advert_loop():
     """
     while True:
         try:
+            await asyncio.sleep(ADVERT_CHECK_INTERVAL)
+
             # Try to send - send_advertisement() handles all checks
             # (disabled, throttled, not connected)
             if radio_manager.is_connected:
@@ -454,9 +456,6 @@ async def _periodic_advert_loop():
                         await send_advertisement(mc)
                 except RadioOperationBusyError:
                     logger.debug("Skipping periodic advertisement: radio busy")
-
-            # Sleep before next check
-            await asyncio.sleep(ADVERT_CHECK_INTERVAL)
 
         except asyncio.CancelledError:
             logger.info("Periodic advertisement task cancelled")
@@ -595,9 +594,7 @@ async def _sync_contacts_to_radio_inner(mc: MeshCore) -> dict:
             break
 
     if len(selected_contacts) < max_contacts:
-        recent_contacts = await ContactRepository.get_recent_non_repeaters(
-            limit=max_contacts
-        )
+        recent_contacts = await ContactRepository.get_recent_non_repeaters(limit=max_contacts)
         for contact in recent_contacts:
             key = contact.public_key.lower()
             if key in selected_keys:
@@ -658,9 +655,7 @@ async def _sync_contacts_to_radio_inner(mc: MeshCore) -> dict:
     }
 
 
-async def sync_recent_contacts_to_radio(
-    force: bool = False, mc: MeshCore | None = None
-) -> dict:
+async def sync_recent_contacts_to_radio(force: bool = False, mc: MeshCore | None = None) -> dict:
     """
     Load contacts to the radio for DM ACK support.
 

@@ -1,7 +1,7 @@
 """Tests for shared radio operation locking behavior."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -169,3 +169,54 @@ class TestRadioOperationYield:
         async with radio_manager.radio_operation("test_swap") as yielded:
             assert yielded is new_mc
             assert yielded is not old_mc
+
+
+class TestRequireConnected:
+    """Test the require_connected() FastAPI dependency."""
+
+    def test_raises_503_when_setup_in_progress(self):
+        """HTTPException 503 is raised when radio is connected but setup is still in progress."""
+        from fastapi import HTTPException
+
+        from app.dependencies import require_connected
+
+        with patch("app.dependencies.radio_manager") as mock_rm:
+            mock_rm.is_connected = True
+            mock_rm.meshcore = MagicMock()
+            mock_rm.is_setup_in_progress = True
+
+            with pytest.raises(HTTPException) as exc_info:
+                require_connected()
+
+            assert exc_info.value.status_code == 503
+            assert "initializing" in exc_info.value.detail.lower()
+
+    def test_raises_503_when_not_connected(self):
+        """HTTPException 503 is raised when radio is not connected."""
+        from fastapi import HTTPException
+
+        from app.dependencies import require_connected
+
+        with patch("app.dependencies.radio_manager") as mock_rm:
+            mock_rm.is_setup_in_progress = False
+            mock_rm.is_connected = False
+            mock_rm.meshcore = None
+
+            with pytest.raises(HTTPException) as exc_info:
+                require_connected()
+
+            assert exc_info.value.status_code == 503
+
+    def test_returns_meshcore_when_connected_and_setup_complete(self):
+        """Returns meshcore instance when radio is connected and setup is complete."""
+        from app.dependencies import require_connected
+
+        mock_mc = MagicMock()
+        with patch("app.dependencies.radio_manager") as mock_rm:
+            mock_rm.is_setup_in_progress = False
+            mock_rm.is_connected = True
+            mock_rm.meshcore = mock_mc
+
+            result = require_connected()
+
+        assert result is mock_mc

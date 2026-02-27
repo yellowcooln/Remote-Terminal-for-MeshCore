@@ -177,6 +177,32 @@ describe('useWebSocket dispatch', () => {
     Object.values(handlers).forEach((fn) => expect(fn).not.toHaveBeenCalled());
   });
 
+  it('routes raw_packet event to onRawPacket with observation_id', () => {
+    const onRawPacket = vi.fn();
+    renderHook(() => useWebSocket({ onRawPacket }));
+
+    const rawPacketData = {
+      id: 5,
+      observation_id: 42,
+      timestamp: 1700000000,
+      data: 'aabbccdd',
+      payload_type: 'GROUP_TEXT',
+      snr: 7.5,
+      rssi: -85,
+      decrypted: true,
+      decrypted_info: {
+        channel_name: '#general',
+        sender: 'Alice',
+      },
+    };
+    fireMessage({ type: 'raw_packet', data: rawPacketData });
+
+    expect(onRawPacket).toHaveBeenCalledOnce();
+    expect(onRawPacket).toHaveBeenCalledWith(rawPacketData);
+    expect(onRawPacket.mock.calls[0][0]).toHaveProperty('observation_id', 42);
+    expect(onRawPacket.mock.calls[0][0]).toHaveProperty('id', 5);
+  });
+
   it('malformed JSON calls no handlers (catch branch)', () => {
     const handlers = {
       onHealth: vi.fn(),

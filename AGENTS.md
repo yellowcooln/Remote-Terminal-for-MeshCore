@@ -150,8 +150,10 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 .
 ├── app/                    # FastAPI backend
 │   ├── AGENTS.md           # Backend documentation
+│   ├── bot.py              # Bot execution and outbound bot sends
 │   ├── main.py             # App entry, lifespan
 │   ├── routers/            # API endpoints
+│   ├── packet_processor.py # Raw packet pipeline, dedup, path handling
 │   ├── repository.py       # Database CRUD
 │   ├── event_handlers.py   # Radio events
 │   ├── decoder.py          # Packet decryption
@@ -167,7 +169,6 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   │       ├── MapView.tsx       # Leaflet map showing node locations
 │   │       └── ...
 │   └── vite.config.ts
-├── references/meshcore_py/ # MeshCore Python library
 ├── tests/                  # Backend tests (pytest)
 ├── data/                   # SQLite database (runtime)
 └── pyproject.toml          # Python dependencies
@@ -389,6 +390,8 @@ mc.subscribe(EventType.ACK, handler)
 | `MESHCORE_TCP_PORT` | `4000` | TCP port (used with `MESHCORE_TCP_HOST`) |
 | `MESHCORE_BLE_ADDRESS` | *(none)* | BLE device address (mutually exclusive with serial/TCP) |
 | `MESHCORE_BLE_PIN` | *(required with BLE)* | BLE PIN code |
+| `MESHCORE_SERIAL_BAUDRATE` | `115200` | Serial baud rate |
+| `MESHCORE_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
 | `MESHCORE_DATABASE_PATH` | `data/meshcore.db` | SQLite database location |
 
 **Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, and `bots`. They are configured via `GET/PATCH /api/settings` (and related settings endpoints).

@@ -365,6 +365,48 @@ class TestSyncRecentContactsToRadio:
         assert result["failed"] == 1
 
     @pytest.mark.asyncio
+    async def test_mc_param_bypasses_lock_acquisition(self, test_db):
+        """When mc is passed, the function uses it directly without acquiring radio_operation.
+
+        This tests the BUG-1 fix: sync_and_offload_all already holds the lock,
+        so it passes mc directly to avoid deadlock (asyncio.Lock is not reentrant).
+        """
+        await _insert_contact(KEY_A, "Alice", last_contacted=2000)
+
+        mock_mc = MagicMock()
+        mock_mc.get_contact_by_key_prefix = MagicMock(return_value=None)
+        mock_result = MagicMock()
+        mock_result.type = EventType.OK
+        mock_mc.commands.add_contact = AsyncMock(return_value=mock_result)
+
+        # Make radio_operation raise if called — it should NOT be called
+        # when mc is provided
+        def radio_operation_should_not_be_called(*args, **kwargs):
+            raise AssertionError("radio_operation should not be called when mc is passed")
+
+        with patch.object(
+            radio_manager, "radio_operation", side_effect=radio_operation_should_not_be_called
+        ):
+            result = await sync_recent_contacts_to_radio(mc=mock_mc)
+
+        assert result["loaded"] == 1
+        mock_mc.commands.add_contact.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_mc_param_still_respects_throttle(self):
+        """When mc is passed but throttle is active (not forced), it should still return throttled."""
+        mock_mc = MagicMock()
+
+        # First call to set _last_contact_sync
+        radio_manager._meshcore = mock_mc
+        await sync_recent_contacts_to_radio()
+
+        # Second call with mc= but no force — should still be throttled
+        result = await sync_recent_contacts_to_radio(mc=mock_mc)
+        assert result["throttled"] is True
+        assert result["loaded"] == 0
+
+    @pytest.mark.asyncio
     async def test_uses_post_lock_meshcore_after_swap(self, test_db):
         """If _meshcore is swapped between pre-check and lock acquisition,
         the function uses the new (post-lock) instance, not the stale one."""
@@ -1032,9 +1074,10 @@ class TestPeriodicAdvertLoopRaces:
         is caught by the outer except — loop survives and continues."""
         rm, _mc = _make_connected_manager()
         _disconnect_on_acquire(rm)
-        # Advert loop: work first, then sleep.  On error the except-handler
-        # sleeps too, so we need 2 sleeps before cancel.
-        mock_sleep, sleep_calls = _sleep_controller(cancel_after=2)
+        # Advert loop: sleep first, then work.  Sleep 1 (loop top) passes,
+        # work hits RadioDisconnectedError, error handler does sleep 2 (passes),
+        # next iteration sleep 3 cancels cleanly via except CancelledError.
+        mock_sleep, sleep_calls = _sleep_controller(cancel_after=3)
 
         with (
             patch("app.radio_sync.radio_manager", rm),
@@ -1044,15 +1087,15 @@ class TestPeriodicAdvertLoopRaces:
             await _periodic_advert_loop()
 
         mock_advert.assert_not_called()
-        assert len(sleep_calls) == 2
+        assert len(sleep_calls) == 3
 
     @pytest.mark.asyncio
     async def test_busy_lock_skips_iteration(self):
         """RadioOperationBusyError is caught and send_advertisement is not called."""
         rm, _mc = _make_connected_manager()
         lock = await _pre_hold_lock(rm)
-        # Busy path falls through to normal sleep (only 1 needed)
-        mock_sleep, _ = _sleep_controller(cancel_after=1)
+        # Sleep 1 (loop top) passes, work hits busy error, sleep 2 cancels.
+        mock_sleep, _ = _sleep_controller(cancel_after=2)
 
         try:
             with (
@@ -1071,7 +1114,8 @@ class TestPeriodicAdvertLoopRaces:
         """The mc yielded by radio_operation() is forwarded to
         send_advertisement — not a stale radio_manager.meshcore read."""
         rm, mock_mc = _make_connected_manager()
-        mock_sleep, _ = _sleep_controller(cancel_after=1)
+        # Sleep 1 (loop top) passes through, work runs, sleep 2 cancels.
+        mock_sleep, _ = _sleep_controller(cancel_after=2)
 
         with (
             patch("app.radio_sync.radio_manager", rm),
