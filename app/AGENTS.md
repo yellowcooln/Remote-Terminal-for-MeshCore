@@ -114,7 +114,10 @@ app/
 
 ### Contacts
 - `GET /contacts`
+- `GET /contacts/repeaters/advert-paths` — recent advert paths for all contacts
 - `GET /contacts/{public_key}`
+- `GET /contacts/{public_key}/detail` — comprehensive contact profile (stats, name history, paths, nearest repeaters)
+- `GET /contacts/{public_key}/advert-paths` — recent advert paths for one contact
 - `POST /contacts`
 - `DELETE /contacts/{public_key}`
 - `POST /contacts/sync`
@@ -176,10 +179,12 @@ Client sends `"ping"` text; server replies `{"type":"pong"}`.
 ## Data Model Notes
 
 Main tables:
-- `contacts`
+- `contacts` (includes `first_seen` for contact age tracking)
 - `channels`
-- `messages`
+- `messages` (includes `sender_name`, `sender_key` for per-contact channel message attribution)
 - `raw_packets`
+- `contact_advert_paths` (recent unique advertisement paths per contact)
+- `contact_name_history` (tracks name changes over time)
 - `app_settings`
 
 `app_settings` fields in active model:

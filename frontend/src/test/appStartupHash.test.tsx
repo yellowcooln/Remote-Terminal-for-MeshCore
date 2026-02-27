@@ -272,6 +272,7 @@ describe('App startup hash resolution', () => {
       on_radio: false,
       last_contacted: null,
       last_read_at: null,
+      first_seen: null,
     };
 
     window.location.hash = '';

@@ -7,7 +7,12 @@ from meshcore import EventType
 
 from app.models import CONTACT_TYPE_REPEATER, Contact
 from app.packet_processor import process_raw_packet
-from app.repository import AmbiguousPublicKeyPrefixError, ContactRepository, MessageRepository
+from app.repository import (
+    AmbiguousPublicKeyPrefixError,
+    ContactNameHistoryRepository,
+    ContactRepository,
+    MessageRepository,
+)
 from app.websocket import broadcast_event
 
 if TYPE_CHECKING:
@@ -250,6 +255,13 @@ async def on_new_contact(event: "Event") -> None:
         "last_seen": int(time.time()),
     }
     await ContactRepository.upsert(contact_data)
+
+    # Record name history if contact has a name
+    adv_name = payload.get("adv_name")
+    if adv_name:
+        await ContactNameHistoryRepository.record_name(
+            public_key.lower(), adv_name, int(time.time())
+        )
 
     # Read back from DB so the broadcast includes all fields (last_contacted,
     # last_read_at, etc.) matching the REST Contact shape exactly.

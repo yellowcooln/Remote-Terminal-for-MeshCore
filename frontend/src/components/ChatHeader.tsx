@@ -4,6 +4,7 @@ import { formatTime } from '../utils/messageParser';
 import { isValidLocation, calculateDistance, formatDistance } from '../utils/pathUtils';
 import { getMapFocusHash } from '../utils/urlHash';
 import { isFavorite } from '../utils/favorites';
+import { ContactAvatar } from './ContactAvatar';
 import type { Contact, Conversation, Favorite, RadioConfig } from '../types';
 
 interface ChatHeaderProps {
@@ -15,6 +16,7 @@ interface ChatHeaderProps {
   onToggleFavorite: (type: 'channel' | 'contact', id: string) => void;
   onDeleteChannel: (key: string) => void;
   onDeleteContact: (publicKey: string) => void;
+  onOpenContactInfo?: (publicKey: string) => void;
 }
 
 export function ChatHeader({
@@ -26,11 +28,34 @@ export function ChatHeader({
   onToggleFavorite,
   onDeleteChannel,
   onDeleteContact,
+  onOpenContactInfo,
 }: ChatHeaderProps) {
   return (
     <div className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
-      <span className="flex flex-wrap items-baseline gap-x-2 min-w-0 flex-1">
-        <span className="flex-shrink-0 font-semibold text-base">
+      <span className="flex flex-wrap items-center gap-x-2 min-w-0 flex-1">
+        {conversation.type === 'contact' && onOpenContactInfo && (
+          <span
+            className="flex-shrink-0 cursor-pointer"
+            onClick={() => onOpenContactInfo(conversation.id)}
+            title="View contact info"
+          >
+            <ContactAvatar
+              name={conversation.name}
+              publicKey={conversation.id}
+              size={28}
+              contactType={contacts.find((c) => c.public_key === conversation.id)?.type}
+              clickable
+            />
+          </span>
+        )}
+        <span
+          className={`flex-shrink-0 font-semibold text-base ${conversation.type === 'contact' && onOpenContactInfo ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+          onClick={
+            conversation.type === 'contact' && onOpenContactInfo
+              ? () => onOpenContactInfo(conversation.id)
+              : undefined
+          }
+        >
           {conversation.type === 'channel' &&
           !conversation.name.startsWith('#') &&
           conversation.name !== 'Public'

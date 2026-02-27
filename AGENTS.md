@@ -268,9 +268,10 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/radio/reboot` | Reboot radio or reconnect if disconnected |
 | POST | `/api/radio/reconnect` | Manual radio reconnection |
 | GET | `/api/contacts` | List contacts |
-| GET | `/api/contacts/repeaters/advert-paths` | List recent unique advert paths for all repeaters |
+| GET | `/api/contacts/repeaters/advert-paths` | List recent unique advert paths for all contacts |
 | GET | `/api/contacts/{key}` | Get contact by public key or prefix |
-| GET | `/api/contacts/{key}/advert-paths` | List recent unique advert paths for one repeater |
+| GET | `/api/contacts/{key}/detail` | Comprehensive contact profile (stats, name history, paths) |
+| GET | `/api/contacts/{key}/advert-paths` | List recent unique advert paths for a contact |
 | POST | `/api/contacts` | Create contact (optionally trigger historical DM decrypt) |
 | DELETE | `/api/contacts/{key}` | Delete contact |
 | POST | `/api/contacts/sync` | Pull from radio |

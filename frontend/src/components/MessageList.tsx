@@ -26,6 +26,7 @@ interface MessageListProps {
   onResendChannelMessage?: (messageId: number, newTimestamp?: boolean) => void;
   radioName?: string;
   config?: RadioConfig | null;
+  onOpenContactInfo?: (publicKey: string) => void;
 }
 
 // URL regex for linkifying plain text
@@ -148,6 +149,7 @@ export function MessageList({
   onResendChannelMessage,
   radioName,
   config,
+  onOpenContactInfo,
 }: MessageListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef<number>(0);
@@ -466,7 +468,20 @@ export function MessageList({
               {!msg.outgoing && (
                 <div className="w-10 flex-shrink-0 flex items-start pt-0.5">
                   {showAvatar && avatarKey && (
-                    <ContactAvatar name={avatarName} publicKey={avatarKey} size={32} />
+                    <span
+                      onClick={
+                        onOpenContactInfo && !avatarKey.startsWith('name:')
+                          ? () => onOpenContactInfo(avatarKey)
+                          : undefined
+                      }
+                    >
+                      <ContactAvatar
+                        name={avatarName}
+                        publicKey={avatarKey}
+                        size={32}
+                        clickable={!!onOpenContactInfo && !avatarKey.startsWith('name:')}
+                      />
+                    </span>
                   )}
                 </div>
               )}

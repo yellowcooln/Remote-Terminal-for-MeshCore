@@ -22,7 +22,7 @@ import {
   type Contact,
   type RawPacket,
   type RadioConfig,
-  type RepeaterAdvertPathSummary,
+  type ContactAdvertPathSummary,
 } from '../types';
 import { getRawPacketObservationKey } from '../utils/rawPacketIdentity';
 import { Checkbox } from './ui/checkbox';
@@ -118,7 +118,7 @@ interface UseVisualizerData3DOptions {
   packets: RawPacket[];
   contacts: Contact[];
   config: RadioConfig | null;
-  repeaterAdvertPaths: RepeaterAdvertPathSummary[];
+  repeaterAdvertPaths: ContactAdvertPathSummary[];
   showAmbiguousPaths: boolean;
   showAmbiguousNodes: boolean;
   useAdvertPathHints: boolean;
@@ -195,9 +195,9 @@ function useVisualizerData3D({
   }, [contacts]);
 
   const advertPathIndex = useMemo(() => {
-    const byRepeater = new Map<string, RepeaterAdvertPathSummary['paths']>();
+    const byRepeater = new Map<string, ContactAdvertPathSummary['paths']>();
     for (const summary of repeaterAdvertPaths) {
-      const key = summary.repeater_key.slice(0, 12).toLowerCase();
+      const key = summary.public_key.slice(0, 12).toLowerCase();
       byRepeater.set(key, summary.paths);
     }
     return { byRepeater };
@@ -1018,7 +1018,7 @@ export function PacketVisualizer3D({
   const [showControls, setShowControls] = useState(true);
   const [autoOrbit, setAutoOrbit] = useState(false);
   const [pruneStaleNodes, setPruneStaleNodes] = useState(false);
-  const [repeaterAdvertPaths, setRepeaterAdvertPaths] = useState<RepeaterAdvertPathSummary[]>([]);
+  const [repeaterAdvertPaths, setRepeaterAdvertPaths] = useState<ContactAdvertPathSummary[]>([]);
 
   useEffect(() => {
     let cancelled = false;

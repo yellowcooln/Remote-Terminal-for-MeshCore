@@ -282,6 +282,7 @@ function makeContact(overrides: Partial<Contact> = {}): Contact {
     on_radio: true,
     last_contacted: null,
     last_read_at: null,
+    first_seen: null,
     ...overrides,
   };
 }

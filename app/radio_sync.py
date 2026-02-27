@@ -251,9 +251,15 @@ async def sync_and_offload_all(mc: MeshCore) -> dict:
     # Ensure default channels exist
     await ensure_default_channels()
 
+    # Reload favorites and recent contacts back onto the radio immediately
+    # so favorited contacts don't stay in the on_radio=False limbo until the
+    # next advertisement arrives.
+    reload_result = await sync_recent_contacts_to_radio(force=True)
+
     return {
         "contacts": contacts_result,
         "channels": channels_result,
+        "reloaded": reload_result,
     }
 
 

@@ -15,7 +15,7 @@ from meshcore import EventType
 
 from app.database import Database
 from app.radio import radio_manager
-from app.repository import ContactRepository, MessageRepository, RepeaterAdvertPathRepository
+from app.repository import ContactAdvertPathRepository, ContactRepository, MessageRepository
 
 # Sample 64-char hex public keys for testing
 KEY_A = "aa" * 32  # aaaa...aa
@@ -215,15 +215,15 @@ class TestAdvertPaths:
     async def test_list_repeater_advert_paths(self, test_db, client):
         repeater_key = KEY_A
         await _insert_contact(repeater_key, "R1", type=2)
-        await RepeaterAdvertPathRepository.record_observation(repeater_key, "1122", 1000)
-        await RepeaterAdvertPathRepository.record_observation(repeater_key, "3344", 1010)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "1122", 1000)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "3344", 1010)
 
         response = await client.get("/api/contacts/repeaters/advert-paths?limit_per_repeater=1")
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
-        assert data[0]["repeater_key"] == repeater_key
+        assert data[0]["public_key"] == repeater_key
         assert len(data[0]["paths"]) == 1
         assert data[0]["paths"][0]["path"] == "3344"
         assert data[0]["paths"][0]["next_hop"] == "33"
@@ -232,7 +232,7 @@ class TestAdvertPaths:
     async def test_get_contact_advert_paths_for_repeater(self, test_db, client):
         repeater_key = KEY_A
         await _insert_contact(repeater_key, "R1", type=2)
-        await RepeaterAdvertPathRepository.record_observation(repeater_key, "", 1000)
+        await ContactAdvertPathRepository.record_observation(repeater_key, "", 1000)
 
         response = await client.get(f"/api/contacts/{repeater_key}/advert-paths")
 
@@ -243,13 +243,164 @@ class TestAdvertPaths:
         assert data[0]["next_hop"] is None
 
     @pytest.mark.asyncio
-    async def test_get_contact_advert_paths_rejects_non_repeater(self, test_db, client):
+    async def test_get_contact_advert_paths_works_for_non_repeater(self, test_db, client):
         await _insert_contact(KEY_A, "Alice", type=1)
 
         response = await client.get(f"/api/contacts/{KEY_A}/advert-paths")
 
-        assert response.status_code == 400
-        assert "not a repeater" in response.json()["detail"].lower()
+        assert response.status_code == 200
+        assert response.json() == []
+
+
+class TestContactDetail:
+    """Test GET /api/contacts/{public_key}/detail."""
+
+    @pytest.mark.asyncio
+    async def test_detail_returns_full_profile(self, test_db, client):
+        """Happy path: contact with DMs, channel messages, name history, advert paths."""
+        await _insert_contact(KEY_A, "Alice", type=1)
+
+        # Add some DMs
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="hi",
+            conversation_key=KEY_A,
+            sender_timestamp=1000,
+            received_at=1000,
+            sender_key=KEY_A,
+        )
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="hello",
+            conversation_key=KEY_A,
+            sender_timestamp=1001,
+            received_at=1001,
+            outgoing=True,
+        )
+
+        # Add a channel message attributed to this contact
+        from app.repository import ContactNameHistoryRepository
+
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Alice: yo",
+            conversation_key="CHAN_KEY_0" * 2,
+            sender_timestamp=1002,
+            received_at=1002,
+            sender_name="Alice",
+            sender_key=KEY_A,
+        )
+
+        # Record name history
+        await ContactNameHistoryRepository.record_name(KEY_A, "Alice", 1000)
+        await ContactNameHistoryRepository.record_name(KEY_A, "AliceOld", 500)
+
+        # Record advert paths
+        await ContactAdvertPathRepository.record_observation(KEY_A, "1122", 1000)
+        await ContactAdvertPathRepository.record_observation(KEY_A, "", 900)
+
+        response = await client.get(f"/api/contacts/{KEY_A}/detail")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["contact"]["public_key"] == KEY_A
+        assert data["dm_message_count"] == 2
+        assert data["channel_message_count"] == 1
+        assert len(data["name_history"]) == 2
+        assert data["name_history"][0]["name"] == "Alice"  # most recent first
+        assert len(data["advert_paths"]) == 2
+        assert len(data["most_active_rooms"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_detail_contact_not_found(self, test_db, client):
+        response = await client.get(f"/api/contacts/{KEY_A}/detail")
+
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_detail_with_no_activity(self, test_db, client):
+        """Contact with no messages or paths returns zero counts and empty lists."""
+        await _insert_contact(KEY_A, "Alice")
+
+        response = await client.get(f"/api/contacts/{KEY_A}/detail")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["dm_message_count"] == 0
+        assert data["channel_message_count"] == 0
+        assert data["most_active_rooms"] == []
+        assert data["advert_paths"] == []
+        assert data["advert_frequency"] is None
+        assert data["nearest_repeaters"] == []
+
+    @pytest.mark.asyncio
+    async def test_detail_nearest_repeaters_resolved(self, test_db, client):
+        """Nearest repeaters are resolved from first-hop prefixes in advert paths."""
+        await _insert_contact(KEY_A, "Alice", type=1)
+        # Create a repeater whose key starts with "bb"
+        await _insert_contact(KEY_B, "Relay1", type=2)
+
+        # Record advert paths that go through KEY_B's prefix
+        await ContactAdvertPathRepository.record_observation(KEY_A, "bb1122", 1000)
+        await ContactAdvertPathRepository.record_observation(KEY_A, "bb3344", 1010)
+
+        response = await client.get(f"/api/contacts/{KEY_A}/detail")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["nearest_repeaters"]) == 1
+        repeater = data["nearest_repeaters"][0]
+        assert repeater["public_key"] == KEY_B
+        assert repeater["name"] == "Relay1"
+        assert repeater["heard_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_detail_advert_frequency_computed(self, test_db, client):
+        """Advert frequency is computed from path observations over time span."""
+        await _insert_contact(KEY_A, "Alice")
+
+        # 10 observations over 1 hour (3600s)
+        for i in range(10):
+            path_hex = f"{i:02x}" * 2  # unique paths to avoid upsert
+            await ContactAdvertPathRepository.record_observation(KEY_A, path_hex, 1000 + i * 360)
+
+        response = await client.get(f"/api/contacts/{KEY_A}/detail")
+
+        assert response.status_code == 200
+        data = response.json()
+        # 10 observations / (3240s / 3600) ≈ 11.11/hr
+        assert data["advert_frequency"] is not None
+        assert data["advert_frequency"] > 0
+
+
+class TestDeleteContactCascade:
+    """Test that contact delete cleans up related tables."""
+
+    @pytest.mark.asyncio
+    async def test_delete_removes_name_history_and_advert_paths(self, test_db, client):
+        await _insert_contact(KEY_A, "Alice")
+
+        from app.repository import ContactNameHistoryRepository
+
+        await ContactNameHistoryRepository.record_name(KEY_A, "Alice", 1000)
+        await ContactAdvertPathRepository.record_observation(KEY_A, "1122", 1000)
+
+        # Verify data exists
+        assert len(await ContactNameHistoryRepository.get_history(KEY_A)) == 1
+        assert len(await ContactAdvertPathRepository.get_recent_for_contact(KEY_A)) == 1
+
+        with patch("app.routers.contacts.radio_manager") as mock_rm:
+            mock_rm.is_connected = False
+            mock_rm.meshcore = None
+            mock_rm.radio_operation = _noop_radio_operation()
+
+            response = await client.delete(f"/api/contacts/{KEY_A}")
+
+        assert response.status_code == 200
+
+        # Verify related data cleaned up
+        assert len(await ContactNameHistoryRepository.get_history(KEY_A)) == 0
+        assert len(await ContactAdvertPathRepository.get_recent_for_contact(KEY_A)) == 0
 
 
 class TestMarkRead:
