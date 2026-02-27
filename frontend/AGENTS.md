@@ -48,7 +48,10 @@ frontend/src/
 │   ├── contactAvatar.ts        # Avatar color derivation from public key
 │   ├── rawPacketIdentity.ts    # observation_id vs id dedup helpers
 │   ├── visualizerUtils.ts      # 3D visualizer node types, colors, particles
-│   └── lastViewedConversation.ts   # localStorage for last-viewed conversation
+│   ├── lastViewedConversation.ts   # localStorage for last-viewed conversation
+│   ├── contactMerge.ts            # Merge WS contact updates into list
+│   ├── localLabel.ts              # Local label (text + color) in localStorage
+│   └── radioPresets.ts            # LoRa radio preset configurations
 ├── components/
 │   ├── StatusBar.tsx
 │   ├── Sidebar.tsx
@@ -69,6 +72,7 @@ frontend/src/
 │   ├── ContactInfoPane.tsx     # Contact detail sheet (stats, name history, paths)
 │   ├── RepeaterDashboard.tsx   # Repeater pane-based dashboard (telemetry, neighbors, ACL, etc.)
 │   ├── RepeaterLogin.tsx       # Repeater login form (password + guest)
+│   ├── NeighborsMiniMap.tsx    # Leaflet mini-map for repeater neighbor locations
 │   └── ui/                     # shadcn/ui primitives
 ├── types/
 │   └── d3-force-3d.d.ts       # Type declarations for d3-force-3d
@@ -86,7 +90,10 @@ frontend/src/
     ├── radioPresets.test.ts
     ├── rawPacketIdentity.test.ts
     ├── repeaterDashboard.test.tsx
-    ├── repeaterMode.test.ts
+    ├── repeaterFormatters.test.ts
+    ├── repeaterLogin.test.tsx
+    ├── repeaterMessageParsing.test.ts
+    ├── localLabel.test.ts
     ├── settingsModal.test.tsx
     ├── sidebar.test.tsx
     ├── unreadCounts.test.ts
@@ -200,13 +207,30 @@ LocalStorage migration helpers for favorites; canonical favorites are server-sid
 - `last_advert_time`
 - `bots`
 
+## Contact Info Pane
+
+Clicking a contact's avatar in `ChatHeader` or `MessageList` opens a `ContactInfoPane` sheet (right drawer) showing comprehensive contact details fetched from `GET /api/contacts/{key}/detail`:
+
+- Header: avatar, name, public key, type badge, on-radio badge
+- Info grid: last seen, first heard, last contacted, distance, hops
+- GPS location (clickable → map)
+- Favorite toggle
+- Name history ("Also Known As") — shown only when the contact has used multiple names
+- Message stats: DM count, channel message count
+- Most active rooms (clickable → navigate to channel)
+- Advert observation rate
+- Nearest repeaters (resolved from first-hop path prefixes)
+- Recent advert paths
+
+State: `infoPaneContactKey` in App.tsx controls open/close. Live contact data from WebSocket updates is preferred over the initial detail snapshot.
+
 ## Repeater Dashboard
 
 For repeater contacts (`type=2`), App.tsx renders `RepeaterDashboard` instead of the normal chat UI (ChatHeader + MessageList + MessageInput).
 
 **Login**: `RepeaterLogin` component — password or guest login via `POST /api/contacts/{key}/repeater/login`.
 
-**Dashboard panes** (after login): Telemetry, Neighbors, ACL, Radio Settings, Advert Intervals, Owner Info, Clock — each fetched via granular `POST /api/contacts/{key}/repeater/{pane}` endpoints. Panes retry up to 3 times client-side. "Load All" fetches all panes serially (parallel would queue behind the radio lock).
+**Dashboard panes** (after login): Telemetry, Neighbors, ACL, Radio Settings, Advert Intervals, Owner Info — each fetched via granular `POST /api/contacts/{key}/repeater/{pane}` endpoints. Panes retry up to 3 times client-side. "Load All" fetches all panes serially (parallel would queue behind the radio lock).
 
 **Actions pane**: Send Advert, Sync Clock, Reboot — all send CLI commands via `POST /api/contacts/{key}/command`.
 

@@ -110,13 +110,13 @@ Raw packet handling uses two identities by design:
 
 Frontend packet-feed consumers should treat `observation_id` as the dedup/render key, while `id` remains the storage reference.
 
-## Repeater Advert Path Memory
+## Contact Advert Path Memory
 
-To improve repeater disambiguation in the network visualizer, the backend stores recent unique advertisement paths per repeater in a dedicated table (`repeater_advert_paths`).
+To improve repeater disambiguation in the network visualizer, the backend stores recent unique advertisement paths per contact in a dedicated table (`contact_advert_paths`).
 
 - This is independent of raw-packet payload deduplication.
-- Paths are keyed per repeater + path, with `heard_count`, `first_seen`, and `last_seen`.
-- Only the N most recent unique paths are retained per repeater (currently 10).
+- Paths are keyed per contact + path, with `heard_count`, `first_seen`, and `last_seen`.
+- Only the N most recent unique paths are retained per contact (currently 10).
 - See `frontend/src/components/AGENTS.md` § "Advert-Path Identity Hints" for how the visualizer consumes this data.
 
 ## Data Flow
@@ -288,7 +288,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/contacts/{key}/repeater/radio-settings` | Fetch radio settings via CLI |
 | POST | `/api/contacts/{key}/repeater/advert-intervals` | Fetch advert intervals |
 | POST | `/api/contacts/{key}/repeater/owner-info` | Fetch owner info |
-| POST | `/api/contacts/{key}/repeater/clock` | Fetch repeater clock |
+
 | GET | `/api/channels` | List channels |
 | GET | `/api/channels/{key}` | Get channel by key |
 | POST | `/api/channels` | Create channel |

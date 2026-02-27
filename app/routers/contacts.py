@@ -24,7 +24,6 @@ from app.models import (
     NeighborInfo,
     RepeaterAclResponse,
     RepeaterAdvertIntervalsResponse,
-    RepeaterClockResponse,
     RepeaterLoginRequest,
     RepeaterLoginResponse,
     RepeaterLppTelemetryResponse,
@@ -479,21 +478,6 @@ async def repeater_owner_info(public_key: str) -> RepeaterOwnerInfoResponse:
         ],
     )
     return RepeaterOwnerInfoResponse(**results)
-
-
-@router.post("/{public_key}/repeater/clock", response_model=RepeaterClockResponse)
-async def repeater_clock(public_key: str) -> RepeaterClockResponse:
-    """Fetch clock output from a repeater."""
-    require_connected()
-    contact = await _resolve_contact_or_404(public_key)
-    _require_repeater(contact)
-
-    results = await _batch_cli_fetch(
-        contact,
-        "repeater_clock",
-        [("clock", "clock_output")],
-    )
-    return RepeaterClockResponse(**results)
 
 
 @router.get("", response_model=list[Contact])

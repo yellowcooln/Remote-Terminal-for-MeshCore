@@ -15,7 +15,6 @@ from app.routers.contacts import (
     _fetch_repeater_response,
     repeater_acl,
     repeater_advert_intervals,
-    repeater_clock,
     repeater_login,
     repeater_lpp_telemetry,
     repeater_neighbors,
@@ -84,6 +83,7 @@ async def _insert_contact(public_key: str, name: str = "Node", contact_type: int
             "last_seen": None,
             "on_radio": False,
             "last_contacted": None,
+            "first_seen": None,
         }
     )
 
@@ -1055,45 +1055,6 @@ class TestRepeaterOwnerInfo:
 
         assert response.owner_info is None
         assert response.guest_password is None
-
-
-class TestRepeaterClock:
-    @pytest.mark.asyncio
-    async def test_success(self, test_db):
-        mc = _mock_mc()
-        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
-
-        mc.commands.get_msg = AsyncMock(
-            return_value=_radio_result(
-                EventType.CONTACT_MSG_RECV,
-                {"pubkey_prefix": KEY_A[:12], "text": "2026-02-25 12:00:00 UTC", "txt_type": 1},
-            )
-        )
-
-        with (
-            patch("app.routers.contacts.require_connected", return_value=mc),
-            patch.object(radio_manager, "_meshcore", mc),
-            patch(_MONOTONIC, side_effect=_advancing_clock()),
-        ):
-            response = await repeater_clock(KEY_A)
-
-        assert response.clock_output == "2026-02-25 12:00:00 UTC"
-
-    @pytest.mark.asyncio
-    async def test_timeout_returns_none(self, test_db):
-        mc = _mock_mc()
-        await _insert_contact(KEY_A, name="Repeater", contact_type=2)
-        mc.commands.get_msg = AsyncMock(return_value=_radio_result(EventType.NO_MORE_MSGS))
-
-        with (
-            patch("app.routers.contacts.require_connected", return_value=mc),
-            patch.object(radio_manager, "_meshcore", mc),
-            patch(_MONOTONIC, side_effect=[0.0, 5.0, 11.0]),
-            patch("app.routers.contacts.asyncio.sleep", new_callable=AsyncMock),
-        ):
-            response = await repeater_clock(KEY_A)
-
-        assert response.clock_output is None
 
 
 def _make_contact(

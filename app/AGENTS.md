@@ -134,7 +134,6 @@ app/
 - `POST /contacts/{public_key}/repeater/radio-settings`
 - `POST /contacts/{public_key}/repeater/advert-intervals`
 - `POST /contacts/{public_key}/repeater/owner-info`
-- `POST /contacts/{public_key}/repeater/clock`
 
 ### Channels
 - `GET /channels`

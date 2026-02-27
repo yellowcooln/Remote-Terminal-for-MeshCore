@@ -276,12 +276,6 @@ class RepeaterOwnerInfoResponse(BaseModel):
     guest_password: str | None = Field(default=None, description="Guest password")
 
 
-class RepeaterClockResponse(BaseModel):
-    """Clock output from a repeater."""
-
-    clock_output: str | None = Field(default=None, description="Output from 'clock' command")
-
-
 class LppSensor(BaseModel):
     """A single CayenneLPP sensor reading from req_telemetry_sync."""
 
