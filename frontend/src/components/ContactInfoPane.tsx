@@ -50,15 +50,25 @@ export function ContactInfoPane({
       return;
     }
 
+    let cancelled = false;
     setLoading(true);
     api
       .getContactDetail(contactKey)
-      .then(setDetail)
-      .catch((err) => {
-        console.error('Failed to fetch contact detail:', err);
-        toast.error('Failed to load contact info');
+      .then((data) => {
+        if (!cancelled) setDetail(data);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Failed to fetch contact detail:', err);
+          toast.error('Failed to load contact info');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [contactKey]);
 
   // Use live contact data where available, fall back to detail snapshot
