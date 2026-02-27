@@ -935,10 +935,10 @@ class RawPacketRepository:
         # Compute payload hash for deduplication
         payload = extract_payload(data)
         if payload:
-            payload_hash = sha256(payload).hexdigest()
+            payload_hash = sha256(payload).digest()
         else:
             # For malformed packets, hash the full data
-            payload_hash = sha256(data).hexdigest()
+            payload_hash = sha256(data).digest()
 
         # Check if this payload already exists
         cursor = await db.conn.execute(
@@ -950,7 +950,7 @@ class RawPacketRepository:
             # Duplicate - return existing packet ID
             logger.debug(
                 "Duplicate payload detected (hash=%s..., existing_id=%d)",
-                payload_hash[:12],
+                payload_hash.hex()[:12],
                 existing["id"],
             )
             return (existing["id"], False)
@@ -970,7 +970,7 @@ class RawPacketRepository:
             # close together. Query again to get the existing ID.
             logger.debug(
                 "Duplicate packet detected via race condition (payload_hash=%s), dropping",
-                payload_hash[:16],
+                payload_hash.hex()[:16],
             )
             cursor = await db.conn.execute(
                 "SELECT id FROM raw_packets WHERE payload_hash = ?", (payload_hash,)

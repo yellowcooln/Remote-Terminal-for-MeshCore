@@ -100,8 +100,8 @@ class TestMigration001:
             # Run migrations
             applied = await run_migrations(conn)
 
-            assert applied == 27  # All migrations run
-            assert await get_version(conn) == 27
+            assert applied == 28  # All migrations run
+            assert await get_version(conn) == 28
 
             # Verify columns exist by inserting and selecting
             await conn.execute(
@@ -183,9 +183,9 @@ class TestMigration001:
             applied1 = await run_migrations(conn)
             applied2 = await run_migrations(conn)
 
-            assert applied1 == 27  # All migrations run
+            assert applied1 == 28  # All migrations run
             assert applied2 == 0  # No migrations on second run
-            assert await get_version(conn) == 27
+            assert await get_version(conn) == 28
         finally:
             await conn.close()
 
@@ -246,8 +246,8 @@ class TestMigration001:
             applied = await run_migrations(conn)
 
             # All migrations applied (version incremented) but no error
-            assert applied == 27
-            assert await get_version(conn) == 27
+            assert applied == 28
+            assert await get_version(conn) == 28
         finally:
             await conn.close()
 
@@ -376,8 +376,8 @@ class TestMigration013:
 
             # Run migration 13 (plus 14-27 which also run)
             applied = await run_migrations(conn)
-            assert applied == 15
-            assert await get_version(conn) == 27
+            assert applied == 16
+            assert await get_version(conn) == 28
 
             # Verify bots array was created with migrated data
             cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
@@ -497,7 +497,7 @@ class TestMigration018:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 27
+            assert await get_version(conn) == 28
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -516,7 +516,11 @@ class TestMigration018:
             assert rows[0]["timestamp"] == 1000
             assert bytes(rows[0]["data"]) == b"\x01\x02\x03"
             assert rows[0]["message_id"] is None
-            assert rows[0]["payload_hash"] == "hash_a"
+            # payload_hash was converted from TEXT to BLOB by migration 28;
+            # "hash_a" is not valid hex so gets sha256-hashed
+            from hashlib import sha256
+
+            assert bytes(rows[0]["payload_hash"]) == sha256(b"hash_a").digest()
             assert rows[1]["message_id"] == 42
 
             # Verify payload_hash unique index still works
@@ -571,8 +575,8 @@ class TestMigration018:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 10  # Migrations 18-27 run (18+19 skip internally)
-            assert await get_version(conn) == 27
+            assert applied == 11  # Migrations 18-28 run (18+19 skip internally)
+            assert await get_version(conn) == 28
         finally:
             await conn.close()
 
@@ -644,7 +648,7 @@ class TestMigration019:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 27
+            assert await get_version(conn) == 28
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -710,8 +714,8 @@ class TestMigration020:
             assert (await cursor.fetchone())[0] == "delete"
 
             applied = await run_migrations(conn)
-            assert applied == 8  # Migrations 20-27
-            assert await get_version(conn) == 27
+            assert applied == 9  # Migrations 20-28
+            assert await get_version(conn) == 28
 
             # Verify WAL mode
             cursor = await conn.execute("PRAGMA journal_mode")
@@ -741,12 +745,140 @@ class TestMigration020:
             await set_version(conn, 20)
 
             applied = await run_migrations(conn)
-            assert applied == 7  # Migrations 21-27 still run
+            assert applied == 8  # Migrations 21-28 still run
 
             # Still WAL + INCREMENTAL
             cursor = await conn.execute("PRAGMA journal_mode")
             assert (await cursor.fetchone())[0] == "wal"
             cursor = await conn.execute("PRAGMA auto_vacuum")
             assert (await cursor.fetchone())[0] == 2
+        finally:
+            await conn.close()
+
+
+class TestMigration028:
+    """Test migration 028: convert payload_hash from TEXT to BLOB."""
+
+    @pytest.mark.asyncio
+    async def test_migration_converts_hex_text_to_blob(self):
+        """Migration converts 64-char hex TEXT payload_hash values to 32-byte BLOBs."""
+        from hashlib import sha256
+
+        conn = await aiosqlite.connect(":memory:")
+        conn.row_factory = aiosqlite.Row
+        try:
+            await set_version(conn, 27)
+
+            # Create raw_packets with TEXT payload_hash (pre-migration schema)
+            await conn.execute("""
+                CREATE TABLE raw_packets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp INTEGER NOT NULL,
+                    data BLOB NOT NULL,
+                    message_id INTEGER,
+                    payload_hash TEXT
+                )
+            """)
+            await conn.execute(
+                "CREATE UNIQUE INDEX idx_raw_packets_payload_hash ON raw_packets(payload_hash)"
+            )
+            await conn.execute("CREATE INDEX idx_raw_packets_message_id ON raw_packets(message_id)")
+
+            # Insert rows with hex TEXT hashes (as produced by .hexdigest())
+            hash_a = sha256(b"packet_a").hexdigest()
+            hash_b = sha256(b"packet_b").hexdigest()
+            await conn.execute(
+                "INSERT INTO raw_packets (timestamp, data, payload_hash) VALUES (?, ?, ?)",
+                (1000, b"\x01\x02", hash_a),
+            )
+            await conn.execute(
+                "INSERT INTO raw_packets (timestamp, data, message_id, payload_hash) VALUES (?, ?, ?, ?)",
+                (2000, b"\x03\x04", 42, hash_b),
+            )
+            # Row with NULL payload_hash
+            await conn.execute(
+                "INSERT INTO raw_packets (timestamp, data) VALUES (?, ?)",
+                (3000, b"\x05\x06"),
+            )
+            await conn.commit()
+
+            applied = await run_migrations(conn)
+            assert applied == 1
+            assert await get_version(conn) == 28
+
+            # Verify payload_hash column is now BLOB
+            cursor = await conn.execute("PRAGMA table_info(raw_packets)")
+            cols = {row[1]: row[2] for row in await cursor.fetchall()}
+            assert cols["payload_hash"] == "BLOB"
+
+            # Verify data is preserved and converted correctly
+            cursor = await conn.execute(
+                "SELECT id, timestamp, data, message_id, payload_hash FROM raw_packets ORDER BY id"
+            )
+            rows = await cursor.fetchall()
+            assert len(rows) == 3
+
+            assert rows[0]["timestamp"] == 1000
+            assert bytes(rows[0]["data"]) == b"\x01\x02"
+            assert bytes(rows[0]["payload_hash"]) == sha256(b"packet_a").digest()
+            assert rows[0]["message_id"] is None
+
+            assert rows[1]["timestamp"] == 2000
+            assert bytes(rows[1]["payload_hash"]) == sha256(b"packet_b").digest()
+            assert rows[1]["message_id"] == 42
+
+            assert rows[2]["payload_hash"] is None
+
+            # Verify unique index works
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE name='idx_raw_packets_payload_hash'"
+            )
+            assert await cursor.fetchone() is not None
+
+            # Verify message_id index exists
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE name='idx_raw_packets_message_id'"
+            )
+            assert await cursor.fetchone() is not None
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_migration_skips_when_already_blob(self):
+        """Migration is a no-op when payload_hash is already BLOB (fresh install)."""
+        conn = await aiosqlite.connect(":memory:")
+        conn.row_factory = aiosqlite.Row
+        try:
+            await set_version(conn, 27)
+
+            # Create raw_packets with BLOB payload_hash (new schema)
+            await conn.execute("""
+                CREATE TABLE raw_packets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp INTEGER NOT NULL,
+                    data BLOB NOT NULL,
+                    message_id INTEGER,
+                    payload_hash BLOB
+                )
+            """)
+            await conn.execute(
+                "CREATE UNIQUE INDEX idx_raw_packets_payload_hash ON raw_packets(payload_hash)"
+            )
+
+            # Insert a row with a BLOB hash
+            await conn.execute(
+                "INSERT INTO raw_packets (timestamp, data, payload_hash) VALUES (?, ?, ?)",
+                (1000, b"\x01", b"\xab" * 32),
+            )
+            await conn.commit()
+
+            applied = await run_migrations(conn)
+            assert applied == 1  # Version still bumped
+            assert await get_version(conn) == 28
+
+            # Verify data unchanged
+            cursor = await conn.execute("SELECT payload_hash FROM raw_packets")
+            row = await cursor.fetchone()
+            assert bytes(row["payload_hash"]) == b"\xab" * 32
         finally:
             await conn.close()

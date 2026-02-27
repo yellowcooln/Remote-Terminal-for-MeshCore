@@ -137,15 +137,15 @@ class TestStatisticsCounts:
         # 2 decrypted packets (linked to message), 1 undecrypted
         await conn.execute(
             "INSERT INTO raw_packets (timestamp, data, message_id, payload_hash) VALUES (?, ?, ?, ?)",
-            (now, b"\x01", msg_id, "hash1"),
+            (now, b"\x01", msg_id, b"\x01" * 32),
         )
         await conn.execute(
             "INSERT INTO raw_packets (timestamp, data, message_id, payload_hash) VALUES (?, ?, ?, ?)",
-            (now, b"\x02", msg_id, "hash2"),
+            (now, b"\x02", msg_id, b"\x02" * 32),
         )
         await conn.execute(
             "INSERT INTO raw_packets (timestamp, data, payload_hash) VALUES (?, ?, ?)",
-            (now, b"\x03", "hash3"),
+            (now, b"\x03", b"\x03" * 32),
         )
         await conn.commit()
 

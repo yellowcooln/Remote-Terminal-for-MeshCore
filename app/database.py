@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS raw_packets (
     timestamp INTEGER NOT NULL,
     data BLOB NOT NULL,
     message_id INTEGER,
-    payload_hash TEXT,
+    payload_hash BLOB,
     FOREIGN KEY (message_id) REFERENCES messages(id)
 );
 
