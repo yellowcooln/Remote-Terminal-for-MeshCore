@@ -173,6 +173,7 @@ export function App() {
     fetchOlderMessages,
     addMessageIfNew,
     updateMessageAck,
+    triggerReconcile,
   } = useConversationMessages(activeConversation);
 
   const {
@@ -182,6 +183,7 @@ export function App() {
     incrementUnread,
     markAllRead,
     trackNewMessage,
+    refreshUnreads,
   } = useUnreadCounts(channels, contacts, activeConversation);
 
   // Determine if active contact is a repeater (used for routing to dashboard)
@@ -227,10 +229,12 @@ export function App() {
         });
       },
       onReconnect: () => {
-        toast.warning('Unstable connection', {
-          description: 'Please refresh the page to ensure all messages are correctly loaded.',
-          duration: 10000,
-        });
+        // Silently recover any data missed during the disconnect window
+        triggerReconcile();
+        refreshUnreads();
+        fetchAllContacts()
+          .then((data) => setContacts(data))
+          .catch(console.error);
       },
       onMessage: (msg: Message) => {
         const activeConv = activeConversationRef.current;
@@ -299,6 +303,9 @@ export function App() {
       setConfig,
       activeConversationRef,
       setContacts,
+      triggerReconcile,
+      refreshUnreads,
+      fetchAllContacts,
     ]
   );
 

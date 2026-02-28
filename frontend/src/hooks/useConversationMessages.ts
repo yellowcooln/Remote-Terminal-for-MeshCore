@@ -66,6 +66,7 @@ interface UseConversationMessagesResult {
   fetchOlderMessages: () => Promise<void>;
   addMessageIfNew: (msg: Message) => boolean;
   updateMessageAck: (messageId: number, ackCount: number, paths?: MessagePath[]) => void;
+  triggerReconcile: () => void;
 }
 
 export function useConversationMessages(
@@ -258,6 +259,15 @@ export function useConversationMessages(
     }
   }, [activeConversation, loadingOlder, hasOlderMessages, messages, applyPendingAck]);
 
+  // Trigger a background reconciliation for the current conversation.
+  // Used after WebSocket reconnects to silently recover any missed messages.
+  const triggerReconcile = useCallback(() => {
+    const conv = activeConversation;
+    if (!conv || conv.type === 'raw' || conv.type === 'map' || conv.type === 'visualizer') return;
+    const controller = new AbortController();
+    reconcileFromBackend(conv, controller.signal);
+  }, [activeConversation]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Background reconciliation: silently fetch from backend after a cache restore
   // and only update state if something differs (missed WS message, stale ack, etc.).
   // No-ops on the happy path — zero rerenders when cache is already consistent.
@@ -435,5 +445,6 @@ export function useConversationMessages(
     fetchOlderMessages,
     addMessageIfNew,
     updateMessageAck,
+    triggerReconcile,
   };
 }

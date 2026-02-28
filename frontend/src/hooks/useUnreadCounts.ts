@@ -17,6 +17,7 @@ interface UseUnreadCountsResult {
   incrementUnread: (stateKey: string, hasMention?: boolean) => void;
   markAllRead: () => void;
   trackNewMessage: (msg: Message) => void;
+  refreshUnreads: () => Promise<void>;
 }
 
 export function useUnreadCounts(
@@ -170,5 +171,6 @@ export function useUnreadCounts(
     incrementUnread,
     markAllRead,
     trackNewMessage,
+    refreshUnreads: fetchUnreads,
   };
 }
