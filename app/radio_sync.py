@@ -29,6 +29,33 @@ from app.repository import (
 
 logger = logging.getLogger(__name__)
 
+
+async def upsert_channel_from_radio_slot(payload: dict, *, on_radio: bool) -> str | None:
+    """Parse a radio channel-slot payload and upsert to the database.
+
+    Returns the uppercase hex key if a channel was upserted, or None if the
+    slot was empty/invalid.
+    """
+    name = payload.get("channel_name", "")
+    secret = payload.get("channel_secret", b"")
+
+    # Skip empty channels
+    if not name or name == "\x00" * len(name):
+        return None
+
+    is_hashtag = name.startswith("#")
+    key_bytes = secret if isinstance(secret, bytes) else bytes(secret)
+    key_hex = key_bytes.hex().upper()
+
+    await ChannelRepository.upsert(
+        key=key_hex,
+        name=name,
+        is_hashtag=is_hashtag,
+        on_radio=on_radio,
+    )
+    return key_hex
+
+
 # Message poll task handle
 _message_poll_task: asyncio.Task | None = None
 
@@ -172,29 +199,15 @@ async def sync_and_offload_channels(mc: MeshCore) -> dict:
             if result.type != EventType.CHANNEL_INFO:
                 continue
 
-            payload = result.payload
-            name = payload.get("channel_name", "")
-            secret = payload.get("channel_secret", b"")
-
-            # Skip empty channels
-            if not name or name == "\x00" * len(name):
-                continue
-
-            is_hashtag = name.startswith("#")
-
-            # Convert key bytes to hex string
-            key_bytes = secret if isinstance(secret, bytes) else bytes(secret)
-            key_hex = key_bytes.hex().upper()
-
-            # Save to database
-            await ChannelRepository.upsert(
-                key=key_hex,
-                name=name,
-                is_hashtag=is_hashtag,
+            key_hex = await upsert_channel_from_radio_slot(
+                result.payload,
                 on_radio=False,  # We're about to clear it
             )
+            if key_hex is None:
+                continue
+
             synced += 1
-            logger.debug("Synced channel %s: %s", key_hex[:8], name)
+            logger.debug("Synced channel %s: %s", key_hex[:8], result.payload.get("channel_name"))
 
             # Clear from radio (set empty name and zero key)
             try:

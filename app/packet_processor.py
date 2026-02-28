@@ -28,7 +28,13 @@ from app.decoder import (
     try_decrypt_packet_with_channel_key,
 )
 from app.keystore import get_private_key, get_public_key, has_private_key
-from app.models import CONTACT_TYPE_REPEATER, RawPacketBroadcast, RawPacketDecryptedInfo
+from app.models import (
+    CONTACT_TYPE_REPEATER,
+    Message,
+    MessagePath,
+    RawPacketBroadcast,
+    RawPacketDecryptedInfo,
+)
 from app.repository import (
     ChannelRepository,
     ContactAdvertPathRepository,
@@ -187,24 +193,20 @@ async def create_message_from_decrypted(
 
     # Build paths array for broadcast
     # Use "is not None" to include empty string (direct/0-hop messages)
-    paths = [{"path": path or "", "received_at": received}] if path is not None else None
+    paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
     # Broadcast new message to connected clients
     broadcast_event(
         "message",
-        {
-            "id": msg_id,
-            "type": "CHAN",
-            "conversation_key": channel_key_normalized,
-            "text": text,
-            "sender_timestamp": timestamp,
-            "received_at": received,
-            "paths": paths,
-            "txt_type": 0,
-            "signature": None,
-            "outgoing": False,
-            "acked": 0,
-        },
+        Message(
+            id=msg_id,
+            type="CHAN",
+            conversation_key=channel_key_normalized,
+            text=text,
+            sender_timestamp=timestamp,
+            received_at=received,
+            paths=paths,
+        ).model_dump(),
     )
 
     # Run bot if enabled (for incoming channel messages, not historical decryption)
@@ -307,24 +309,21 @@ async def create_dm_message_from_decrypted(
     await RawPacketRepository.mark_decrypted(packet_id, msg_id)
 
     # Build paths array for broadcast
-    paths = [{"path": path or "", "received_at": received}] if path is not None else None
+    paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
     # Broadcast new message to connected clients
     broadcast_event(
         "message",
-        {
-            "id": msg_id,
-            "type": "PRIV",
-            "conversation_key": conversation_key,
-            "text": decrypted.message,
-            "sender_timestamp": decrypted.timestamp,
-            "received_at": received,
-            "paths": paths,
-            "txt_type": 0,
-            "signature": None,
-            "outgoing": outgoing,
-            "acked": 0,
-        },
+        Message(
+            id=msg_id,
+            type="PRIV",
+            conversation_key=conversation_key,
+            text=decrypted.message,
+            sender_timestamp=decrypted.timestamp,
+            received_at=received,
+            paths=paths,
+            outgoing=outgoing,
+        ).model_dump(),
     )
 
     # Update contact's last_contacted timestamp (for sorting)

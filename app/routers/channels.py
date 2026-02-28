@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.dependencies import require_connected
 from app.models import Channel
 from app.radio import radio_manager
+from app.radio_sync import upsert_channel_from_radio_slot
 from app.repository import ChannelRepository
 
 logger = logging.getLogger(__name__)
@@ -92,26 +93,12 @@ async def sync_channels_from_radio(max_channels: int = Query(default=40, ge=1, l
             result = await mc.commands.get_channel(idx)
 
             if result.type == EventType.CHANNEL_INFO:
-                payload = result.payload
-                name = payload.get("channel_name", "")
-                secret = payload.get("channel_secret", b"")
-
-                # Skip empty channels
-                if not name or name == "\x00" * len(name):
-                    continue
-
-                is_hashtag = name.startswith("#")
-                key_bytes = secret if isinstance(secret, bytes) else bytes(secret)
-                key_hex = key_bytes.hex().upper()
-
-                await ChannelRepository.upsert(
-                    key=key_hex,
-                    name=name,
-                    is_hashtag=is_hashtag,
-                    on_radio=True,
-                )
-                count += 1
-                logger.debug("Synced channel %s: %s", key_hex, name)
+                key_hex = await upsert_channel_from_radio_slot(result.payload, on_radio=True)
+                if key_hex is not None:
+                    count += 1
+                    logger.debug(
+                        "Synced channel %s: %s", key_hex, result.payload.get("channel_name")
+                    )
 
     logger.info("Synced %d channels from radio", count)
     return {"synced": count}

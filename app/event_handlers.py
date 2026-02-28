@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from meshcore import EventType
 
-from app.models import CONTACT_TYPE_REPEATER, Contact
+from app.models import CONTACT_TYPE_REPEATER, Contact, Message, MessagePath
 from app.packet_processor import process_raw_packet
 from app.repository import (
     AmbiguousPublicKeyPrefixError,
@@ -126,24 +126,22 @@ async def on_contact_message(event: "Event") -> None:
 
     # Build paths array for broadcast
     path = payload.get("path")
-    paths = [{"path": path or "", "received_at": received_at}] if path is not None else None
+    paths = [MessagePath(path=path or "", received_at=received_at)] if path is not None else None
 
     # Broadcast the new message
     broadcast_event(
         "message",
-        {
-            "id": msg_id,
-            "type": "PRIV",
-            "conversation_key": sender_pubkey,
-            "text": payload.get("text", ""),
-            "sender_timestamp": payload.get("sender_timestamp") or received_at,
-            "received_at": received_at,
-            "paths": paths,
-            "txt_type": txt_type,
-            "signature": payload.get("signature"),
-            "outgoing": False,
-            "acked": 0,
-        },
+        Message(
+            id=msg_id,
+            type="PRIV",
+            conversation_key=sender_pubkey,
+            text=payload.get("text", ""),
+            sender_timestamp=payload.get("sender_timestamp") or received_at,
+            received_at=received_at,
+            paths=paths,
+            txt_type=txt_type,
+            signature=payload.get("signature"),
+        ).model_dump(),
     )
 
     # Update contact last_contacted (contact was already fetched above)
