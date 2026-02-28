@@ -181,6 +181,8 @@ export function markAllRead(): Promise<{ status: string; timestamp: number }> {
 
 // --- Settings ---
 
+export type Favorite = { type: string; id: string };
+
 export interface BotConfig {
   id: string;
   name: string;
@@ -190,7 +192,7 @@ export interface BotConfig {
 
 export interface AppSettings {
   max_radio_contacts: number;
-  favorites: { type: string; id: string }[];
+  favorites: Favorite[];
   auto_decrypt_dm_on_advert: boolean;
   sidebar_sort_order: string;
   last_message_times: Record<string, number>;
@@ -241,4 +243,35 @@ export async function waitForRadioConnected(
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   throw new Error(`Radio did not reconnect within ${timeoutMs}ms`);
+}
+
+// --- Contacts sync ---
+
+export function syncContacts(): Promise<{ synced: number }> {
+  return fetchJson('/contacts/sync', { method: 'POST' });
+}
+
+// --- Packets / Historical decryption ---
+
+export function getUndecryptedCount(): Promise<{ count: number }> {
+  return fetchJson('/packets/undecrypted/count');
+}
+
+export interface DecryptResult {
+  started: boolean;
+  total_packets: number;
+  message: string;
+}
+
+export function decryptHistorical(params: {
+  key_type: 'channel' | 'contact';
+  channel_key?: string;
+  channel_name?: string;
+  private_key?: string;
+  contact_public_key?: string;
+}): Promise<DecryptResult> {
+  return fetchJson('/packets/decrypt/historical', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
 }

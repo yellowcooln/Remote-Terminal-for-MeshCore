@@ -78,6 +78,20 @@ def set_channel_last_read(key_hex: str, last_read: int | None):
     conn.commit()
 
 
+def inject_raw_packet(hex_data: str, payload_hash: str):
+    ts = int(time.time())
+    data_blob = bytes.fromhex(hex_data)
+    hash_blob = bytes.fromhex(payload_hash)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO raw_packets (timestamp, data, payload_hash)
+        VALUES (?, ?, ?)
+        """,
+        (ts, data_blob, hash_blob),
+    )
+    conn.commit()
+
+
 if payload['action'] == 'seed_channel':
     name = payload['name']
     key_hex = payload['key_hex']
@@ -102,6 +116,8 @@ elif payload['action'] == 'seed_unread':
             (key_hex, text, ts, ts),
         )
     set_channel_last_read(key_hex, now - 10_000)  # ensure unread
+elif payload['action'] == 'inject_raw_packet':
+    inject_raw_packet(payload['hex_data'], payload['payload_hash'])
 else:
     raise SystemExit('unknown action')
 
@@ -138,6 +154,92 @@ export function seedChannelMessages(options: SeedOptions) {
     },
   });
   return { key: keyHex };
+}
+
+interface EncryptedGroupTextOptions {
+  channelName: string; // e.g. "test" — will be prefixed with # if needed
+  senderName: string;
+  messageText: string;
+  timestamp?: number;
+}
+
+/**
+ * Build a raw MeshCore GROUP_TEXT packet encrypted with the channel key,
+ * matching the format expected by decoder.py `decrypt_group_text`.
+ *
+ * Packet layout:
+ *   header(1) + path_len(1) + payload
+ * Where payload = channel_hash(1) + mac(2) + ciphertext
+ *
+ * Header byte for FLOOD + GROUP_TEXT: route_type=0x01, payload_type=0x05 → (0x05 << 2) | 0x01 = 0x15
+ */
+function buildEncryptedGroupTextPacket(options: EncryptedGroupTextOptions): {
+  rawHex: string;
+  payloadHash: string;
+} {
+  const hashName = options.channelName.startsWith('#')
+    ? options.channelName
+    : `#${options.channelName}`;
+
+  // channel_key = SHA256("#name")[:16]
+  const channelKeyFull = crypto.createHash('sha256').update(hashName).digest();
+  const channelKey = channelKeyFull.subarray(0, 16);
+
+  // channel_hash = SHA256(channel_key)[0]
+  const channelHash = crypto.createHash('sha256').update(channelKey).digest()[0];
+
+  // Build plaintext: timestamp(4 LE) + flags(1) + "sender: message\0"
+  const ts = options.timestamp ?? Math.floor(Date.now() / 1000);
+  const tsBuf = Buffer.alloc(4);
+  tsBuf.writeUInt32LE(ts, 0);
+  const flagsBuf = Buffer.from([0x00]);
+  const textStr = `${options.senderName}: ${options.messageText}\0`;
+  const textBuf = Buffer.from(textStr, 'utf-8');
+
+  const plainLen = 4 + 1 + textBuf.length;
+  const paddedLen = Math.ceil(plainLen / 16) * 16;
+  const plaintext = Buffer.alloc(paddedLen, 0);
+  tsBuf.copy(plaintext, 0);
+  flagsBuf.copy(plaintext, 4);
+  textBuf.copy(plaintext, 5);
+
+  // Encrypt: AES-128-ECB
+  const cipher = crypto.createCipheriv('aes-128-ecb', channelKey, null);
+  cipher.setAutoPadding(false);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+
+  // MAC: HMAC-SHA256(channel_key + 16_zero_bytes, ciphertext)[:2]
+  const channelSecret = Buffer.concat([channelKey, Buffer.alloc(16, 0)]);
+  const mac = crypto.createHmac('sha256', channelSecret).update(ciphertext).digest().subarray(0, 2);
+
+  // Payload: channel_hash + mac + ciphertext
+  const payload = Buffer.concat([Buffer.from([channelHash]), mac, ciphertext]);
+
+  // Raw packet: header(0x15 = FLOOD + GROUP_TEXT) + path_len(0x00) + payload
+  const rawPacket = Buffer.concat([Buffer.from([0x15, 0x00]), payload]);
+
+  // payload_hash for dedup: SHA256 of the payload portion
+  const payloadHash = crypto.createHash('sha256').update(payload).digest().toString('hex');
+
+  return {
+    rawHex: rawPacket.toString('hex'),
+    payloadHash,
+  };
+}
+
+/**
+ * Build an encrypted GROUP_TEXT packet and inject it into the raw_packets table.
+ */
+export function injectEncryptedGroupText(options: EncryptedGroupTextOptions) {
+  const { rawHex, payloadHash } = buildEncryptedGroupTextPacket(options);
+  runPython({
+    action: 'inject_raw_packet',
+    root: ROOT,
+    db_path: DB_PATH,
+    hex_data: rawHex,
+    payload_hash: payloadHash,
+  });
+  return { rawHex, payloadHash };
 }
 
 export function seedChannelUnread(options: SeedReadStateOptions) {

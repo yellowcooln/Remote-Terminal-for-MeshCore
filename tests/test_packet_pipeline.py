@@ -2218,3 +2218,206 @@ class TestHistoricalDMDirectionDetection:
         mock_create.assert_awaited_once()
         call_kwargs = mock_create.call_args[1]
         assert call_kwargs["outgoing"] is False
+
+
+class TestHistoricalChannelDecryptIntegration:
+    """Integration test: store undecrypted packet → add hashtag room → historical decrypt.
+
+    Exercises the full flow with real AES encryption (no mocked decryption),
+    verifying that _run_historical_channel_decryption can recover messages
+    from raw packets stored before the channel key was known.
+    """
+
+    @staticmethod
+    def _build_group_text_packet(
+        channel_key: bytes, timestamp: int, sender: str, message: str
+    ) -> bytes:
+        """Build a complete raw FLOOD/GROUP_TEXT packet with real AES encryption.
+
+        Packet layout:
+          [header:1][path_length:1][payload...]
+        Header byte for FLOOD(1) + GROUP_TEXT(5) + version 0:
+          (0 << 6) | (5 << 2) | 1 = 0x15
+        """
+        import hashlib as _hashlib
+        import hmac as _hmac
+
+        from Crypto.Cipher import AES as _AES
+
+        # Build plaintext: timestamp(4 LE) + flags(1) + "sender: message\0" + padding
+        text = f"{sender}: {message}"
+        plaintext = (
+            timestamp.to_bytes(4, "little")
+            + b"\x00"  # flags
+            + text.encode("utf-8")
+            + b"\x00"  # null terminator
+        )
+        pad_len = (16 - len(plaintext) % 16) % 16
+        if pad_len == 0:
+            pad_len = 16
+        plaintext += bytes(pad_len)
+
+        # AES-128 ECB encrypt
+        ciphertext = _AES.new(channel_key, _AES.MODE_ECB).encrypt(plaintext)
+
+        # MAC: HMAC-SHA256(channel_secret, ciphertext)[:2]
+        channel_secret = channel_key + bytes(16)
+        mac = _hmac.new(channel_secret, ciphertext, _hashlib.sha256).digest()[:2]
+
+        # channel_hash: first byte of SHA256(key)
+        channel_hash = _hashlib.sha256(channel_key).digest()[0:1]
+
+        # Payload: channel_hash(1) + mac(2) + ciphertext
+        payload = channel_hash + mac + ciphertext
+
+        # Wrap in a FLOOD GROUP_TEXT packet: header=0x15, path_length=0
+        return bytes([0x15, 0x00]) + payload
+
+    @pytest.mark.asyncio
+    async def test_store_then_add_room_then_historical_decrypt(
+        self, test_db, captured_broadcasts
+    ):
+        """Full flow: packet arrives for unknown channel, channel added later, historical decrypt recovers the message."""
+        import hashlib as _hashlib
+
+        from app.packet_processor import process_raw_packet
+        from app.routers.packets import _run_historical_channel_decryption
+
+        channel_name = "#testroom"
+        channel_key = _hashlib.sha256(channel_name.encode()).digest()[:16]
+        channel_key_hex = channel_key.hex().upper()
+        timestamp = 1700000000
+        sender = "Alice"
+        message_text = "Hello from the past"
+
+        raw_packet = self._build_group_text_packet(channel_key, timestamp, sender, message_text)
+
+        # --- Step 1: packet arrives but channel is unknown → stored undecrypted ---
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            result = await process_raw_packet(raw_packet, timestamp=timestamp)
+
+        assert result is not None
+
+        # No message broadcast (channel unknown)
+        message_broadcasts = [b for b in broadcasts if b["type"] == "message"]
+        assert len(message_broadcasts) == 0
+
+        # Raw packet is in the undecrypted pool
+        undecrypted = await RawPacketRepository.get_all_undecrypted()
+        assert len(undecrypted) == 1
+        packet_id = undecrypted[0][0]
+
+        # --- Step 2: user adds the hashtag room ---
+        await ChannelRepository.upsert(
+            key=channel_key_hex, name=channel_name, is_hashtag=True
+        )
+
+        # --- Step 3: run historical channel decryption (real crypto, no mocks) ---
+        broadcasts.clear()
+
+        with patch("app.websocket.ws_manager") as mock_ws:
+            mock_ws.broadcast = AsyncMock()
+            await _run_historical_channel_decryption(
+                channel_key, channel_key_hex, channel_name
+            )
+
+        # --- Verify: message was created in DB ---
+        messages = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=channel_key_hex, limit=10
+        )
+        assert len(messages) == 1
+        msg = messages[0]
+        assert msg.text == f"{sender}: {message_text}"
+        assert msg.sender_timestamp == timestamp
+        assert msg.conversation_key == channel_key_hex
+
+        # --- Verify: raw packet is now marked as decrypted ---
+        undecrypted_after = await RawPacketRepository.get_all_undecrypted()
+        remaining_ids = [p[0] for p in undecrypted_after]
+        assert packet_id not in remaining_ids
+
+    @pytest.mark.asyncio
+    async def test_historical_decrypt_skips_wrong_channel(
+        self, test_db, captured_broadcasts
+    ):
+        """Historical decrypt with a different channel key does not decrypt the packet."""
+        import hashlib as _hashlib
+
+        from app.packet_processor import process_raw_packet
+        from app.routers.packets import _run_historical_channel_decryption
+
+        real_key = _hashlib.sha256(b"#real-room").digest()[:16]
+        wrong_key = _hashlib.sha256(b"#wrong-room").digest()[:16]
+        wrong_key_hex = wrong_key.hex().upper()
+
+        raw_packet = self._build_group_text_packet(real_key, 1700000000, "Bob", "Secret")
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            await process_raw_packet(raw_packet, timestamp=1700000000)
+
+        # Packet stored undecrypted
+        assert len(await RawPacketRepository.get_all_undecrypted()) == 1
+
+        # Run historical decrypt with the wrong key
+        with patch("app.websocket.ws_manager") as mock_ws:
+            mock_ws.broadcast = AsyncMock()
+            await _run_historical_channel_decryption(wrong_key, wrong_key_hex, "#wrong-room")
+
+        # No message created
+        messages = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=wrong_key_hex, limit=10
+        )
+        assert len(messages) == 0
+
+        # Packet still undecrypted
+        assert len(await RawPacketRepository.get_all_undecrypted()) == 1
+
+    @pytest.mark.asyncio
+    async def test_historical_decrypt_multiple_packets(
+        self, test_db, captured_broadcasts
+    ):
+        """Historical decrypt recovers multiple messages from different senders."""
+        import hashlib as _hashlib
+
+        from app.packet_processor import process_raw_packet
+        from app.routers.packets import _run_historical_channel_decryption
+
+        channel_name = "#multi"
+        channel_key = _hashlib.sha256(channel_name.encode()).digest()[:16]
+        channel_key_hex = channel_key.hex().upper()
+
+        packets = [
+            self._build_group_text_packet(channel_key, 1700000001, "Alice", "First message"),
+            self._build_group_text_packet(channel_key, 1700000002, "Bob", "Second message"),
+            self._build_group_text_packet(channel_key, 1700000003, "Carol", "Third message"),
+        ]
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        # Store all packets (channel unknown)
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            for pkt in packets:
+                await process_raw_packet(pkt, timestamp=1700000000)
+
+        assert len(await RawPacketRepository.get_all_undecrypted()) == 3
+
+        # Add channel, run historical decrypt
+        await ChannelRepository.upsert(key=channel_key_hex, name=channel_name, is_hashtag=True)
+
+        with patch("app.websocket.ws_manager") as mock_ws:
+            mock_ws.broadcast = AsyncMock()
+            await _run_historical_channel_decryption(channel_key, channel_key_hex, channel_name)
+
+        messages = await MessageRepository.get_all(
+            msg_type="CHAN", conversation_key=channel_key_hex, limit=10
+        )
+        assert len(messages) == 3
+        texts = sorted(m.text for m in messages)
+        assert texts == ["Alice: First message", "Bob: Second message", "Carol: Third message"]
+
+        # All packets now decrypted
+        assert len(await RawPacketRepository.get_all_undecrypted()) == 0

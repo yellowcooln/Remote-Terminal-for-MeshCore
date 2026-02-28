@@ -4,7 +4,7 @@ import { createChannel, getChannels, getMessages } from '../helpers/api';
 /**
  * These tests wait for real incoming messages from the mesh network.
  * They require a radio attached and other nodes actively transmitting.
- * Timeout is 10 minutes to allow for intermittent traffic.
+ * Timeout is 3 minutes to allow for intermittent traffic.
  */
 
 const ROOMS = [
@@ -34,9 +34,9 @@ const ROOMS = [
   '#vancouver', '#vashon', '#wardriving', '#wormhole', '#yelling', '#zork',
 ];
 
-// 10 minute timeout for waiting on mesh traffic
+// 3 minute timeout for waiting on mesh traffic
 test.describe('Incoming mesh messages', () => {
-  test.setTimeout(600_000);
+  test.setTimeout(180_000);
 
   test.beforeAll(async () => {
     // Ensure all rooms exist — create any that are missing
@@ -86,7 +86,7 @@ test.describe('Incoming mesh messages', () => {
         }
       }
       throw new Error('No new incoming messages yet');
-    }).toPass({ intervals: [5_000], timeout: 570_000 });
+    }).toPass({ intervals: [5_000], timeout: 160_000 });
 
     // Navigate to the channel that received a message
     console.log(`Received message in ${foundChannel}: "${foundMessageText}"`);
@@ -134,7 +134,7 @@ test.describe('Incoming mesh messages', () => {
         }
       }
       throw new Error('No new incoming messages with path data yet');
-    }).toPass({ intervals: [5_000], timeout: 570_000 });
+    }).toPass({ intervals: [5_000], timeout: 160_000 });
 
     console.log(`Found message with path in ${foundChannel}`);
 
