@@ -229,6 +229,9 @@ export function App() {
         });
       },
       onReconnect: () => {
+        // Clear raw packets: observation_id is a process-local counter that resets
+        // on backend restart, so stale packets would cause new ones to be deduped away.
+        setRawPackets([]);
         // Silently recover any data missed during the disconnect window
         triggerReconcile();
         refreshUnreads();
