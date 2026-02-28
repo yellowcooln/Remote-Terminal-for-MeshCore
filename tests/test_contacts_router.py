@@ -546,6 +546,94 @@ class TestSyncContacts:
         assert messages[0].conversation_key == KEY_A.lower()
 
 
+class TestCreateContactWithHistorical:
+    """Test POST /api/contacts with try_historical=true."""
+
+    @pytest.mark.asyncio
+    async def test_new_contact_triggers_historical_decrypt(self, test_db, client):
+        """Creating a new contact with try_historical triggers DM decryption."""
+        with patch(
+            "app.routers.contacts.start_historical_dm_decryption", new_callable=AsyncMock
+        ) as mock_start:
+            response = await client.post(
+                "/api/contacts",
+                json={"public_key": KEY_A, "name": "Alice", "try_historical": True},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["public_key"] == KEY_A
+
+        mock_start.assert_awaited_once()
+        # Verify correct args: (background_tasks, public_key, name)
+        call_args = mock_start.call_args
+        assert call_args[0][1] == KEY_A  # public_key
+        assert call_args[0][2] == "Alice"  # display_name
+
+    @pytest.mark.asyncio
+    async def test_new_contact_without_historical(self, test_db, client):
+        """Creating a new contact without try_historical does not trigger decryption."""
+        with patch(
+            "app.routers.contacts.start_historical_dm_decryption", new_callable=AsyncMock
+        ) as mock_start:
+            response = await client.post(
+                "/api/contacts",
+                json={"public_key": KEY_A, "name": "Alice", "try_historical": False},
+            )
+
+        assert response.status_code == 200
+        mock_start.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_existing_contact_with_historical(self, test_db, client):
+        """Existing contact with try_historical still triggers decryption."""
+        await _insert_contact(KEY_A, "Alice")
+
+        with patch(
+            "app.routers.contacts.start_historical_dm_decryption", new_callable=AsyncMock
+        ) as mock_start:
+            response = await client.post(
+                "/api/contacts",
+                json={"public_key": KEY_A, "name": "Alice", "try_historical": True},
+            )
+
+        assert response.status_code == 200
+        mock_start.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_existing_contact_updates_name_and_decrypts(self, test_db, client):
+        """Existing contact with try_historical updates name AND triggers decryption."""
+        await _insert_contact(KEY_A, "OldName")
+
+        with patch(
+            "app.routers.contacts.start_historical_dm_decryption", new_callable=AsyncMock
+        ) as mock_start:
+            response = await client.post(
+                "/api/contacts",
+                json={"public_key": KEY_A, "name": "NewName", "try_historical": True},
+            )
+
+        assert response.status_code == 200
+        mock_start.assert_awaited_once()
+
+        # Verify name was also updated
+        contact = await ContactRepository.get_by_key(KEY_A)
+        assert contact.name == "NewName"
+
+    @pytest.mark.asyncio
+    async def test_default_try_historical_is_false(self, test_db, client):
+        """try_historical defaults to false when not provided."""
+        with patch(
+            "app.routers.contacts.start_historical_dm_decryption", new_callable=AsyncMock
+        ) as mock_start:
+            response = await client.post(
+                "/api/contacts",
+                json={"public_key": KEY_A, "name": "Alice"},
+            )
+
+        assert response.status_code == 200
+        mock_start.assert_not_awaited()
+
+
 class TestAddRemoveRadio:
     """Test add-to-radio and remove-from-radio endpoints."""
 

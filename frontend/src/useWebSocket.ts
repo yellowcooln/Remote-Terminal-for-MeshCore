@@ -58,7 +58,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      // Connection established (or re-established after disconnect)
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
@@ -70,7 +70,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     };
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected');
+      // Connection lost — will auto-reconnect after delay
       wsRef.current = null;
 
       if (!shouldReconnectRef.current) {
@@ -82,7 +82,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       reconnectTimeoutRef.current = window.setTimeout(() => {
-        console.log('Attempting WebSocket reconnect...');
+        // Reconnect attempt after disconnect
         connect();
       }, 3000);
     };
@@ -129,7 +129,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
             // Heartbeat response, ignore
             break;
           default:
-            console.log('Unknown WebSocket message type:', msg.type);
+            console.warn('Unknown WebSocket message type:', msg.type);
         }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e);

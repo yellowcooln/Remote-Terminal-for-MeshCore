@@ -94,7 +94,7 @@ Access at http://localhost:8000
 
 > **Note:** BLE-in-docker is outside the scope of this README, but the env vars should all still work.
 
-Edit `docker-compose.yaml` to set a serial device for passthrough, or uncomment your transport (serial or TCP).Then:
+Edit `docker-compose.yaml` to set a serial device for passthrough, or uncomment your transport (serial or TCP). Then:
 
 ```bash
 docker compose up -d

@@ -890,3 +890,169 @@ class TestConcurrentDMDedup:
             msg_type="CHAN", conversation_key=CHANNEL_KEY, limit=10
         )
         assert len(messages) == 1
+
+
+class TestMessageAckedBroadcastShape:
+    """Verify that message_acked broadcasts from _handle_duplicate_message
+    match the frontend's MessageAckedEvent interface.
+
+    The on_ack handler (event_handlers.py) broadcasts {message_id, ack_count},
+    while _handle_duplicate_message broadcasts {message_id, ack_count, paths}.
+    Both must match what the frontend expects in useWebSocket.ts.
+    """
+
+    # Frontend MessageAckedEvent keys (from useWebSocket.ts:113-117)
+    # The 'paths' key is optional in the TypeScript interface
+    REQUIRED_KEYS = {"message_id", "ack_count"}
+    OPTIONAL_KEYS = {"paths"}
+
+    @pytest.mark.asyncio
+    async def test_outgoing_echo_broadcast_shape(self, test_db, captured_broadcasts):
+        """Outgoing echo broadcast has all required keys plus paths."""
+        from app.packet_processor import create_message_from_decrypted
+
+        msg_id = await MessageRepository.create(
+            msg_type="CHAN",
+            text="Sender: Shape test",
+            conversation_key=CHANNEL_KEY,
+            sender_timestamp=SENDER_TIMESTAMP,
+            received_at=SENDER_TIMESTAMP,
+            outgoing=True,
+        )
+
+        pkt_id, _ = await RawPacketRepository.create(b"shape_echo", SENDER_TIMESTAMP + 1)
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            await create_message_from_decrypted(
+                packet_id=pkt_id,
+                channel_key=CHANNEL_KEY,
+                sender="Sender",
+                message_text="Shape test",
+                timestamp=SENDER_TIMESTAMP,
+                received_at=SENDER_TIMESTAMP + 1,
+                path="aabb",
+            )
+
+        ack_broadcasts = [b for b in broadcasts if b["type"] == "message_acked"]
+        assert len(ack_broadcasts) == 1
+
+        payload = ack_broadcasts[0]["data"]
+        payload_keys = set(payload.keys())
+
+        # Must have all required keys
+        assert payload_keys >= self.REQUIRED_KEYS
+        # Must only have expected keys
+        assert payload_keys <= (self.REQUIRED_KEYS | self.OPTIONAL_KEYS)
+
+        # Verify types
+        assert isinstance(payload["message_id"], int)
+        assert isinstance(payload["ack_count"], int)
+        assert payload["message_id"] == msg_id
+        assert payload["ack_count"] == 1
+
+        # paths should be a list of dicts with path and received_at keys
+        assert isinstance(payload["paths"], list)
+        for p in payload["paths"]:
+            assert "path" in p
+            assert "received_at" in p
+
+    @pytest.mark.asyncio
+    async def test_incoming_echo_broadcast_shape(self, test_db, captured_broadcasts):
+        """Incoming echo broadcast (with path) has the correct shape."""
+        from app.packet_processor import create_message_from_decrypted
+
+        pkt1, _ = await RawPacketRepository.create(b"shape_inc_1", SENDER_TIMESTAMP)
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            await create_message_from_decrypted(
+                packet_id=pkt1,
+                channel_key=CHANNEL_KEY,
+                sender="Other",
+                message_text="Incoming shape",
+                timestamp=SENDER_TIMESTAMP,
+                received_at=SENDER_TIMESTAMP,
+                path="aa",
+            )
+
+        broadcasts.clear()
+
+        pkt2, _ = await RawPacketRepository.create(b"shape_inc_2", SENDER_TIMESTAMP + 1)
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            await create_message_from_decrypted(
+                packet_id=pkt2,
+                channel_key=CHANNEL_KEY,
+                sender="Other",
+                message_text="Incoming shape",
+                timestamp=SENDER_TIMESTAMP,
+                received_at=SENDER_TIMESTAMP + 1,
+                path="bbcc",
+            )
+
+        ack_broadcasts = [b for b in broadcasts if b["type"] == "message_acked"]
+        assert len(ack_broadcasts) == 1
+
+        payload = ack_broadcasts[0]["data"]
+        payload_keys = set(payload.keys())
+
+        assert payload_keys >= self.REQUIRED_KEYS
+        assert payload_keys <= (self.REQUIRED_KEYS | self.OPTIONAL_KEYS)
+        assert payload["ack_count"] == 0  # Not outgoing, no ack increment
+
+    @pytest.mark.asyncio
+    async def test_dm_echo_broadcast_shape(self, test_db, captured_broadcasts):
+        """DM duplicate broadcast has the same shape as channel echo."""
+        from app.packet_processor import create_dm_message_from_decrypted
+
+        pkt1, _ = await RawPacketRepository.create(b"dm_shape_1", SENDER_TIMESTAMP)
+        decrypted = DecryptedDirectMessage(
+            timestamp=SENDER_TIMESTAMP,
+            flags=0,
+            message="DM shape test",
+            dest_hash="fa",
+            src_hash="a1",
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            msg_id = await create_dm_message_from_decrypted(
+                packet_id=pkt1,
+                decrypted=decrypted,
+                their_public_key=CONTACT_PUB,
+                our_public_key=OUR_PUB,
+                received_at=SENDER_TIMESTAMP,
+                outgoing=True,
+                path="aabb",
+            )
+
+        assert msg_id is not None
+        broadcasts.clear()
+
+        pkt2, _ = await RawPacketRepository.create(b"dm_shape_2", SENDER_TIMESTAMP + 1)
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            await create_dm_message_from_decrypted(
+                packet_id=pkt2,
+                decrypted=decrypted,
+                their_public_key=CONTACT_PUB,
+                our_public_key=OUR_PUB,
+                received_at=SENDER_TIMESTAMP + 1,
+                outgoing=True,
+                path="ccddee",
+            )
+
+        ack_broadcasts = [b for b in broadcasts if b["type"] == "message_acked"]
+        assert len(ack_broadcasts) == 1
+
+        payload = ack_broadcasts[0]["data"]
+        payload_keys = set(payload.keys())
+
+        assert payload_keys >= self.REQUIRED_KEYS
+        assert payload_keys <= (self.REQUIRED_KEYS | self.OPTIONAL_KEYS)
+        assert isinstance(payload["message_id"], int)
+        assert isinstance(payload["ack_count"], int)
+        assert payload["ack_count"] == 1  # Outgoing DM echo increments ack

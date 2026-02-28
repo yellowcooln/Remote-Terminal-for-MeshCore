@@ -123,8 +123,8 @@ To improve repeater disambiguation in the network visualizer, the backend stores
 
 ### Incoming Messages
 
-1. Radio receives message → MeshCore library emits event
-2. `event_handlers.py` catches event → stores in database
+1. Radio receives raw bytes → `packet_processor.py` parses, decrypts, deduplicates, and stores in database (primary path via `RX_LOG_DATA` event)
+2. `event_handlers.py` handles higher-level events (`CONTACT_MSG_RECV`, `ACK`) as a fallback/supplement
 3. `ws_manager` broadcasts to connected clients
 4. Frontend `useWebSocket` receives → updates React state
 
@@ -270,25 +270,25 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/radio/reconnect` | Manual radio reconnection |
 | GET | `/api/contacts` | List contacts |
 | GET | `/api/contacts/repeaters/advert-paths` | List recent unique advert paths for all contacts |
-| GET | `/api/contacts/{key}` | Get contact by public key or prefix |
-| GET | `/api/contacts/{key}/detail` | Comprehensive contact profile (stats, name history, paths) |
-| GET | `/api/contacts/{key}/advert-paths` | List recent unique advert paths for a contact |
+| GET | `/api/contacts/{public_key}` | Get contact by public key or prefix |
+| GET | `/api/contacts/{public_key}/detail` | Comprehensive contact profile (stats, name history, paths) |
+| GET | `/api/contacts/{public_key}/advert-paths` | List recent unique advert paths for a contact |
 | POST | `/api/contacts` | Create contact (optionally trigger historical DM decrypt) |
-| DELETE | `/api/contacts/{key}` | Delete contact |
+| DELETE | `/api/contacts/{public_key}` | Delete contact |
 | POST | `/api/contacts/sync` | Pull from radio |
-| POST | `/api/contacts/{key}/add-to-radio` | Push contact to radio |
-| POST | `/api/contacts/{key}/remove-from-radio` | Remove contact from radio |
-| POST | `/api/contacts/{key}/mark-read` | Mark contact conversation as read |
-| POST | `/api/contacts/{key}/command` | Send CLI command to repeater |
-| POST | `/api/contacts/{key}/trace` | Trace route to contact |
-| POST | `/api/contacts/{key}/repeater/login` | Log in to a repeater |
-| POST | `/api/contacts/{key}/repeater/status` | Fetch repeater status telemetry |
-| POST | `/api/contacts/{key}/repeater/lpp-telemetry` | Fetch CayenneLPP sensor data |
-| POST | `/api/contacts/{key}/repeater/neighbors` | Fetch repeater neighbors |
-| POST | `/api/contacts/{key}/repeater/acl` | Fetch repeater ACL |
-| POST | `/api/contacts/{key}/repeater/radio-settings` | Fetch radio settings via CLI |
-| POST | `/api/contacts/{key}/repeater/advert-intervals` | Fetch advert intervals |
-| POST | `/api/contacts/{key}/repeater/owner-info` | Fetch owner info |
+| POST | `/api/contacts/{public_key}/add-to-radio` | Push contact to radio |
+| POST | `/api/contacts/{public_key}/remove-from-radio` | Remove contact from radio |
+| POST | `/api/contacts/{public_key}/mark-read` | Mark contact conversation as read |
+| POST | `/api/contacts/{public_key}/command` | Send CLI command to repeater |
+| POST | `/api/contacts/{public_key}/trace` | Trace route to contact |
+| POST | `/api/contacts/{public_key}/repeater/login` | Log in to a repeater |
+| POST | `/api/contacts/{public_key}/repeater/status` | Fetch repeater status telemetry |
+| POST | `/api/contacts/{public_key}/repeater/lpp-telemetry` | Fetch CayenneLPP sensor data |
+| POST | `/api/contacts/{public_key}/repeater/neighbors` | Fetch repeater neighbors |
+| POST | `/api/contacts/{public_key}/repeater/acl` | Fetch repeater ACL |
+| POST | `/api/contacts/{public_key}/repeater/radio-settings` | Fetch radio settings via CLI |
+| POST | `/api/contacts/{public_key}/repeater/advert-intervals` | Fetch advert intervals |
+| POST | `/api/contacts/{public_key}/repeater/owner-info` | Fetch owner info |
 
 | GET | `/api/channels` | List channels |
 | GET | `/api/channels/{key}` | Get channel by key |
@@ -343,7 +343,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 
 Read state (`last_read_at`) is tracked **server-side** for consistency across devices:
 - Stored as Unix timestamp in `contacts.last_read_at` and `channels.last_read_at`
-- Updated via `POST /api/contacts/{key}/mark-read` and `POST /api/channels/{key}/mark-read`
+- Updated via `POST /api/contacts/{public_key}/mark-read` and `POST /api/channels/{key}/mark-read`
 - Bulk update via `POST /api/read-state/mark-all-read`
 - Aggregated counts via `GET /api/read-state/unreads` (server-side computation)
 

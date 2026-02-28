@@ -388,6 +388,55 @@ class TestAdvertisementPipeline:
         assert contact.last_path_len == 1  # Still the shorter path
 
     @pytest.mark.asyncio
+    async def test_advertisement_default_path_len_treated_as_infinity(
+        self, test_db, captured_broadcasts
+    ):
+        """Contact with last_path_len=-1 (unset) is treated as infinite length.
+
+        Any new advertisement should replace the default -1 path since
+        the code converts -1 to float('inf') for comparison.
+        """
+        from app.packet_processor import _process_advertisement
+
+        test_pubkey = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        await ContactRepository.upsert(
+            {
+                "public_key": test_pubkey,
+                "name": "TestNode",
+                "type": 1,
+                "last_seen": 1000,
+                "last_path_len": -1,  # Default unset value
+                "last_path": None,
+            }
+        )
+
+        from app.decoder import ParsedAdvertisement
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        packet_info = MagicMock()
+        packet_info.path_length = 3
+        packet_info.path = bytes.fromhex("aabbcc")
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            with patch("app.packet_processor.parse_advertisement") as mock_parse:
+                mock_parse.return_value = ParsedAdvertisement(
+                    public_key=test_pubkey,
+                    name="TestNode",
+                    timestamp=1050,
+                    lat=None,
+                    lon=None,
+                    device_role=1,
+                )
+                # Process within 60s window (last_seen=1000, now=1050)
+                await _process_advertisement(b"", timestamp=1050, packet_info=packet_info)
+
+        # Since -1 is treated as infinity, the new path (len=3) should replace it
+        contact = await ContactRepository.get_by_key(test_pubkey)
+        assert contact.last_path_len == 3
+        assert contact.last_path == "aabbcc"
+
+    @pytest.mark.asyncio
     async def test_advertisement_replaces_stale_path_outside_window(
         self, test_db, captured_broadcasts
     ):

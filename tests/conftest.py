@@ -20,17 +20,3 @@ def cleanup_test_db_dir():
     """Clean up temporary pytest DB directory after the test session."""
     yield
     shutil.rmtree(_TEST_DB_DIR, ignore_errors=True)
-
-
-@pytest.fixture
-def sample_channel_key():
-    """A sample 16-byte channel key for testing."""
-    return bytes.fromhex("0123456789abcdef0123456789abcdef")
-
-
-@pytest.fixture
-def sample_hashtag_key():
-    """A channel key derived from hashtag name '#test'."""
-    import hashlib
-
-    return hashlib.sha256(b"#test").digest()[:16]
