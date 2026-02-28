@@ -4,26 +4,7 @@ import time
 
 import pytest
 
-from app.database import Database
 from app.repository import StatisticsRepository
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with the module-level db swapped in."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
 
 
 class TestStatisticsEmpty:

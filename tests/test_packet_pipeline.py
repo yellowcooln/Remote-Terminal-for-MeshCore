@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.database import Database
 from app.decoder import DecryptedDirectMessage, PacketInfo, ParsedAdvertisement, PayloadType
 from app.repository import (
     ChannelRepository,
@@ -26,41 +25,6 @@ from app.repository import (
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "websocket_events.json"
 with open(FIXTURES_PATH) as f:
     FIXTURES = json.load(f)
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database.
-
-    We need to patch the db module-level variable before any repository
-    methods are called, so they use our test database.
-    """
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    # Store original and patch the module attribute directly
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
-
-
-@pytest.fixture
-def captured_broadcasts():
-    """Capture WebSocket broadcasts for verification."""
-    broadcasts = []
-
-    def mock_broadcast(event_type: str, data: dict):
-        """Synchronous mock that captures broadcasts."""
-        broadcasts.append({"type": event_type, "data": data})
-
-    return broadcasts, mock_broadcast
 
 
 class TestChannelMessagePipeline:

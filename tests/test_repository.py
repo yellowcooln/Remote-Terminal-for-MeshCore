@@ -4,31 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.database import Database
 from app.repository import (
     ContactAdvertPathRepository,
     ContactNameHistoryRepository,
     ContactRepository,
     MessageRepository,
 )
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with the module-level db swapped in."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
 
 
 async def _create_message(test_db, **overrides) -> int:
@@ -90,7 +71,7 @@ class TestMessageRepositoryAddPath:
         """Adding a path without received_at uses current timestamp."""
         msg_id = await _create_message(test_db)
 
-        with patch("app.repository.time") as mock_time:
+        with patch("app.repository.messages.time") as mock_time:
             mock_time.time.return_value = 1700000500.5
             result = await MessageRepository.add_path(message_id=msg_id, path="1A2B")
 
@@ -518,7 +499,7 @@ class TestAppSettingsRepository:
         mock_db = MagicMock()
         mock_db.conn = mock_conn
 
-        with patch("app.repository.db", mock_db):
+        with patch("app.repository.settings.db", mock_db):
             from app.repository import AppSettingsRepository
 
             settings = await AppSettingsRepository.get()

@@ -3,7 +3,6 @@
 import pytest
 from fastapi import HTTPException
 
-from app.database import Database
 from app.models import AppSettings, BotConfig
 from app.repository import AppSettingsRepository
 from app.routers.settings import (
@@ -14,24 +13,6 @@ from app.routers.settings import (
     toggle_favorite,
     update_settings,
 )
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with schema + migrations."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
 
 
 class TestUpdateSettings:

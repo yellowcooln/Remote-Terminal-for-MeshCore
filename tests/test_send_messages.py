@@ -8,7 +8,6 @@ import pytest
 from fastapi import HTTPException
 from meshcore import EventType
 
-from app.database import Database
 from app.models import (
     SendChannelMessageRequest,
     SendDirectMessageRequest,
@@ -34,24 +33,6 @@ def _reset_radio_state():
     yield
     radio_manager._meshcore = prev
     radio_manager._operation_lock = prev_lock
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with schema + migrations."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
 
 
 def _make_radio_result(payload=None):

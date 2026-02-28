@@ -7,45 +7,9 @@ undecrypted count endpoint, and the maintenance endpoint.
 import time
 from unittest.mock import patch
 
-import httpx
 import pytest
 
-from app.database import Database
 from app.repository import ChannelRepository, MessageRepository, RawPacketRepository
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with schema + migrations."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    # Also patch the db reference used by the packets router for VACUUM
-    import app.routers.packets as packets_module
-
-    original_packets_db = packets_module.db
-    packets_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        packets_module.db = original_packets_db
-        await db.disconnect()
-
-
-@pytest.fixture
-def client():
-    """Create an httpx AsyncClient for testing the app."""
-    from app.main import app
-
-    transport = httpx.ASGITransport(app=app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
 async def _insert_raw_packets(count: int, decrypted: bool = False, age_days: int = 0) -> list[int]:

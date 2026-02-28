@@ -23,6 +23,7 @@ from app.routers import (
     packets,
     radio,
     read_state,
+    repeaters,
     settings,
     statistics,
     ws,
@@ -106,6 +107,7 @@ async def radio_disconnected_handler(request: Request, exc: RadioDisconnectedErr
 app.include_router(health.router, prefix="/api")
 app.include_router(radio.router, prefix="/api")
 app.include_router(contacts.router, prefix="/api")
+app.include_router(repeaters.router, prefix="/api")
 app.include_router(channels.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(packets.router, prefix="/api")

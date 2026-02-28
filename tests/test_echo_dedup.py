@@ -11,43 +11,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.database import Database
 from app.decoder import DecryptedDirectMessage
 from app.repository import (
     ContactRepository,
     MessageRepository,
     RawPacketRepository,
 )
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
-
-
-@pytest.fixture
-def captured_broadcasts():
-    """Capture WebSocket broadcasts for verification."""
-    broadcasts = []
-
-    def mock_broadcast(event_type: str, data: dict):
-        broadcasts.append({"type": event_type, "data": data})
-
-    return broadcasts, mock_broadcast
-
 
 # Shared test constants
 CHANNEL_KEY = "ABC123DEF456ABC123DEF456ABC12345"

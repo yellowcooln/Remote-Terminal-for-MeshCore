@@ -7,31 +7,11 @@ from the radio and upserts them into the database.
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 from meshcore import EventType
 
-from app.database import Database
 from app.radio import radio_manager
 from app.repository import ChannelRepository
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with schema + migrations."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
 
 
 @pytest.fixture(autouse=True)
@@ -42,15 +22,6 @@ def _reset_radio_state():
     yield
     radio_manager._meshcore = prev
     radio_manager._operation_lock = prev_lock
-
-
-@pytest.fixture
-def client():
-    """Create an httpx AsyncClient for testing the app."""
-    from app.main import app
-
-    transport = httpx.ASGITransport(app=app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
 def _make_channel_info(name: str, secret: bytes):

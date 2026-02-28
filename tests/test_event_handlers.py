@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.database import Database
 from app.event_handlers import (
     _active_subscriptions,
     _pending_acks,
@@ -21,24 +20,6 @@ from app.repository import (
     ContactRepository,
     MessageRepository,
 )
-
-
-@pytest.fixture
-async def test_db():
-    """Create an in-memory test database with schema + migrations."""
-    import app.repository as repo_module
-
-    db = Database(":memory:")
-    await db.connect()
-
-    original_db = repo_module.db
-    repo_module.db = db
-
-    try:
-        yield db
-    finally:
-        repo_module.db = original_db
-        await db.disconnect()
 
 
 @pytest.fixture(autouse=True)
