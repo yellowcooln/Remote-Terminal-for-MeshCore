@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   type FormEvent,
+  type ReactNode,
   lazy,
   Suspense,
 } from 'react';
@@ -33,6 +34,7 @@ import type {
   NeighborInfo,
 } from '../types';
 import { isValidLocation, calculateDistance, formatDistance } from '../utils/pathUtils';
+import { getMapFocusHash } from '../utils/urlHash';
 
 // Lazy-load the entire mini-map file so react-leaflet imports are bundled together
 // and MapContainer only mounts once (avoids "already initialized" crash).
@@ -838,11 +840,57 @@ export function RepeaterDashboard({
           >
             {conversation.id}
           </span>
-          {contact?.last_seen && (
-            <span className="font-normal text-sm text-muted-foreground flex-shrink-0">
-              (Last heard: {formatTime(contact.last_seen)})
-            </span>
-          )}
+          {contact &&
+            (() => {
+              const parts: ReactNode[] = [];
+              if (contact.last_seen) {
+                parts.push(`Last heard: ${formatTime(contact.last_seen)}`);
+              }
+              if (contact.last_path_len === -1) {
+                parts.push('flood');
+              } else if (contact.last_path_len === 0) {
+                parts.push('direct');
+              } else if (contact.last_path_len > 0) {
+                parts.push(`${contact.last_path_len} hop${contact.last_path_len > 1 ? 's' : ''}`);
+              }
+              if (isValidLocation(contact.lat, contact.lon)) {
+                const distFromUs =
+                  radioLat != null && radioLon != null && isValidLocation(radioLat, radioLon)
+                    ? calculateDistance(radioLat, radioLon, contact.lat, contact.lon)
+                    : null;
+                parts.push(
+                  <span key="coords">
+                    <span
+                      className="font-mono cursor-pointer hover:text-primary hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const url =
+                          window.location.origin +
+                          window.location.pathname +
+                          getMapFocusHash(contact.public_key);
+                        window.open(url, '_blank');
+                      }}
+                      title="View on map"
+                    >
+                      {contact.lat!.toFixed(3)}, {contact.lon!.toFixed(3)}
+                    </span>
+                    {distFromUs !== null && ` (${formatDistance(distFromUs)})`}
+                  </span>
+                );
+              }
+              return parts.length > 0 ? (
+                <span className="font-normal text-sm text-muted-foreground flex-shrink-0">
+                  (
+                  {parts.map((part, i) => (
+                    <span key={i}>
+                      {i > 0 && ', '}
+                      {part}
+                    </span>
+                  ))}
+                  )
+                </span>
+              ) : null;
+            })()}
         </span>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {loggedIn && (
