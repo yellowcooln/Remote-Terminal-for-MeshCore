@@ -429,3 +429,31 @@ async def request_trace(public_key: str) -> TraceResponse:
     )
 
     return TraceResponse(remote_snr=remote_snr, local_snr=local_snr, path_len=path_len)
+
+
+@router.post("/{public_key}/reset-path")
+async def reset_contact_path(public_key: str) -> dict:
+    """Reset a contact's routing path to flood."""
+    contact = await _resolve_contact_or_404(public_key)
+
+    await ContactRepository.update_path(contact.public_key, "", -1)
+    logger.info("Reset path to flood for %s", contact.public_key[:12])
+
+    # Push the updated path to radio if connected and contact is on radio
+    if radio_manager.is_connected and contact.on_radio:
+        try:
+            updated = await ContactRepository.get_by_key(contact.public_key)
+            if updated:
+                async with radio_manager.radio_operation("reset_path_on_radio") as mc:
+                    await mc.commands.add_contact(updated.to_radio_dict())
+        except Exception:
+            logger.warning("Failed to push flood path to radio for %s", contact.public_key[:12])
+
+    # Broadcast updated contact so frontend refreshes
+    from app.websocket import broadcast_event
+
+    updated_contact = await ContactRepository.get_by_key(contact.public_key)
+    if updated_contact:
+        broadcast_event("contact", updated_contact.model_dump())
+
+    return {"status": "ok", "public_key": contact.public_key}

@@ -605,6 +605,78 @@ class TestCreateContactWithHistorical:
         mock_start.assert_not_awaited()
 
 
+class TestResetPath:
+    """Test POST /api/contacts/{public_key}/reset-path."""
+
+    @pytest.mark.asyncio
+    async def test_reset_path_to_flood(self, test_db, client):
+        """Happy path: resets path to flood and returns ok."""
+        await _insert_contact(KEY_A, last_path="1122", last_path_len=1)
+
+        with (
+            patch("app.routers.contacts.radio_manager") as mock_rm,
+            patch("app.websocket.broadcast_event"),
+        ):
+            mock_rm.is_connected = False
+            response = await client.post(f"/api/contacts/{KEY_A}/reset-path")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["public_key"] == KEY_A
+
+        # Verify path was reset in DB
+        contact = await ContactRepository.get_by_key(KEY_A)
+        assert contact.last_path == ""
+        assert contact.last_path_len == -1
+
+    @pytest.mark.asyncio
+    async def test_reset_path_not_found(self, test_db, client):
+        response = await client.post(f"/api/contacts/{KEY_A}/reset-path")
+
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_reset_path_pushes_to_radio(self, test_db, client):
+        """When radio connected and contact on_radio, pushes updated path."""
+        await _insert_contact(KEY_A, on_radio=True, last_path="1122", last_path_len=1)
+
+        mock_mc = MagicMock()
+        mock_result = MagicMock()
+        mock_result.type = EventType.OK
+        mock_mc.commands.add_contact = AsyncMock(return_value=mock_result)
+
+        with (
+            patch("app.routers.contacts.radio_manager") as mock_rm,
+            patch("app.websocket.broadcast_event"),
+        ):
+            mock_rm.is_connected = True
+            mock_rm.radio_operation = _noop_radio_operation(mock_mc)
+            response = await client.post(f"/api/contacts/{KEY_A}/reset-path")
+
+        assert response.status_code == 200
+        mock_mc.commands.add_contact.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reset_path_broadcasts_websocket_event(self, test_db, client):
+        """After resetting, broadcasts updated contact via WebSocket."""
+        await _insert_contact(KEY_A, last_path="1122", last_path_len=1)
+
+        with (
+            patch("app.routers.contacts.radio_manager") as mock_rm,
+            patch("app.websocket.broadcast_event") as mock_broadcast,
+        ):
+            mock_rm.is_connected = False
+            response = await client.post(f"/api/contacts/{KEY_A}/reset-path")
+
+        assert response.status_code == 200
+        mock_broadcast.assert_called_once()
+        event_type, event_data = mock_broadcast.call_args[0]
+        assert event_type == "contact"
+        assert event_data["public_key"] == KEY_A
+        assert event_data["last_path_len"] == -1
+
+
 class TestAddRemoveRadio:
     """Test add-to-radio and remove-from-radio endpoints."""
 

@@ -134,6 +134,10 @@ export const api = {
     fetchJson<TraceResponse>(`/contacts/${publicKey}/trace`, {
       method: 'POST',
     }),
+  resetContactPath: (publicKey: string) =>
+    fetchJson<{ status: string; public_key: string }>(`/contacts/${publicKey}/reset-path`, {
+      method: 'POST',
+    }),
 
   // Channels
   getChannels: () => fetchJson<Channel[]>('/channels'),

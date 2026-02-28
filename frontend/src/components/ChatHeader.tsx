@@ -1,5 +1,6 @@
 import type React from 'react';
 import { toast } from './ui/sonner';
+import { api } from '../api';
 import { formatTime } from '../utils/messageParser';
 import { isValidLocation, calculateDistance, formatDistance } from '../utils/pathUtils';
 import { getMapFocusHash } from '../utils/urlHash';
@@ -87,9 +88,43 @@ export function ChatHeader({
             if (contact.last_path_len === -1) {
               parts.push('flood');
             } else if (contact.last_path_len === 0) {
-              parts.push('direct');
+              parts.push(
+                <span
+                  key="path"
+                  className="cursor-pointer hover:text-primary hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Reset path to flood?')) {
+                      api.resetContactPath(contact.public_key).then(
+                        () => toast.success('Path reset to flood'),
+                        () => toast.error('Failed to reset path')
+                      );
+                    }
+                  }}
+                  title="Click to reset path to flood"
+                >
+                  direct
+                </span>
+              );
             } else if (contact.last_path_len > 0) {
-              parts.push(`${contact.last_path_len} hop${contact.last_path_len > 1 ? 's' : ''}`);
+              parts.push(
+                <span
+                  key="path"
+                  className="cursor-pointer hover:text-primary hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Reset path to flood?')) {
+                      api.resetContactPath(contact.public_key).then(
+                        () => toast.success('Path reset to flood'),
+                        () => toast.error('Failed to reset path')
+                      );
+                    }
+                  }}
+                  title="Click to reset path to flood"
+                >
+                  {contact.last_path_len} hop{contact.last_path_len > 1 ? 's' : ''}
+                </span>
+              );
             }
             if (isValidLocation(contact.lat, contact.lon)) {
               const distFromUs =

@@ -268,4 +268,105 @@ describe('RepeaterDashboard', () => {
 
     expect(screen.getByText('Type a CLI command below...')).toBeInTheDocument();
   });
+
+  describe('path type display and reset', () => {
+    it('shows flood when last_path_len is -1', () => {
+      render(<RepeaterDashboard {...defaultProps} />);
+
+      expect(screen.getByText('flood')).toBeInTheDocument();
+    });
+
+    it('shows direct when last_path_len is 0', () => {
+      const directContacts: Contact[] = [
+        { ...contacts[0], last_path_len: 0, last_seen: 1700000000 },
+      ];
+
+      render(<RepeaterDashboard {...defaultProps} contacts={directContacts} />);
+
+      expect(screen.getByText('direct')).toBeInTheDocument();
+    });
+
+    it('shows N hops when last_path_len > 0', () => {
+      const hoppedContacts: Contact[] = [
+        { ...contacts[0], last_path_len: 3, last_seen: 1700000000 },
+      ];
+
+      render(<RepeaterDashboard {...defaultProps} contacts={hoppedContacts} />);
+
+      expect(screen.getByText('3 hops')).toBeInTheDocument();
+    });
+
+    it('shows 1 hop (singular) for single hop', () => {
+      const oneHopContacts: Contact[] = [
+        { ...contacts[0], last_path_len: 1, last_seen: 1700000000 },
+      ];
+
+      render(<RepeaterDashboard {...defaultProps} contacts={oneHopContacts} />);
+
+      expect(screen.getByText('1 hop')).toBeInTheDocument();
+    });
+
+    it('direct path is clickable with reset title', () => {
+      const directContacts: Contact[] = [
+        { ...contacts[0], last_path_len: 0, last_seen: 1700000000 },
+      ];
+
+      render(<RepeaterDashboard {...defaultProps} contacts={directContacts} />);
+
+      const directEl = screen.getByTitle('Click to reset path to flood');
+      expect(directEl).toBeInTheDocument();
+      expect(directEl.textContent).toBe('direct');
+    });
+
+    it('clicking direct path calls resetContactPath on confirm', async () => {
+      const directContacts: Contact[] = [
+        { ...contacts[0], last_path_len: 0, last_seen: 1700000000 },
+      ];
+
+      // Mock window.confirm to return true
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      // Mock the api module
+      const { api } = await import('../api');
+      const resetSpy = vi.spyOn(api, 'resetContactPath').mockResolvedValue({
+        status: 'ok',
+        public_key: REPEATER_KEY,
+      });
+
+      render(<RepeaterDashboard {...defaultProps} contacts={directContacts} />);
+
+      fireEvent.click(screen.getByTitle('Click to reset path to flood'));
+
+      expect(confirmSpy).toHaveBeenCalledWith('Reset path to flood?');
+      expect(resetSpy).toHaveBeenCalledWith(REPEATER_KEY);
+
+      confirmSpy.mockRestore();
+      resetSpy.mockRestore();
+    });
+
+    it('clicking path does not call API when confirm is cancelled', async () => {
+      const directContacts: Contact[] = [
+        { ...contacts[0], last_path_len: 0, last_seen: 1700000000 },
+      ];
+
+      // Mock window.confirm to return false
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      const { api } = await import('../api');
+      const resetSpy = vi.spyOn(api, 'resetContactPath').mockResolvedValue({
+        status: 'ok',
+        public_key: REPEATER_KEY,
+      });
+
+      render(<RepeaterDashboard {...defaultProps} contacts={directContacts} />);
+
+      fireEvent.click(screen.getByTitle('Click to reset path to flood'));
+
+      expect(confirmSpy).toHaveBeenCalledWith('Reset path to flood?');
+      expect(resetSpy).not.toHaveBeenCalled();
+
+      confirmSpy.mockRestore();
+      resetSpy.mockRestore();
+    });
+  });
 });
