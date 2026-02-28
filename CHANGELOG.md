@@ -1,3 +1,19 @@
+## [2.2.0] - 2026-02-28
+
+Feature: Track advert paths and use to disambiguate repeater identity in visualizer
+Feature: Contact info pane
+Feature: Overhaul repeater interface
+Bugfix: Misc. frontend rendering + perf improvements
+Bugfix: Better behavior around radio locking and autofetch/polling
+Bugifx: Clear channel name field on new-channel modal tab change
+Bugfix: Repeater inforbox can scroll
+Bugfix: Better handling of historical DM encrypts
+Bugfix: Handle errors if returned in prefetch phase
+Misc: Radio event response failure is logged/surfaced better
+Misc: Improve test coverage and remove dead code
+Misc: Documentatin and errata improvements
+Misc: Databse storage optimization
+
 ## [2.1.0] - 2026-02-23
 
 Feature: Add ability to remember last-used channel on load

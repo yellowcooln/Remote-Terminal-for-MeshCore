@@ -2274,9 +2274,7 @@ class TestHistoricalChannelDecryptIntegration:
         return bytes([0x15, 0x00]) + payload
 
     @pytest.mark.asyncio
-    async def test_store_then_add_room_then_historical_decrypt(
-        self, test_db, captured_broadcasts
-    ):
+    async def test_store_then_add_room_then_historical_decrypt(self, test_db, captured_broadcasts):
         """Full flow: packet arrives for unknown channel, channel added later, historical decrypt recovers the message."""
         import hashlib as _hashlib
 
@@ -2310,18 +2308,14 @@ class TestHistoricalChannelDecryptIntegration:
         packet_id = undecrypted[0][0]
 
         # --- Step 2: user adds the hashtag room ---
-        await ChannelRepository.upsert(
-            key=channel_key_hex, name=channel_name, is_hashtag=True
-        )
+        await ChannelRepository.upsert(key=channel_key_hex, name=channel_name, is_hashtag=True)
 
         # --- Step 3: run historical channel decryption (real crypto, no mocks) ---
         broadcasts.clear()
 
         with patch("app.websocket.ws_manager") as mock_ws:
             mock_ws.broadcast = AsyncMock()
-            await _run_historical_channel_decryption(
-                channel_key, channel_key_hex, channel_name
-            )
+            await _run_historical_channel_decryption(channel_key, channel_key_hex, channel_name)
 
         # --- Verify: message was created in DB ---
         messages = await MessageRepository.get_all(
@@ -2339,9 +2333,7 @@ class TestHistoricalChannelDecryptIntegration:
         assert packet_id not in remaining_ids
 
     @pytest.mark.asyncio
-    async def test_historical_decrypt_skips_wrong_channel(
-        self, test_db, captured_broadcasts
-    ):
+    async def test_historical_decrypt_skips_wrong_channel(self, test_db, captured_broadcasts):
         """Historical decrypt with a different channel key does not decrypt the packet."""
         import hashlib as _hashlib
 
@@ -2377,9 +2369,7 @@ class TestHistoricalChannelDecryptIntegration:
         assert len(await RawPacketRepository.get_all_undecrypted()) == 1
 
     @pytest.mark.asyncio
-    async def test_historical_decrypt_multiple_packets(
-        self, test_db, captured_broadcasts
-    ):
+    async def test_historical_decrypt_multiple_packets(self, test_db, captured_broadcasts):
         """Historical decrypt recovers multiple messages from different senders."""
         import hashlib as _hashlib
 
