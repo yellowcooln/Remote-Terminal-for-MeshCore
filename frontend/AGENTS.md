@@ -87,6 +87,7 @@ frontend/src/
     ├── messageCache.test.ts
     ├── messageParser.test.ts
     ├── pathUtils.test.ts
+    ├── prefetch.test.ts
     ├── radioPresets.test.ts
     ├── rawPacketIdentity.test.ts
     ├── repeaterDashboard.test.tsx

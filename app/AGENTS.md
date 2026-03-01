@@ -20,7 +20,7 @@ app/
 ├── database.py          # SQLite connection + base schema + migration runner
 ├── migrations.py        # Schema migrations (SQLite user_version)
 ├── models.py            # Pydantic request/response models
-├── repository.py        # Data access layer
+├── repository/          # Data access layer (contacts, channels, messages, raw_packets, settings)
 ├── radio.py             # RadioManager + auto-reconnect monitor
 ├── radio_sync.py        # Polling, sync, periodic advertisement loop
 ├── decoder.py           # Packet parsing/decryption
@@ -41,6 +41,7 @@ app/
     ├── packets.py
     ├── read_state.py
     ├── settings.py
+    ├── repeaters.py
     ├── statistics.py
     └── ws.py
 ```
@@ -139,6 +140,7 @@ app/
 - `POST /contacts/{public_key}/remove-from-radio`
 - `POST /contacts/{public_key}/mark-read`
 - `POST /contacts/{public_key}/command`
+- `POST /contacts/{public_key}/reset-path`
 - `POST /contacts/{public_key}/trace`
 - `POST /contacts/{public_key}/repeater/login`
 - `POST /contacts/{public_key}/repeater/status`
@@ -242,14 +244,17 @@ Test suites:
 ```text
 tests/
 ├── conftest.py                 # Shared fixtures
+├── test_ack_tracking_wiring.py # DM ACK tracking extraction and wiring
 ├── test_api.py                 # REST endpoint integration tests
 ├── test_bot.py                 # Bot execution and sandboxing
+├── test_channels_router.py     # Channels router endpoints
 ├── test_config.py              # Configuration validation
 ├── test_contacts_router.py     # Contacts router endpoints
 ├── test_decoder.py             # Packet parsing/decryption
 ├── test_echo_dedup.py          # Echo/repeat deduplication (incl. concurrent)
 ├── test_event_handlers.py      # ACK tracking, event registration, cleanup
 ├── test_frontend_static.py     # Frontend static file serving
+├── test_health_mqtt_status.py  # Health endpoint MQTT status field
 ├── test_key_normalization.py   # Public key normalization
 ├── test_keystore.py            # Ephemeral keystore
 ├── test_message_pagination.py  # Cursor-based message pagination
@@ -257,12 +262,14 @@ tests/
 ├── test_migrations.py          # Schema migration system
 ├── test_mqtt.py                # MQTT publisher topic routing and lifecycle
 ├── test_packet_pipeline.py     # End-to-end packet processing
+├── test_packets_router.py      # Packets router endpoints (decrypt, maintenance)
 ├── test_radio.py               # RadioManager, serial detection
 ├── test_radio_operation.py     # radio_operation() context manager
 ├── test_radio_router.py        # Radio router endpoints
 ├── test_radio_sync.py          # Polling, sync, advertisement
 ├── test_repeater_routes.py     # Repeater command/telemetry/trace + granular pane endpoints
 ├── test_repository.py          # Data access layer
+├── test_rx_log_data.py         # on_rx_log_data event handler integration
 ├── test_send_messages.py       # Outgoing messages, bot triggers, concurrent sends
 ├── test_settings_router.py     # Settings endpoints, advert validation
 ├── test_statistics.py          # Statistics aggregation

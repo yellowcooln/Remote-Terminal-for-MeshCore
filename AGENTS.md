@@ -155,7 +155,7 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   ├── main.py             # App entry, lifespan
 │   ├── routers/            # API endpoints
 │   ├── packet_processor.py # Raw packet pipeline, dedup, path handling
-│   ├── repository.py       # Database CRUD
+│   ├── repository/         # Database CRUD (contacts, channels, messages, raw_packets, settings)
 │   ├── event_handlers.py   # Radio events
 │   ├── decoder.py          # Packet decryption
 │   ├── websocket.py        # Real-time broadcasts
@@ -229,9 +229,13 @@ Key test files:
 - `tests/test_decoder.py` - Channel + direct message decryption, key exchange
 - `tests/test_keystore.py` - Ephemeral key store
 - `tests/test_event_handlers.py` - ACK tracking, repeat detection
+- `tests/test_packet_pipeline.py` - End-to-end packet processing
 - `tests/test_api.py` - API endpoints, read state tracking
 - `tests/test_migrations.py` - Database migration system
 - `tests/test_frontend_static.py` - Frontend static route registration (missing `dist`/`index.html` handling)
+- `tests/test_rx_log_data.py` - on_rx_log_data event handler integration
+- `tests/test_ack_tracking_wiring.py` - DM ACK tracking extraction and wiring
+- `tests/test_health_mqtt_status.py` - Health endpoint MQTT status field
 
 ### Frontend (Vitest)
 
@@ -282,6 +286,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/contacts/{public_key}/remove-from-radio` | Remove contact from radio |
 | POST | `/api/contacts/{public_key}/mark-read` | Mark contact conversation as read |
 | POST | `/api/contacts/{public_key}/command` | Send CLI command to repeater |
+| POST | `/api/contacts/{public_key}/reset-path` | Reset contact path to flood |
 | POST | `/api/contacts/{public_key}/trace` | Trace route to contact |
 | POST | `/api/contacts/{public_key}/repeater/login` | Log in to a repeater |
 | POST | `/api/contacts/{public_key}/repeater/status` | Fetch repeater status telemetry |
