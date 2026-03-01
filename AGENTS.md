@@ -15,6 +15,7 @@ PYTHONPATH=. uv run pytest tests/ -v # test python
 cd frontend/ # move to frontend directory
 npm run lint:fix # fix lint violations
 npm run format # format the code
+npm run test:run # run frontend tests
 npm run build # run a frontend build
 ```
 
