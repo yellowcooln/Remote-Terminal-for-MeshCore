@@ -381,10 +381,15 @@ export function useConversationMessages(
       }
       seenMessageContent.current.add(contentKey);
 
-      // Limit set size to prevent memory issues (keep last 500)
+      // Limit set size to prevent memory issues — rebuild from current messages
+      // so visible messages always remain in the dedup set (insertion-order slicing
+      // could evict keys for still-displayed messages, allowing echo duplicates).
       if (seenMessageContent.current.size > 1000) {
-        const entries = Array.from(seenMessageContent.current);
-        seenMessageContent.current = new Set(entries.slice(-500));
+        seenMessageContent.current = new Set(
+          messagesRef.current.map((m) => getMessageContentKey(m))
+        );
+        // Re-add the just-inserted key in case it's a new message not yet in state
+        seenMessageContent.current.add(contentKey);
       }
 
       setMessages((prev) => {
