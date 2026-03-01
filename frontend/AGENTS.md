@@ -206,6 +206,12 @@ LocalStorage migration helpers for favorites; canonical favorites are server-sid
 - `advert_interval`
 - `last_advert_time`
 - `bots`
+- `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`
+- `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`
+
+`HealthStatus` includes `mqtt_status` (`"connected"`, `"disconnected"`, `"disabled"`, or `null`).
+
+`RawPacket.decrypted_info` includes `channel_key` and `contact_key` for MQTT topic routing.
 
 ## Contact Info Pane
 

@@ -29,6 +29,7 @@ export interface HealthStatus {
   connection_info: string | null;
   database_size_mb: number;
   oldest_undecrypted_timestamp: number | null;
+  mqtt_status: string | null;
 }
 
 export interface MaintenanceResult {
@@ -155,6 +156,8 @@ export interface RawPacket {
   decrypted_info: {
     channel_name: string | null;
     sender: string | null;
+    channel_key: string | null;
+    contact_key: string | null;
   } | null;
 }
 
@@ -180,6 +183,15 @@ export interface AppSettings {
   advert_interval: number;
   last_advert_time: number;
   bots: BotConfig[];
+  mqtt_broker_host: string;
+  mqtt_broker_port: number;
+  mqtt_username: string;
+  mqtt_password: string;
+  mqtt_use_tls: boolean;
+  mqtt_tls_insecure: boolean;
+  mqtt_topic_prefix: string;
+  mqtt_publish_messages: boolean;
+  mqtt_publish_raw_packets: boolean;
 }
 
 export interface AppSettingsUpdate {
@@ -188,6 +200,15 @@ export interface AppSettingsUpdate {
   sidebar_sort_order?: 'recent' | 'alpha';
   advert_interval?: number;
   bots?: BotConfig[];
+  mqtt_broker_host?: string;
+  mqtt_broker_port?: number;
+  mqtt_username?: string;
+  mqtt_password?: string;
+  mqtt_use_tls?: boolean;
+  mqtt_tls_insecure?: boolean;
+  mqtt_topic_prefix?: string;
+  mqtt_publish_messages?: boolean;
+  mqtt_publish_raw_packets?: boolean;
 }
 
 export interface MigratePreferencesRequest {

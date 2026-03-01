@@ -493,6 +493,15 @@ class TestAppSettingsRepository:
                 "advert_interval": None,
                 "last_advert_time": None,
                 "bots": "{bad-bots-json",
+                "mqtt_broker_host": "",
+                "mqtt_broker_port": 1883,
+                "mqtt_username": "",
+                "mqtt_password": "",
+                "mqtt_use_tls": 0,
+                "mqtt_tls_insecure": 0,
+                "mqtt_topic_prefix": "meshcore",
+                "mqtt_publish_messages": 0,
+                "mqtt_publish_raw_packets": 0,
             }
         )
         mock_conn.execute = AsyncMock(return_value=mock_cursor)

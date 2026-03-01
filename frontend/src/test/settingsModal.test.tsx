@@ -38,6 +38,7 @@ const baseHealth: HealthStatus = {
   connection_info: 'Serial: /dev/ttyUSB0',
   database_size_mb: 1.2,
   oldest_undecrypted_timestamp: null,
+  mqtt_status: null,
 };
 
 const baseSettings: AppSettings = {
@@ -50,10 +51,20 @@ const baseSettings: AppSettings = {
   advert_interval: 0,
   last_advert_time: 0,
   bots: [],
+  mqtt_broker_host: '',
+  mqtt_broker_port: 1883,
+  mqtt_username: '',
+  mqtt_password: '',
+  mqtt_use_tls: false,
+  mqtt_tls_insecure: false,
+  mqtt_topic_prefix: 'meshcore',
+  mqtt_publish_messages: false,
+  mqtt_publish_raw_packets: false,
 };
 
 function renderModal(overrides?: {
   appSettings?: AppSettings;
+  health?: HealthStatus;
   onSaveAppSettings?: (update: AppSettingsUpdate) => Promise<void>;
   onRefreshAppSettings?: () => Promise<void>;
   onSave?: (update: RadioConfigUpdate) => Promise<void>;
@@ -79,7 +90,7 @@ function renderModal(overrides?: {
     open: overrides?.open ?? true,
     pageMode: overrides?.pageMode,
     config: baseConfig,
-    health: baseHealth,
+    health: overrides?.health ?? baseHealth,
     appSettings: overrides?.appSettings ?? baseSettings,
     onClose,
     onSave,
@@ -131,6 +142,11 @@ function setMatchMedia(matches: boolean) {
 function openConnectivitySection() {
   const connectivityToggle = screen.getByRole('button', { name: /Connectivity/i });
   fireEvent.click(connectivityToggle);
+}
+
+function openMqttSection() {
+  const mqttToggle = screen.getByRole('button', { name: /MQTT/i });
+  fireEvent.click(mqttToggle);
 }
 
 function openDatabaseSection() {
@@ -387,6 +403,66 @@ describe('SettingsModal', () => {
     // Busiest channels
     expect(screen.getByText('general')).toBeInTheDocument();
     expect(screen.getByText('42 msgs')).toBeInTheDocument();
+  });
+
+  it('renders MQTT section with form inputs', () => {
+    renderModal();
+    openMqttSection();
+
+    expect(screen.getByLabelText('Broker Host')).toBeInTheDocument();
+    expect(screen.getByLabelText('Broker Port')).toBeInTheDocument();
+    expect(screen.getByLabelText('Username')).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    expect(screen.getByLabelText('Topic Prefix')).toBeInTheDocument();
+    expect(screen.getByText('Publish Messages')).toBeInTheDocument();
+    expect(screen.getByText('Publish Raw Packets')).toBeInTheDocument();
+  });
+
+  it('saves MQTT settings through onSaveAppSettings', async () => {
+    const { onSaveAppSettings } = renderModal();
+    openMqttSection();
+
+    const hostInput = screen.getByLabelText('Broker Host');
+    fireEvent.change(hostInput, { target: { value: 'mqtt.example.com' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save MQTT Settings' }));
+
+    await waitFor(() => {
+      expect(onSaveAppSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mqtt_broker_host: 'mqtt.example.com',
+          mqtt_broker_port: 1883,
+        })
+      );
+    });
+  });
+
+  it('shows MQTT disabled status when mqtt_status is null', () => {
+    renderModal({
+      appSettings: {
+        ...baseSettings,
+        mqtt_broker_host: 'broker.local',
+      },
+    });
+    openMqttSection();
+
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+  });
+
+  it('shows MQTT connected status badge', () => {
+    renderModal({
+      appSettings: {
+        ...baseSettings,
+        mqtt_broker_host: 'broker.local',
+      },
+      health: {
+        ...baseHealth,
+        mqtt_status: 'connected',
+      },
+    });
+    openMqttSection();
+
+    expect(screen.getByText('Connected')).toBeInTheDocument();
   });
 
   it('fetches statistics when expanded in mobile external-nav mode', async () => {

@@ -27,6 +27,7 @@ app/
 ├── packet_processor.py  # Raw packet pipeline, dedup, path handling
 ├── event_handlers.py    # MeshCore event subscriptions and ACK tracking
 ├── websocket.py         # WS manager + broadcast helpers
+├── mqtt.py              # Optional MQTT publisher (fire-and-forget forwarding)
 ├── bot.py               # Bot execution and outbound bot sends
 ├── dependencies.py      # Shared FastAPI dependency providers
 ├── keystore.py          # Ephemeral private/public key storage for DM decryption
@@ -98,6 +99,19 @@ app/
 - Controlled by `app_settings.advert_interval` (seconds).
 - `0` means disabled.
 - Last send time tracked in `app_settings.last_advert_time`.
+
+### MQTT publishing
+
+- Optional forwarding of mesh events to an external MQTT broker.
+- All config in `app_settings` (not env vars): `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`.
+- Disabled when `mqtt_broker_host` is empty.
+- `broadcast_event()` in `websocket.py` calls `mqtt_broadcast()` — single hook covers all message and raw_packet events.
+- `MqttPublisher` (`app/mqtt.py`) runs a background connection loop with auto-reconnect and exponential backoff (5s → 30s).
+- Publishes are fire-and-forget; individual publish failures logged but not surfaced to users.
+- Connection state changes surface via `broadcast_error`/`broadcast_success` toasts.
+- Health endpoint includes `mqtt_status` field (`connected`, `disconnected`, `disabled`).
+- Settings changes trigger `mqtt_publisher.restart()` — no server restart needed.
+- Topics: `{prefix}/dm:{key}`, `{prefix}/gm:{key}`, `{prefix}/raw/dm:{key}`, `{prefix}/raw/gm:{key}`, `{prefix}/raw/unrouted`.
 
 ## API Surface (all under `/api`)
 
@@ -204,6 +218,8 @@ Main tables:
 - `advert_interval`
 - `last_advert_time`
 - `bots`
+- `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`
+- `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`
 
 ## Security Posture (intentional)
 
@@ -239,6 +255,7 @@ tests/
 ├── test_message_pagination.py  # Cursor-based message pagination
 ├── test_message_prefix_claim.py # Message prefix claim logic
 ├── test_migrations.py          # Schema migration system
+├── test_mqtt.py                # MQTT publisher topic routing and lifecycle
 ├── test_packet_pipeline.py     # End-to-end packet processing
 ├── test_radio.py               # RadioManager, serial detection
 ├── test_radio_operation.py     # radio_operation() context manager

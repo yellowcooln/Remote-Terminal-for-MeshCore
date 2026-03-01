@@ -1,5 +1,7 @@
 """Tests for settings router endpoints and validation behavior."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi import HTTPException
 
@@ -65,6 +67,55 @@ class TestUpdateSettings:
 
         assert exc.value.status_code == 400
         assert "syntax error" in exc.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_mqtt_fields_round_trip(self, test_db):
+        """MQTT settings should be saved and retrieved correctly."""
+        mock_publisher = type("MockPublisher", (), {"restart": AsyncMock()})()
+        with patch("app.mqtt.mqtt_publisher", mock_publisher):
+            result = await update_settings(
+                AppSettingsUpdate(
+                    mqtt_broker_host="broker.test",
+                    mqtt_broker_port=8883,
+                    mqtt_username="user",
+                    mqtt_password="pass",
+                    mqtt_use_tls=True,
+                    mqtt_tls_insecure=True,
+                    mqtt_topic_prefix="custom",
+                    mqtt_publish_messages=True,
+                    mqtt_publish_raw_packets=True,
+                )
+            )
+
+        assert result.mqtt_broker_host == "broker.test"
+        assert result.mqtt_broker_port == 8883
+        assert result.mqtt_username == "user"
+        assert result.mqtt_password == "pass"
+        assert result.mqtt_use_tls is True
+        assert result.mqtt_tls_insecure is True
+        assert result.mqtt_topic_prefix == "custom"
+        assert result.mqtt_publish_messages is True
+        assert result.mqtt_publish_raw_packets is True
+
+        # Verify persistence
+        fresh = await AppSettingsRepository.get()
+        assert fresh.mqtt_broker_host == "broker.test"
+        assert fresh.mqtt_use_tls is True
+
+    @pytest.mark.asyncio
+    async def test_mqtt_defaults_on_fresh_db(self, test_db):
+        """MQTT fields should have correct defaults on a fresh database."""
+        settings = await AppSettingsRepository.get()
+
+        assert settings.mqtt_broker_host == ""
+        assert settings.mqtt_broker_port == 1883
+        assert settings.mqtt_username == ""
+        assert settings.mqtt_password == ""
+        assert settings.mqtt_use_tls is False
+        assert settings.mqtt_tls_insecure is False
+        assert settings.mqtt_topic_prefix == "meshcore"
+        assert settings.mqtt_publish_messages is False
+        assert settings.mqtt_publish_raw_packets is False
 
 
 class TestToggleFavorite:

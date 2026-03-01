@@ -26,7 +26,10 @@ class AppSettingsRepository:
             """
             SELECT max_radio_contacts, favorites, auto_decrypt_dm_on_advert,
                    sidebar_sort_order, last_message_times, preferences_migrated,
-                   advert_interval, last_advert_time, bots
+                   advert_interval, last_advert_time, bots,
+                   mqtt_broker_host, mqtt_broker_port, mqtt_username, mqtt_password,
+                   mqtt_use_tls, mqtt_tls_insecure, mqtt_topic_prefix,
+                   mqtt_publish_messages, mqtt_publish_raw_packets
             FROM app_settings WHERE id = 1
             """
         )
@@ -91,6 +94,15 @@ class AppSettingsRepository:
             advert_interval=row["advert_interval"] or 0,
             last_advert_time=row["last_advert_time"] or 0,
             bots=bots,
+            mqtt_broker_host=row["mqtt_broker_host"] or "",
+            mqtt_broker_port=row["mqtt_broker_port"] or 1883,
+            mqtt_username=row["mqtt_username"] or "",
+            mqtt_password=row["mqtt_password"] or "",
+            mqtt_use_tls=bool(row["mqtt_use_tls"]),
+            mqtt_tls_insecure=bool(row["mqtt_tls_insecure"]),
+            mqtt_topic_prefix=row["mqtt_topic_prefix"] or "meshcore",
+            mqtt_publish_messages=bool(row["mqtt_publish_messages"]),
+            mqtt_publish_raw_packets=bool(row["mqtt_publish_raw_packets"]),
         )
 
     @staticmethod
@@ -104,6 +116,15 @@ class AppSettingsRepository:
         advert_interval: int | None = None,
         last_advert_time: int | None = None,
         bots: list[BotConfig] | None = None,
+        mqtt_broker_host: str | None = None,
+        mqtt_broker_port: int | None = None,
+        mqtt_username: str | None = None,
+        mqtt_password: str | None = None,
+        mqtt_use_tls: bool | None = None,
+        mqtt_tls_insecure: bool | None = None,
+        mqtt_topic_prefix: str | None = None,
+        mqtt_publish_messages: bool | None = None,
+        mqtt_publish_raw_packets: bool | None = None,
     ) -> AppSettings:
         """Update app settings. Only provided fields are updated."""
         updates = []
@@ -146,6 +167,42 @@ class AppSettingsRepository:
             updates.append("bots = ?")
             bots_json = json.dumps([b.model_dump() for b in bots])
             params.append(bots_json)
+
+        if mqtt_broker_host is not None:
+            updates.append("mqtt_broker_host = ?")
+            params.append(mqtt_broker_host)
+
+        if mqtt_broker_port is not None:
+            updates.append("mqtt_broker_port = ?")
+            params.append(mqtt_broker_port)
+
+        if mqtt_username is not None:
+            updates.append("mqtt_username = ?")
+            params.append(mqtt_username)
+
+        if mqtt_password is not None:
+            updates.append("mqtt_password = ?")
+            params.append(mqtt_password)
+
+        if mqtt_use_tls is not None:
+            updates.append("mqtt_use_tls = ?")
+            params.append(1 if mqtt_use_tls else 0)
+
+        if mqtt_tls_insecure is not None:
+            updates.append("mqtt_tls_insecure = ?")
+            params.append(1 if mqtt_tls_insecure else 0)
+
+        if mqtt_topic_prefix is not None:
+            updates.append("mqtt_topic_prefix = ?")
+            params.append(mqtt_topic_prefix)
+
+        if mqtt_publish_messages is not None:
+            updates.append("mqtt_publish_messages = ?")
+            params.append(1 if mqtt_publish_messages else 0)
+
+        if mqtt_publish_raw_packets is not None:
+            updates.append("mqtt_publish_raw_packets = ?")
+            params.append(1 if mqtt_publish_raw_packets else 0)
 
         if updates:
             query = f"UPDATE app_settings SET {', '.join(updates)} WHERE id = 1"

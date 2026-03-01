@@ -96,9 +96,13 @@ def broadcast_event(event_type: str, data: dict) -> None:
     """Schedule a broadcast without blocking.
 
     Convenience function that creates an asyncio task to broadcast
-    an event to all connected WebSocket clients.
+    an event to all connected WebSocket clients and forward to MQTT.
     """
     asyncio.create_task(ws_manager.broadcast(event_type, data))
+
+    from app.mqtt import mqtt_broadcast
+
+    mqtt_broadcast(event_type, data)
 
 
 def broadcast_error(message: str, details: str | None = None) -> None:

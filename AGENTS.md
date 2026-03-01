@@ -91,7 +91,7 @@ A web interface for MeshCore mesh radio networks. The backend connects to a Mesh
 1. **Store-and-serve**: Backend stores all packets even when no client is connected
 2. **Parallel storage**: Messages stored both decrypted (when possible) and as raw packets
 3. **Extended capacity**: Server stores contacts/channels beyond radio limits (~350 contacts, ~40 channels)
-4. **Real-time updates**: WebSocket pushes events; REST for actions
+4. **Real-time updates**: WebSocket pushes events; REST for actions; optional MQTT forwarding
 5. **Offline-capable**: Radio operates independently; server syncs when connected
 6. **Auto-reconnect**: Background monitor detects disconnection and attempts reconnection
 
@@ -126,7 +126,7 @@ To improve repeater disambiguation in the network visualizer, the backend stores
 
 1. Radio receives raw bytes → `packet_processor.py` parses, decrypts, deduplicates, and stores in database (primary path via `RX_LOG_DATA` event)
 2. `event_handlers.py` handles higher-level events (`CONTACT_MSG_RECV`, `ACK`) as a fallback/supplement
-3. `ws_manager` broadcasts to connected clients
+3. `broadcast_event()` in `websocket.py` fans out to both WebSocket clients and MQTT
 4. Frontend `useWebSocket` receives → updates React state
 
 ### Outgoing Messages
@@ -158,7 +158,8 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   ├── repository.py       # Database CRUD
 │   ├── event_handlers.py   # Radio events
 │   ├── decoder.py          # Packet decryption
-│   └── websocket.py        # Real-time broadcasts
+│   ├── websocket.py        # Real-time broadcasts
+│   └── mqtt.py             # Optional MQTT publisher
 ├── frontend/               # React frontend
 │   ├── AGENTS.md           # Frontend documentation
 │   ├── src/
@@ -354,6 +355,23 @@ Read state (`last_read_at`) is tracked **server-side** for consistency across de
 
 **Note:** These are NOT the same as `Message.conversation_key` (the database field).
 
+### MQTT Publishing
+
+Optional MQTT integration forwards mesh events to an external broker for home automation, logging, or alerting. All MQTT config is stored in the database (`app_settings`), not env vars — configured from the Settings pane, no server restart needed.
+
+**Two independent toggles**: publish decrypted messages, publish raw packets.
+
+**Topic structure** (default prefix `meshcore`):
+- `meshcore/dm:<contact_public_key>` — decrypted DM
+- `meshcore/gm:<channel_key>` — decrypted channel message
+- `meshcore/raw/dm:<contact_key>` — raw packet attributed to a DM contact
+- `meshcore/raw/gm:<channel_key>` — raw packet attributed to a channel
+- `meshcore/raw/unrouted` — raw packets that couldn't be attributed
+
+**Architecture**: `broadcast_event()` in `websocket.py` calls `mqtt_broadcast()` — a single hook covering all message and raw_packet broadcasts. The `MqttPublisher` in `app/mqtt.py` manages a background connection loop with auto-reconnect and backoff. Publishes are fire-and-forget (silent drop if disconnected). Connection state changes trigger toasts via `broadcast_error`/`broadcast_success`. The health endpoint includes `mqtt_status`.
+
+**Security**: MQTT password stored in plaintext in SQLite, consistent with the project's trusted-network design.
+
 ### Server-Side Decryption
 
 The server can decrypt packets using stored keys, both in real-time and for historical packets.
@@ -395,7 +413,7 @@ mc.subscribe(EventType.ACK, handler)
 | `MESHCORE_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
 | `MESHCORE_DATABASE_PATH` | `data/meshcore.db` | SQLite database location |
 
-**Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, and `bots`. They are configured via `GET/PATCH /api/settings` (and related settings endpoints).
+**Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, `bots`, and all MQTT configuration (`mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`). They are configured via `GET/PATCH /api/settings` (and related settings endpoints).
 
 Byte-perfect channel retries are user-triggered via `POST /api/messages/channel/{message_id}/resend` and are allowed for 30 seconds after the original send.
 
