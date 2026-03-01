@@ -233,6 +233,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 28)
         applied += 1
 
+    # Migration 29: Add covering index for unread counts query
+    if version < 29:
+        logger.info("Applying migration 29: add covering index for unread counts query")
+        await _migrate_029_add_unread_covering_index(conn)
+        await set_version(conn, 29)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -1790,3 +1797,25 @@ async def _migrate_028_payload_hash_text_to_blob(conn: aiosqlite.Connection) -> 
 
     await conn.commit()
     logger.info("Converted %d payload_hash values from TEXT to BLOB", total)
+
+
+async def _migrate_029_add_unread_covering_index(conn: aiosqlite.Connection) -> None:
+    """
+    Add a covering index for the unread counts query.
+
+    The /api/read-state/unreads endpoint runs three queries against messages.
+    The last-message-times query (GROUP BY type, conversation_key + MAX(received_at))
+    was doing a full table scan. This covering index lets SQLite resolve the
+    grouping and MAX entirely from the index without touching the table.
+    It also improves the unread count queries which filter on outgoing and received_at.
+    """
+    # Guard: table or columns may not exist in partial-schema test setups
+    cursor = await conn.execute("PRAGMA table_info(messages)")
+    columns = {row[1] for row in await cursor.fetchall()}
+    required = {"type", "conversation_key", "outgoing", "received_at"}
+    if required <= columns:
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_messages_unread_covering "
+            "ON messages(type, conversation_key, outgoing, received_at)"
+        )
+    await conn.commit()
