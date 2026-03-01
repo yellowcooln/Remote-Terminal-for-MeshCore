@@ -56,9 +56,20 @@ async def lifespan(app: FastAPI):
     # Always start connection monitor (even if initial connection failed)
     await radio_manager.start_connection_monitor()
 
+    # Start MQTT publisher if configured
+    from app.mqtt import mqtt_publisher
+    from app.repository import AppSettingsRepository
+
+    try:
+        mqtt_settings = await AppSettingsRepository.get()
+        await mqtt_publisher.start(mqtt_settings)
+    except Exception as e:
+        logger.warning("Failed to start MQTT publisher: %s", e)
+
     yield
 
     logger.info("Shutting down")
+    await mqtt_publisher.stop()
     await radio_manager.stop_connection_monitor()
     await stop_message_polling()
     await stop_periodic_advert()

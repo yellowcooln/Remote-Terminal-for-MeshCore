@@ -16,6 +16,7 @@ class HealthResponse(BaseModel):
     connection_info: str | None
     database_size_mb: float
     oldest_undecrypted_timestamp: int | None
+    mqtt_status: str | None = None
 
 
 async def build_health_data(radio_connected: bool, connection_info: str | None) -> dict:
@@ -33,12 +34,25 @@ async def build_health_data(radio_connected: bool, connection_info: str | None) 
     except RuntimeError:
         pass  # Database not connected
 
+    # MQTT status
+    mqtt_status: str | None = None
+    try:
+        from app.mqtt import mqtt_publisher
+
+        if mqtt_publisher._mqtt_configured():
+            mqtt_status = "connected" if mqtt_publisher.connected else "disconnected"
+        else:
+            mqtt_status = "disabled"
+    except Exception:
+        pass
+
     return {
         "status": "ok" if radio_connected else "degraded",
         "radio_connected": radio_connected,
         "connection_info": connection_info,
         "database_size_mb": db_size_mb,
         "oldest_undecrypted_timestamp": oldest_ts,
+        "mqtt_status": mqtt_status,
     }
 
 

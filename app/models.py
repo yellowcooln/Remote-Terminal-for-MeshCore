@@ -173,6 +173,8 @@ class RawPacketDecryptedInfo(BaseModel):
 
     channel_name: str | None = None
     sender: str | None = None
+    channel_key: str | None = None
+    contact_key: str | None = None
 
 
 class RawPacketBroadcast(BaseModel):
@@ -424,6 +426,42 @@ class AppSettings(BaseModel):
     bots: list[BotConfig] = Field(
         default_factory=list,
         description="List of bot configurations",
+    )
+    mqtt_broker_host: str = Field(
+        default="",
+        description="MQTT broker hostname (empty = disabled)",
+    )
+    mqtt_broker_port: int = Field(
+        default=1883,
+        description="MQTT broker port",
+    )
+    mqtt_username: str = Field(
+        default="",
+        description="MQTT username (optional)",
+    )
+    mqtt_password: str = Field(
+        default="",
+        description="MQTT password (optional)",
+    )
+    mqtt_use_tls: bool = Field(
+        default=False,
+        description="Whether to use TLS for MQTT connection",
+    )
+    mqtt_tls_insecure: bool = Field(
+        default=False,
+        description="Skip TLS certificate verification (for self-signed certs)",
+    )
+    mqtt_topic_prefix: str = Field(
+        default="meshcore",
+        description="MQTT topic prefix",
+    )
+    mqtt_publish_messages: bool = Field(
+        default=False,
+        description="Whether to publish decrypted messages to MQTT",
+    )
+    mqtt_publish_raw_packets: bool = Field(
+        default=False,
+        description="Whether to publish raw packets to MQTT",
     )
 
 

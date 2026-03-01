@@ -247,6 +247,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 30)
         applied += 1
 
+    # Migration 31: Add MQTT configuration columns to app_settings
+    if version < 31:
+        logger.info("Applying migration 31: add MQTT columns to app_settings")
+        await _migrate_031_add_mqtt_columns(conn)
+        await set_version(conn, 31)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -1851,4 +1858,36 @@ async def _migrate_030_add_pagination_index(conn: aiosqlite.Connection) -> None:
             "ON messages(type, conversation_key, received_at DESC, id DESC)"
         )
         await conn.execute("DROP INDEX IF EXISTS idx_messages_conversation")
+    await conn.commit()
+
+
+async def _migrate_031_add_mqtt_columns(conn: aiosqlite.Connection) -> None:
+    """Add MQTT configuration columns to app_settings."""
+    # Guard: app_settings may not exist in partial-schema test setups
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+    )
+    if not await cursor.fetchone():
+        await conn.commit()
+        return
+
+    cursor = await conn.execute("PRAGMA table_info(app_settings)")
+    columns = {row[1] for row in await cursor.fetchall()}
+
+    new_columns = [
+        ("mqtt_broker_host", "TEXT DEFAULT ''"),
+        ("mqtt_broker_port", "INTEGER DEFAULT 1883"),
+        ("mqtt_username", "TEXT DEFAULT ''"),
+        ("mqtt_password", "TEXT DEFAULT ''"),
+        ("mqtt_use_tls", "INTEGER DEFAULT 0"),
+        ("mqtt_tls_insecure", "INTEGER DEFAULT 0"),
+        ("mqtt_topic_prefix", "TEXT DEFAULT 'meshcore'"),
+        ("mqtt_publish_messages", "INTEGER DEFAULT 0"),
+        ("mqtt_publish_raw_packets", "INTEGER DEFAULT 0"),
+    ]
+
+    for col_name, col_def in new_columns:
+        if col_name not in columns:
+            await conn.execute(f"ALTER TABLE app_settings ADD COLUMN {col_name} {col_def}")
+
     await conn.commit()

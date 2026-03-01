@@ -59,6 +59,44 @@ class AppSettingsUpdate(BaseModel):
         default=None,
         description="List of bot configurations",
     )
+    mqtt_broker_host: str | None = Field(
+        default=None,
+        description="MQTT broker hostname (empty = disabled)",
+    )
+    mqtt_broker_port: int | None = Field(
+        default=None,
+        ge=1,
+        le=65535,
+        description="MQTT broker port",
+    )
+    mqtt_username: str | None = Field(
+        default=None,
+        description="MQTT username (optional)",
+    )
+    mqtt_password: str | None = Field(
+        default=None,
+        description="MQTT password (optional)",
+    )
+    mqtt_use_tls: bool | None = Field(
+        default=None,
+        description="Whether to use TLS for MQTT connection",
+    )
+    mqtt_tls_insecure: bool | None = Field(
+        default=None,
+        description="Skip TLS certificate verification (for self-signed certs)",
+    )
+    mqtt_topic_prefix: str | None = Field(
+        default=None,
+        description="MQTT topic prefix",
+    )
+    mqtt_publish_messages: bool | None = Field(
+        default=None,
+        description="Whether to publish decrypted messages to MQTT",
+    )
+    mqtt_publish_raw_packets: bool | None = Field(
+        default=None,
+        description="Whether to publish raw packets to MQTT",
+    )
 
 
 class FavoriteRequest(BaseModel):
@@ -124,8 +162,35 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         logger.info("Updating bots (count=%d)", len(update.bots))
         kwargs["bots"] = update.bots
 
+    # MQTT fields
+    mqtt_fields = [
+        "mqtt_broker_host",
+        "mqtt_broker_port",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_use_tls",
+        "mqtt_tls_insecure",
+        "mqtt_topic_prefix",
+        "mqtt_publish_messages",
+        "mqtt_publish_raw_packets",
+    ]
+    mqtt_changed = False
+    for field in mqtt_fields:
+        value = getattr(update, field)
+        if value is not None:
+            kwargs[field] = value
+            mqtt_changed = True
+
     if kwargs:
-        return await AppSettingsRepository.update(**kwargs)
+        result = await AppSettingsRepository.update(**kwargs)
+
+        # Restart MQTT publisher if any MQTT settings changed
+        if mqtt_changed:
+            from app.mqtt import mqtt_publisher
+
+            await mqtt_publisher.restart(result)
+
+        return result
 
     return await AppSettingsRepository.get()
 
