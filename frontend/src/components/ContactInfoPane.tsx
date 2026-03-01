@@ -272,14 +272,6 @@ export function ContactInfoPane({
               </div>
             )}
 
-            {/* Advert Info */}
-            {detail && detail.advert_frequency !== null && (
-              <div className="px-5 py-3 border-b border-border">
-                <SectionLabel>Advert Observations</SectionLabel>
-                <p className="text-sm">{detail.advert_frequency.toFixed(1)} observations/hour</p>
-              </div>
-            )}
-
             {/* Nearest Repeaters */}
             {detail && detail.nearest_repeaters.length > 0 && (
               <div className="px-5 py-3 border-b border-border">
@@ -310,7 +302,9 @@ export function ContactInfoPane({
                       key={p.path + p.first_seen}
                       className="flex justify-between items-center text-sm"
                     >
-                      <span className="font-mono text-xs truncate">{p.path || '(direct)'}</span>
+                      <span className="font-mono text-xs truncate">
+                        {p.path ? p.path.match(/.{2}/g)!.join(' → ') : '(direct)'}
+                      </span>
                       <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
                         {p.heard_count}x · {formatTime(p.last_seen)}
                       </span>
