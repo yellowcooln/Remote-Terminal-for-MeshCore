@@ -45,6 +45,17 @@ export function SettingsAboutSection({ className }: { className?: string }) {
               MIT License
             </a>
           </p>
+          <p>
+            This code is free, and ad-free, forever. If you love my work,{' '}
+            <a
+              href="https://ko-fi.com/jackkingsman"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              buy me a coffee!
+            </a>
+          </p>
         </div>
 
         <Separator />
