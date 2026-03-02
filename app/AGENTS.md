@@ -106,19 +106,20 @@ app/
 ### MQTT publishing
 
 - Optional forwarding of mesh events to an external MQTT broker.
-- All config in `app_settings` (not env vars): `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`.
-- Disabled when `mqtt_broker_host` is empty.
+- All config in `app_settings` (not env vars): `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`.
+- Disabled when `mqtt_broker_host` is empty, or when both publish toggles are off (`mqtt_publish_messages=false` and `mqtt_publish_raw_packets=false`).
 - `broadcast_event()` in `websocket.py` calls `mqtt_broadcast()` — single hook covers all message and raw_packet events.
 - `MqttPublisher` (`app/mqtt.py`) runs a background connection loop with auto-reconnect and exponential backoff (5s → 30s).
 - Publishes are fire-and-forget; individual publish failures logged but not surfaced to users.
 - Connection state changes surface via `broadcast_error`/`broadcast_success` toasts.
-- Health endpoint includes `mqtt_status` field (`connected`, `disconnected`, `disabled`).
+- Health endpoint includes `mqtt_status` field (`connected`, `disconnected`, `disabled`), where `disabled` covers both "no broker host configured" and "nothing enabled to publish".
 - Settings changes trigger `mqtt_publisher.restart()` — no server restart needed.
 - Topics: `{prefix}/dm:{key}`, `{prefix}/gm:{key}`, `{prefix}/raw/dm:{key}`, `{prefix}/raw/gm:{key}`, `{prefix}/raw/unrouted`.
 
 ### Community MQTT
 
 - Separate publisher (`app/community_mqtt.py`) for sharing raw packets with the MeshCore community aggregator.
+- Implementation intent: keep functional parity with the reference implementation at `https://github.com/agessaman/meshcore-packet-capture` unless this repository explicitly documents a deliberate deviation.
 - Independent from the private `MqttPublisher` — different broker, authentication, and topic structure.
 - Connects to the community broker (default `mqtt-us-v1.letsmesh.net:443`) via WebSockets over TLS.
 - Authentication: Ed25519 JWT tokens signed with the radio's expanded "orlp" private key. Tokens expire after 24 hours; proactive renewal at 23 hours.
