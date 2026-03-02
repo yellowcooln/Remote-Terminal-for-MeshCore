@@ -59,8 +59,7 @@ frontend/src/
 │   ├── MessageList.tsx
 │   ├── MessageInput.tsx
 │   ├── NewMessageModal.tsx
-│   ├── SettingsModal.tsx
-│   ├── settingsConstants.ts    # Settings section ordering and labels
+│   ├── SettingsModal.tsx       # Layout shell — delegates to settings/ sections
 │   ├── RawPacketList.tsx
 │   ├── MapView.tsx
 │   ├── VisualizerView.tsx
@@ -70,9 +69,28 @@ frontend/src/
 │   ├── BotCodeEditor.tsx
 │   ├── ContactAvatar.tsx
 │   ├── ContactInfoPane.tsx     # Contact detail sheet (stats, name history, paths)
-│   ├── RepeaterDashboard.tsx   # Repeater pane-based dashboard (telemetry, neighbors, ACL, etc.)
+│   ├── RepeaterDashboard.tsx   # Layout shell — delegates to repeater/ panes
 │   ├── RepeaterLogin.tsx       # Repeater login form (password + guest)
 │   ├── NeighborsMiniMap.tsx    # Leaflet mini-map for repeater neighbor locations
+│   ├── settings/
+│   │   ├── settingsConstants.ts          # Settings section type, ordering, labels
+│   │   ├── SettingsRadioSection.tsx      # Preset, freq/bw/sf/cr, txPower, lat/lon
+│   │   ├── SettingsIdentitySection.tsx   # Name, keys, advert interval
+│   │   ├── SettingsConnectivitySection.tsx # Connection status, max contacts, reboot
+│   │   ├── SettingsMqttSection.tsx       # MQTT broker config, TLS, publish toggles
+│   │   ├── SettingsDatabaseSection.tsx   # DB size, cleanup, auto-decrypt, local label
+│   │   ├── SettingsBotSection.tsx        # Bot list, code editor, add/delete/reset
+│   │   └── SettingsStatisticsSection.tsx # Read-only mesh network stats
+│   ├── repeater/
+│   │   ├── repeaterPaneShared.tsx        # Shared: RepeaterPane, KvRow, format helpers
+│   │   ├── RepeaterTelemetryPane.tsx    # Battery, airtime, packet counts
+│   │   ├── RepeaterNeighborsPane.tsx    # Neighbor table + lazy mini-map
+│   │   ├── RepeaterAclPane.tsx          # Permission table
+│   │   ├── RepeaterRadioSettingsPane.tsx # Radio settings + advert intervals
+│   │   ├── RepeaterLppTelemetryPane.tsx # CayenneLPP sensor data
+│   │   ├── RepeaterOwnerInfoPane.tsx    # Owner info + guest password
+│   │   ├── RepeaterActionsPane.tsx      # Send Advert, Sync Clock, Reboot
+│   │   └── RepeaterConsolePane.tsx      # CLI console with history
 │   └── ui/                     # shadcn/ui primitives
 ├── types/
 │   └── d3-force-3d.d.ts       # Type declarations for d3-force-3d

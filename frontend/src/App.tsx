@@ -31,7 +31,7 @@ import {
   SETTINGS_SECTION_LABELS,
   SETTINGS_SECTION_ORDER,
   type SettingsSection,
-} from './components/settingsConstants';
+} from './components/settings/settingsConstants';
 import { RawPacketList } from './components/RawPacketList';
 import { ContactInfoPane } from './components/ContactInfoPane';
 import { CONTACT_TYPE_REPEATER } from './types';
