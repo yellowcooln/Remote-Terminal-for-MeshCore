@@ -20,8 +20,12 @@ class MqttPublisher(BaseMqttPublisher):
     _log_prefix = "MQTT"
 
     def _is_configured(self) -> bool:
-        """Check if MQTT is configured (broker host is set)."""
-        return bool(self._settings and self._settings.mqtt_broker_host)
+        """Check if MQTT is configured and has something to publish."""
+        return bool(
+            self._settings
+            and self._settings.mqtt_broker_host
+            and (self._settings.mqtt_publish_messages or self._settings.mqtt_publish_raw_packets)
+        )
 
     def _build_client_kwargs(self, settings: AppSettings) -> dict[str, Any]:
         return {

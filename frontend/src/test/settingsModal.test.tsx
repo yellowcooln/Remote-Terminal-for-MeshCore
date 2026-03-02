@@ -155,6 +155,14 @@ function openMqttSection() {
   fireEvent.click(mqttToggle);
 }
 
+function expandPrivateMqtt() {
+  fireEvent.click(screen.getByText('Private MQTT Broker'));
+}
+
+function expandCommunityMqtt() {
+  fireEvent.click(screen.getByText('Community Analytics'));
+}
+
 function openDatabaseSection() {
   const databaseToggle = screen.getByRole('button', { name: /Database/i });
   fireEvent.click(databaseToggle);
@@ -414,19 +422,30 @@ describe('SettingsModal', () => {
   it('renders MQTT section with form inputs', () => {
     renderModal();
     openMqttSection();
+    expandPrivateMqtt();
 
+    // Publish checkboxes always visible
+    expect(screen.getByText('Publish Messages')).toBeInTheDocument();
+    expect(screen.getByText('Publish Raw Packets')).toBeInTheDocument();
+
+    // Broker config hidden until a publish option is enabled
+    expect(screen.queryByLabelText('Broker Host')).not.toBeInTheDocument();
+
+    // Enable one publish option to reveal broker config
+    fireEvent.click(screen.getByText('Publish Messages'));
     expect(screen.getByLabelText('Broker Host')).toBeInTheDocument();
     expect(screen.getByLabelText('Broker Port')).toBeInTheDocument();
     expect(screen.getByLabelText('Username')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByLabelText('Topic Prefix')).toBeInTheDocument();
-    expect(screen.getByText('Publish Messages')).toBeInTheDocument();
-    expect(screen.getByText('Publish Raw Packets')).toBeInTheDocument();
   });
 
   it('saves MQTT settings through onSaveAppSettings', async () => {
-    const { onSaveAppSettings } = renderModal();
+    const { onSaveAppSettings } = renderModal({
+      appSettings: { ...baseSettings, mqtt_publish_messages: true },
+    });
     openMqttSection();
+    expandPrivateMqtt();
 
     const hostInput = screen.getByLabelText('Broker Host');
     fireEvent.change(hostInput, { target: { value: 'mqtt.example.com' } });
@@ -476,6 +495,7 @@ describe('SettingsModal', () => {
   it('renders community sharing section in MQTT tab', () => {
     renderModal();
     openMqttSection();
+    expandCommunityMqtt();
 
     expect(screen.getByText('Community Analytics')).toBeInTheDocument();
     expect(screen.getByText('Enable Community Analytics')).toBeInTheDocument();
@@ -489,6 +509,7 @@ describe('SettingsModal', () => {
       },
     });
     openMqttSection();
+    expandCommunityMqtt();
 
     expect(screen.queryByLabelText('Region Code (IATA)')).not.toBeInTheDocument();
 
