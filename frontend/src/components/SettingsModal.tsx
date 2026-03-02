@@ -217,20 +217,6 @@ export function SettingsModal(props: SettingsModalProps) {
         </div>
       )}
 
-      {shouldRenderSection('mqtt') && (
-        <div className={sectionWrapperClass}>
-          {renderSectionHeader('mqtt')}
-          {isSectionVisible('mqtt') && appSettings && (
-            <SettingsMqttSection
-              appSettings={appSettings}
-              health={health}
-              onSaveAppSettings={onSaveAppSettings}
-              className={sectionContentClass}
-            />
-          )}
-        </div>
-      )}
-
       {shouldRenderSection('database') && (
         <div className={sectionWrapperClass}>
           {renderSectionHeader('database')}
@@ -254,6 +240,20 @@ export function SettingsModal(props: SettingsModalProps) {
             <SettingsBotSection
               appSettings={appSettings}
               isMobileLayout={isMobileLayout}
+              onSaveAppSettings={onSaveAppSettings}
+              className={sectionContentClass}
+            />
+          )}
+        </div>
+      )}
+
+      {shouldRenderSection('mqtt') && (
+        <div className={sectionWrapperClass}>
+          {renderSectionHeader('mqtt')}
+          {isSectionVisible('mqtt') && appSettings && (
+            <SettingsMqttSection
+              appSettings={appSettings}
+              health={health}
               onSaveAppSettings={onSaveAppSettings}
               className={sectionContentClass}
             />
