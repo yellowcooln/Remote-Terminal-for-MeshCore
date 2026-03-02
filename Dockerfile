@@ -1,13 +1,15 @@
 # Stage 1: Build frontend
 FROM node:20-slim AS frontend-builder
 
+ARG COMMIT_HASH=unknown
+
 WORKDIR /build
 
 COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
-RUN npm run build
+RUN VITE_COMMIT_HASH=${COMMIT_HASH} npm run build
 
 
 # Stage 2: Python runtime

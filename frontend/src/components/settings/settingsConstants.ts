@@ -5,7 +5,8 @@ export type SettingsSection =
   | 'mqtt'
   | 'database'
   | 'bot'
-  | 'statistics';
+  | 'statistics'
+  | 'about';
 
 export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
   'radio',
@@ -15,6 +16,7 @@ export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
   'database',
   'bot',
   'statistics',
+  'about',
 ];
 
 export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
@@ -25,4 +27,5 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   database: '🗄️ Database & Interface',
   bot: '🤖 Bot',
   statistics: '📊 Statistics',
+  about: 'About',
 };

@@ -80,7 +80,8 @@ frontend/src/
 │   │   ├── SettingsMqttSection.tsx       # MQTT broker config, TLS, publish toggles
 │   │   ├── SettingsDatabaseSection.tsx   # DB size, cleanup, auto-decrypt, local label
 │   │   ├── SettingsBotSection.tsx        # Bot list, code editor, add/delete/reset
-│   │   └── SettingsStatisticsSection.tsx # Read-only mesh network stats
+│   │   ├── SettingsStatisticsSection.tsx # Read-only mesh network stats
+│   │   └── SettingsAboutSection.tsx     # Version, author, license, links
 │   ├── repeater/
 │   │   ├── repeaterPaneShared.tsx        # Shared: RepeaterPane, KvRow, format helpers
 │   │   ├── RepeaterTelemetryPane.tsx    # Battery, airtime, packet counts

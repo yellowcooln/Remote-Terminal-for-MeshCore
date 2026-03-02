@@ -16,6 +16,7 @@ import { SettingsMqttSection } from './settings/SettingsMqttSection';
 import { SettingsDatabaseSection } from './settings/SettingsDatabaseSection';
 import { SettingsBotSection } from './settings/SettingsBotSection';
 import { SettingsStatisticsSection } from './settings/SettingsStatisticsSection';
+import { SettingsAboutSection } from './settings/SettingsAboutSection';
 
 interface SettingsModalBaseProps {
   open: boolean;
@@ -77,6 +78,7 @@ export function SettingsModal(props: SettingsModalProps) {
       database: false,
       bot: false,
       statistics: false,
+      about: false,
     };
   });
 
@@ -265,6 +267,13 @@ export function SettingsModal(props: SettingsModalProps) {
           {isSectionVisible('statistics') && (
             <SettingsStatisticsSection className={sectionContentClass} />
           )}
+        </div>
+      )}
+
+      {shouldRenderSection('about') && (
+        <div className={sectionWrapperClass}>
+          {renderSectionHeader('about')}
+          {isSectionVisible('about') && <SettingsAboutSection className={sectionContentClass} />}
         </div>
       )}
     </div>

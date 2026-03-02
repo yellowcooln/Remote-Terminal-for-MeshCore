@@ -153,7 +153,8 @@ GIT_HASH=$(git rev-parse --short HEAD)
 
 # Build docker image
 echo -e "${YELLOW}Building Docker image...${NC}"
-docker build -t jkingsman/remoteterm-meshcore:latest \
+docker build --build-arg COMMIT_HASH=$GIT_HASH \
+             -t jkingsman/remoteterm-meshcore:latest \
              -t jkingsman/remoteterm-meshcore:$VERSION \
              -t jkingsman/remoteterm-meshcore:$GIT_HASH .
 echo -e "${GREEN}Docker build complete!${NC}"
