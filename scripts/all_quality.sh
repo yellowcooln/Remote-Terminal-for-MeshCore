@@ -35,9 +35,24 @@ PID_BACKEND_LINT=$!
 ) &
 PID_FRONTEND_LINT=$!
 
+(
+    echo -e "${BLUE}[licenses]${NC} Checking LICENSES.md freshness..."
+    cd "$SCRIPT_DIR"
+    TMPLIC=$(mktemp)
+    trap "rm -f \$TMPLIC" EXIT
+    bash scripts/collect_licenses.sh "$TMPLIC"
+    if ! diff -q "$TMPLIC" LICENSES.md > /dev/null 2>&1; then
+        echo -e "${RED}[licenses]${NC} LICENSES.md is stale — run scripts/collect_licenses.sh"
+        exit 1
+    fi
+    echo -e "${GREEN}[licenses]${NC} Passed!"
+) &
+PID_LICENSES=$!
+
 FAIL=0
 wait $PID_BACKEND_LINT || FAIL=1
 wait $PID_FRONTEND_LINT || FAIL=1
+wait $PID_LICENSES || FAIL=1
 if [ $FAIL -ne 0 ]; then
     echo -e "${RED}Phase 1 failed — aborting.${NC}"
     exit 1

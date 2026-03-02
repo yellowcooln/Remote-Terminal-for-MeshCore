@@ -29,6 +29,9 @@ RUN uv sync --frozen --no-dev
 # Copy application code
 COPY app/ ./app/
 
+# Copy license attributions
+COPY LICENSES.md ./
+
 # Copy built frontend from first stage
 COPY --from=frontend-builder /build/dist ./frontend/dist
 

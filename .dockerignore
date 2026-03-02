@@ -29,6 +29,7 @@ frontend/src/test/
 # Docs
 *.md
 !README.md
+!LICENSES.md
 
 # Other
 references/
