@@ -300,3 +300,15 @@ npx playwright test --headed # show the browser window
 ## API Documentation
 
 With the backend running: http://localhost:8000/docs
+
+## Debugging & Bug Reports
+
+If you're experiencing issues or opening a bug report, please start the backend with debug logging enabled. Debug mode provides a much more detailed breakdown of radio communication, packet processing, and other internal operations, which makes it significantly easier to diagnose problems.
+
+To start the server with debug logging:
+
+```bash
+MESHCORE_LOG_LEVEL=DEBUG uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Please include the relevant debug log output when filing an issue on GitHub.
