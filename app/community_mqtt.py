@@ -20,20 +20,16 @@ import time
 from datetime import datetime
 from typing import Any
 
-import aiomqtt
 import nacl.bindings
 
 from app.models import AppSettings
+from app.mqtt_base import BaseMqttPublisher
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BROKER = "mqtt-us-v1.letsmesh.net"
 _DEFAULT_PORT = 443  # Community protocol uses WSS on port 443 by default
 _CLIENT_ID = "RemoteTerm (github.com/jkingsman/Remote-Terminal-for-MeshCore)"
-
-# Reconnect backoff: start at 5s, cap at 60s
-_BACKOFF_MIN = 5
-_BACKOFF_MAX = 60
 
 # Proactive JWT renewal: reconnect 1 hour before the 24h token expires
 _TOKEN_LIFETIME = 86400  # 24 hours (must match _generate_jwt_token exp)
@@ -267,59 +263,12 @@ def _format_raw_packet(data: dict[str, Any], device_name: str, public_key_hex: s
     return packet
 
 
-def _broadcast_health_update() -> None:
-    """Push a health broadcast so the frontend sees updated MQTT status badges."""
-    from app.radio import radio_manager
-    from app.websocket import broadcast_health
-
-    broadcast_health(radio_manager.is_connected, radio_manager.connection_info)
-
-
-class CommunityMqttPublisher:
+class CommunityMqttPublisher(BaseMqttPublisher):
     """Manages the community MQTT connection and publishes raw packets."""
 
-    def __init__(self) -> None:
-        self._client: aiomqtt.Client | None = None
-        self._task: asyncio.Task[None] | None = None
-        self._settings: AppSettings | None = None
-        self._settings_version: int = 0
-        self._version_event: asyncio.Event = asyncio.Event()
-        self.connected: bool = False
-
-    async def start(self, settings: AppSettings) -> None:
-        """Start the background connection loop."""
-        self._settings = settings
-        self._settings_version += 1
-        self._version_event.set()
-        if self._task is None or self._task.done():
-            self._task = asyncio.create_task(self._connection_loop())
-
-    async def stop(self) -> None:
-        """Cancel the background task and disconnect."""
-        if self._task and not self._task.done():
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-        self._task = None
-        self._client = None
-        self.connected = False
-
-    async def restart(self, settings: AppSettings) -> None:
-        """Called when community MQTT settings change — stop + start."""
-        await self.stop()
-        await self.start(settings)
-
-    async def publish(self, topic: str, payload: dict[str, Any]) -> None:
-        """Publish a JSON payload. Drops silently if not connected."""
-        if self._client is None or not self.connected:
-            return
-        try:
-            await self._client.publish(topic, json.dumps(payload))
-        except Exception as e:
-            logger.warning("Community MQTT publish failed on %s: %s", topic, e)
-            self.connected = False
+    _backoff_max = 60
+    _log_prefix = "Community MQTT"
+    _not_configured_timeout: float | None = 30
 
     def _is_configured(self) -> bool:
         """Check if community MQTT is enabled and keys are available."""
@@ -327,122 +276,70 @@ class CommunityMqttPublisher:
 
         return bool(self._settings and self._settings.community_mqtt_enabled and has_private_key())
 
-    async def _connection_loop(self) -> None:
-        """Background loop: connect, wait, reconnect on failure."""
+    def _build_client_kwargs(self, settings: AppSettings) -> dict[str, Any]:
         from app.keystore import get_private_key, get_public_key
-        from app.websocket import broadcast_error, broadcast_success
 
-        backoff = _BACKOFF_MIN
+        private_key = get_private_key()
+        public_key = get_public_key()
+        assert private_key is not None and public_key is not None  # guaranteed by _pre_connect
 
-        while True:
-            if not self._is_configured():
-                self.connected = False
-                self._client = None
-                self._version_event.clear()
-                try:
-                    # Also wake periodically so newly exported keys are detected without a settings change.
-                    await asyncio.wait_for(self._version_event.wait(), timeout=30)
-                except asyncio.TimeoutError:
-                    continue
-                except asyncio.CancelledError:
-                    return
-                continue
+        pubkey_hex = public_key.hex().upper()
+        broker_raw = settings.community_mqtt_broker or _DEFAULT_BROKER
+        broker_host, broker_port = _parse_broker_address(broker_raw)
+        jwt_token = _generate_jwt_token(
+            private_key,
+            public_key,
+            audience=broker_host,
+            email=settings.community_mqtt_email or "",
+        )
 
-            settings = self._settings
-            assert settings is not None
-            version_at_connect = self._settings_version
+        tls_context = ssl.create_default_context()
 
+        return {
+            "hostname": broker_host,
+            "port": broker_port,
+            "transport": "websockets",
+            "tls_context": tls_context,
+            "websocket_path": "/",
+            "username": f"v1_{pubkey_hex}",
+            "password": jwt_token,
+        }
+
+    def _on_connected(self, settings: AppSettings) -> tuple[str, str]:
+        broker_raw = settings.community_mqtt_broker or _DEFAULT_BROKER
+        broker_host, broker_port = _parse_broker_address(broker_raw)
+        return ("Community MQTT connected", f"{broker_host}:{broker_port}")
+
+    def _on_error(self) -> tuple[str, str]:
+        return (
+            "Community MQTT connection failure",
+            "Check your internet connection or try again later.",
+        )
+
+    def _should_break_wait(self, elapsed: float) -> bool:
+        if not self.connected:
+            logger.info("Community MQTT publish failure detected, reconnecting")
+            return True
+        if elapsed >= _TOKEN_RENEWAL_THRESHOLD:
+            logger.info("Community MQTT JWT nearing expiry, reconnecting")
+            return True
+        return False
+
+    async def _pre_connect(self, settings: AppSettings) -> bool:
+        from app.keystore import get_private_key, get_public_key
+
+        private_key = get_private_key()
+        public_key = get_public_key()
+        if private_key is None or public_key is None:
+            # Keys not available yet, wait for settings change or key export
+            self.connected = False
+            self._version_event.clear()
             try:
-                private_key = get_private_key()
-                public_key = get_public_key()
-                if private_key is None or public_key is None:
-                    # Keys not available yet, wait for settings change
-                    self.connected = False
-                    self._version_event.clear()
-                    try:
-                        await asyncio.wait_for(self._version_event.wait(), timeout=30)
-                    except asyncio.TimeoutError:
-                        continue
-                    except asyncio.CancelledError:
-                        return
-                    continue
-
-                pubkey_hex = public_key.hex().upper()
-                broker_raw = settings.community_mqtt_broker or _DEFAULT_BROKER
-                broker_host, broker_port = _parse_broker_address(broker_raw)
-                jwt_token = _generate_jwt_token(
-                    private_key,
-                    public_key,
-                    audience=broker_host,
-                    email=settings.community_mqtt_email or "",
-                )
-                token_created_at = time.monotonic()
-
-                tls_context = ssl.create_default_context()
-
-                async with aiomqtt.Client(
-                    hostname=broker_host,
-                    port=broker_port,
-                    transport="websockets",
-                    tls_context=tls_context,
-                    websocket_path="/",
-                    username=f"v1_{pubkey_hex}",
-                    password=jwt_token,
-                ) as client:
-                    self._client = client
-                    self.connected = True
-                    backoff = _BACKOFF_MIN
-
-                    broadcast_success(
-                        "Community MQTT connected",
-                        f"{broker_host}:{broker_port}",
-                    )
-                    _broadcast_health_update()
-
-                    # Wait until cancelled, settings change, or token nears expiry
-                    while self._settings_version == version_at_connect:
-                        self._version_event.clear()
-                        try:
-                            await asyncio.wait_for(self._version_event.wait(), timeout=60)
-                        except asyncio.TimeoutError:
-                            # Detect publish failure: reconnect so packets resume
-                            if not self.connected:
-                                logger.info("Community MQTT publish failure detected, reconnecting")
-                                break
-                            # Proactive JWT renewal: reconnect before token expires
-                            if time.monotonic() - token_created_at >= _TOKEN_RENEWAL_THRESHOLD:
-                                logger.info("Community MQTT JWT nearing expiry, reconnecting")
-                                break
-                            continue
-
-                # async with exited — client is now closed
-                self._client = None
-                self.connected = False
-                _broadcast_health_update()
-
-            except asyncio.CancelledError:
-                self.connected = False
-                self._client = None
-                return
-
-            except Exception as e:
-                self.connected = False
-                self._client = None
-
-                broadcast_error(
-                    "Community MQTT connection failure",
-                    "Check your internet connection or try again later.",
-                )
-                _broadcast_health_update()
-                logger.warning(
-                    "Community MQTT connection error: %s (reconnecting in %ds)", e, backoff
-                )
-
-                try:
-                    await asyncio.sleep(backoff)
-                except asyncio.CancelledError:
-                    return
-                backoff = min(backoff * 2, _BACKOFF_MAX)
+                await asyncio.wait_for(self._version_event.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                pass
+            return False
+        return True
 
 
 # Module-level singleton

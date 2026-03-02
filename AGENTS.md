@@ -152,7 +152,8 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   ├── event_handlers.py   # Radio events
 │   ├── decoder.py          # Packet decryption
 │   ├── websocket.py        # Real-time broadcasts
-│   ├── mqtt.py             # Optional MQTT publisher
+│   ├── mqtt_base.py        # Shared MQTT publisher base class (lifecycle, reconnect, backoff)
+│   ├── mqtt.py             # Private MQTT publisher
 │   └── community_mqtt.py   # Community MQTT publisher (raw packet sharing)
 ├── frontend/               # React frontend
 │   ├── AGENTS.md           # Frontend documentation

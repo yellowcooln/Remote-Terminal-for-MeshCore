@@ -27,7 +27,8 @@ app/
 ├── packet_processor.py  # Raw packet pipeline, dedup, path handling
 ├── event_handlers.py    # MeshCore event subscriptions and ACK tracking
 ├── websocket.py         # WS manager + broadcast helpers
-├── mqtt.py              # Optional MQTT publisher (fire-and-forget forwarding)
+├── mqtt_base.py         # Shared MQTT publisher base class (lifecycle, reconnect, backoff)
+├── mqtt.py              # Private MQTT publisher (fire-and-forget forwarding)
 ├── community_mqtt.py    # Community MQTT publisher (raw packet sharing)
 ├── bot.py               # Bot execution and outbound bot sends
 ├── dependencies.py      # Shared FastAPI dependency providers

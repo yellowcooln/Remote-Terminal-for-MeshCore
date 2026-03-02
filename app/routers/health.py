@@ -40,7 +40,7 @@ async def build_health_data(radio_connected: bool, connection_info: str | None) 
     try:
         from app.mqtt import mqtt_publisher
 
-        if mqtt_publisher._mqtt_configured():
+        if mqtt_publisher._is_configured():
             mqtt_status = "connected" if mqtt_publisher.connected else "disconnected"
         else:
             mqtt_status = "disabled"
