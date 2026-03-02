@@ -252,14 +252,26 @@ export function SettingsMqttSection({
                   />
                   <div className="text-xs text-muted-foreground space-y-2">
                     <div>
-                      <p className="font-medium">Decrypted messages <span className="font-mono font-normal opacity-75">{'{'}id, type, conversation_key, text, sender_timestamp, received_at, paths, outgoing, acked{'}'}</span></p>
+                      <p className="font-medium">
+                        Decrypted messages{' '}
+                        <span className="font-mono font-normal opacity-75">
+                          {'{'}id, type, conversation_key, text, sender_timestamp, received_at,
+                          paths, outgoing, acked{'}'}
+                        </span>
+                      </p>
                       <div className="font-mono ml-2 space-y-0.5">
                         <div>{mqttTopicPrefix || 'meshcore'}/dm:&lt;contact_key&gt;</div>
                         <div>{mqttTopicPrefix || 'meshcore'}/gm:&lt;channel_key&gt;</div>
                       </div>
                     </div>
                     <div>
-                      <p className="font-medium">Raw packets <span className="font-mono font-normal opacity-75">{'{'}id, observation_id, timestamp, data, payload_type, snr, rssi, decrypted, decrypted_info{'}'}</span></p>
+                      <p className="font-medium">
+                        Raw packets{' '}
+                        <span className="font-mono font-normal opacity-75">
+                          {'{'}id, observation_id, timestamp, data, payload_type, snr, rssi,
+                          decrypted, decrypted_info{'}'}
+                        </span>
+                      </p>
                       <div className="font-mono ml-2 space-y-0.5">
                         <div>{mqttTopicPrefix || 'meshcore'}/raw/dm:&lt;contact_key&gt;</div>
                         <div>{mqttTopicPrefix || 'meshcore'}/raw/gm:&lt;channel_key&gt;</div>

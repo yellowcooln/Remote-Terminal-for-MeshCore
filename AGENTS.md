@@ -360,7 +360,7 @@ Optional MQTT integration forwards mesh events to an external broker for home au
 - `meshcore/raw/gm:<channel_key>` — raw packet attributed to a channel
 - `meshcore/raw/unrouted` — raw packets that couldn't be attributed
 
-**Architecture**: `broadcast_event()` in `websocket.py` calls `mqtt_broadcast()` — a single hook covering all message and raw_packet broadcasts. The `MqttPublisher` in `app/mqtt.py` manages a background connection loop with auto-reconnect and backoff. Publishes are fire-and-forget (silent drop if disconnected). Connection state changes trigger toasts via `broadcast_error`/`broadcast_success`. The health endpoint includes `mqtt_status`.
+**Architecture**: `broadcast_event()` in `websocket.py` calls `mqtt_broadcast()` — a single hook covering all message and raw_packet broadcasts. The `MqttPublisher` in `app/mqtt.py` manages a background connection loop with auto-reconnect and backoff. Publishes are fire-and-forget (silent drop if disconnected). Connection state changes trigger toasts via `broadcast_error`/`broadcast_success`. The health endpoint includes `mqtt_status` (`disabled` when no broker host is set, or when both publish toggles are off).
 
 **Security**: MQTT password stored in plaintext in SQLite, consistent with the project's trusted-network design.
 
