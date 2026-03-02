@@ -16,10 +16,12 @@ This runs all linting, formatting, type checking, tests, and builds for both bac
 
 A web interface for MeshCore mesh radio networks. The backend connects to a MeshCore-compatible radio over Serial, TCP, or BLE and exposes REST/WebSocket APIs. The React frontend provides real-time messaging and radio configuration.
 
-**For detailed component documentation, see:**
+**For detailed component documentation, see these primary AGENTS.md files:**
 - `app/AGENTS.md` - Backend (FastAPI, database, radio connection, packet decryption)
 - `frontend/AGENTS.md` - Frontend (React, state management, WebSocket, components)
-- `frontend/src/components/AGENTS.md` - Frontend visualizer feature (a particularly complex and long force-directed graph visualizer component; can skip this file unless you're working on that feature)
+Ancillary AGENTS.md files which should generally not be reviewed unless specific work is being performed on those features include:
+- `app/AGENTS_MQTT.md` - MQTT architecture (private broker, community analytics, JWT auth, packet format protocol)
+- `frontend/src/components/AGENTS_packet_visualizer.md` - Packet visualizer (force-directed graph, advert-path identity, layout engine)
 
 ## Architecture Overview
 
@@ -111,7 +113,7 @@ To improve repeater disambiguation in the network visualizer, the backend stores
 - This is independent of raw-packet payload deduplication.
 - Paths are keyed per contact + path, with `heard_count`, `first_seen`, and `last_seen`.
 - Only the N most recent unique paths are retained per contact (currently 10).
-- See `frontend/src/components/AGENTS.md` § "Advert-Path Identity Hints" for how the visualizer consumes this data.
+- See `frontend/src/components/AGENTS_packet_visualizer.md` § "Advert-Path Identity Hints" for how the visualizer consumes this data.
 
 ## Data Flow
 

@@ -341,6 +341,9 @@ export function SettingsMqttSection({
                       value={communityMqttBrokerHost}
                       onChange={(e) => setCommunityMqttBrokerHost(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      MQTT over TLS (WebSocket Secure) only
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="community-broker-port">Broker Port</Label>
