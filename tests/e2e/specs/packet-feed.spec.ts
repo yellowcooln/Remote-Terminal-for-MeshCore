@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/meshTrafficTest';
 
 test.describe('Packet Feed page', () => {
   test('packet feed page loads and shows header', async ({ page }) => {
@@ -7,7 +7,7 @@ test.describe('Packet Feed page', () => {
     await expect(page.getByText('Raw Packet Feed')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('a packet appears in the raw packet feed', async ({ page }) => {
+  test('a packet appears in the raw packet feed', { tag: '@mesh-traffic' }, async ({ page }) => {
     // This test waits for real RF traffic — needs 180s timeout
     test.setTimeout(180_000);
 

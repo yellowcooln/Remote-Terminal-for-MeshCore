@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/meshTrafficTest';
 import { createChannel, getChannels, getMessages } from '../helpers/api';
 
 /**
@@ -54,7 +54,7 @@ test.describe('Incoming mesh messages', () => {
     }
   });
 
-  test('receive an incoming message in any room', async ({ page }) => {
+  test('receive an incoming message in any room', { tag: '@mesh-traffic' }, async ({ page }) => {
     await page.goto('/');
     await expect(page.getByText('Connected')).toBeVisible();
 
@@ -102,7 +102,7 @@ test.describe('Incoming mesh messages', () => {
     });
   });
 
-  test('incoming message with path shows hop badge and path modal', async ({ page }) => {
+  test('incoming message with path shows hop badge and path modal', { tag: '@mesh-traffic' }, async ({ page }) => {
     await page.goto('/');
     await expect(page.getByText('Connected')).toBeVisible();
 
