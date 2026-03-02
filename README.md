@@ -161,8 +161,14 @@ Run both the backend and `npm run dev` for hot-reloading frontend development.
 
 Please test, lint, format, and quality check your code before PRing or committing. At the least, run a lint + autoformat + pyright check on the backend, and a lint + autoformat on the frontend.
 
+Run everything at once (parallelized):
+
+```bash
+./scripts/all_quality.sh
+```
+
 <details>
-<summary>But how?</summary>
+<summary>Or run individual checks</summary>
 
 ```bash
 # python

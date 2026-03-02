@@ -276,6 +276,14 @@ Do not rely on old class-only layout assumptions.
 
 ## Testing
 
+Run all quality checks (backend + frontend, parallelized) from the repo root:
+
+```bash
+./scripts/all_quality.sh
+```
+
+Or run frontend checks individually:
+
 ```bash
 cd frontend
 npm run test:run

@@ -7,6 +7,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SCRIPT_DIR"
+
 echo -e "${YELLOW}=== RemoteTerm for MeshCore Publish Script ===${NC}"
 echo
 
@@ -33,7 +36,7 @@ echo
 
 # Run frontend linting and formatting check
 echo -e "${YELLOW}Running frontend lint (ESLint)...${NC}"
-cd frontend
+cd "$SCRIPT_DIR/frontend"
 npm run lint
 echo -e "${GREEN}Frontend lint passed!${NC}"
 echo
@@ -52,7 +55,7 @@ echo
 echo -e "${YELLOW}Building frontend...${NC}"
 npm run build
 echo -e "${GREEN}Frontend build complete!${NC}"
-cd ..
+cd "$SCRIPT_DIR"
 echo
 
 # Prompt for version

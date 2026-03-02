@@ -4,20 +4,13 @@
 
 **NEVER make git commits.** A human must make all commits. You may stage files and prepare commit messages, but do not run `git commit`.
 
-If instructed to "run all tests" or "get ready for a commit" or other summative, work ending directives, make sure you run the following and that they all pass green:
+If instructed to "run all tests" or "get ready for a commit" or other summative, work ending directives, run:
 
 ```bash
-uv run ruff check app/ tests/ --fix # check for python violations
-uv run ruff format app/ tests/ # format python
-uv run pyright app/ # type check python
-PYTHONPATH=. uv run pytest tests/ -v # test python
-
-cd frontend/ # move to frontend directory
-npm run lint:fix # fix lint violations
-npm run format # format the code
-npm run test:run # run frontend tests
-npm run build # run a frontend build
+./scripts/all_quality.sh
 ```
+
+This runs all linting, formatting, type checking, tests, and builds for both backend and frontend in parallel. All checks must pass green.
 
 ## Overview
 
@@ -171,6 +164,10 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   │       ├── MapView.tsx       # Leaflet map showing node locations
 │   │       └── ...
 │   └── vite.config.ts
+├── scripts/
+│   ├── all_quality.sh      # Run all lint, format, typecheck, tests, build (parallelized)
+│   ├── publish.sh          # Version bump, changelog, docker build & push
+│   └── deploy.sh           # Deploy to production server
 ├── tests/                  # Backend tests (pytest)
 ├── data/                   # SQLite database (runtime)
 └── pyproject.toml          # Python dependencies
@@ -246,20 +243,7 @@ npm run test:run
 
 ### Before Completing Changes
 
-**Always run both backend and frontend validation before finishing any changes:**
-
-```bash
-# From project root - run backend tests
-PYTHONPATH=. uv run pytest tests/ -v
-
-# From project root - run frontend tests and build
-cd frontend && npm run test:run && npm run build
-```
-
-This catches:
-- Type mismatches between frontend and backend (e.g., missing fields in TypeScript interfaces)
-- Breaking changes to shared types or API contracts
-- Runtime errors that only surface during compilation
+**Always run `./scripts/all_quality.sh` before finishing any changes.** This runs all linting, formatting, type checking, tests, and builds in parallel, catching type mismatches, breaking changes, and compilation errors.
 
 ## API Summary
 
