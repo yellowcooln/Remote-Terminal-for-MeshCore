@@ -361,7 +361,12 @@ async def _message_poll_loop():
                         blocking=False,
                         suspend_auto_fetch=True,
                     ) as mc:
-                        await poll_for_messages(mc)
+                        count = await poll_for_messages(mc)
+                        if count > 0:
+                            logger.warning(
+                                "Poll loop caught %d message(s) missed by auto-fetch",
+                                count,
+                            )
                 except RadioOperationBusyError:
                     logger.debug("Skipping message poll: radio busy")
 
