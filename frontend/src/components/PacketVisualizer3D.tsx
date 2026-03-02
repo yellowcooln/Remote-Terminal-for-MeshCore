@@ -25,6 +25,7 @@ import {
   type ContactAdvertPathSummary,
 } from '../types';
 import { getRawPacketObservationKey } from '../utils/rawPacketIdentity';
+import { getVisualizerSettings, saveVisualizerSettings } from '../utils/visualizerSettings';
 import { Checkbox } from './ui/checkbox';
 import {
   type NodeType,
@@ -34,7 +35,6 @@ import {
   COLORS,
   PARTICLE_COLOR_MAP,
   PARTICLE_SPEED,
-  DEFAULT_OBSERVATION_WINDOW_SEC,
   PACKET_LEGEND_ITEMS,
   parsePacket,
   getPacketLabel,
@@ -1007,18 +1007,54 @@ export function PacketVisualizer3D({
   const mouseRef = useRef(new THREE.Vector2());
 
   // Options
-  const [showAmbiguousPaths, setShowAmbiguousPaths] = useState(true);
-  const [showAmbiguousNodes, setShowAmbiguousNodes] = useState(false);
-  const [useAdvertPathHints, setUseAdvertPathHints] = useState(true);
-  const [splitAmbiguousByTraffic, setSplitAmbiguousByTraffic] = useState(true);
-  const [chargeStrength, setChargeStrength] = useState(-200);
-  const [observationWindowSec, setObservationWindowSec] = useState(DEFAULT_OBSERVATION_WINDOW_SEC);
-  const [letEmDrift, setLetEmDrift] = useState(true);
-  const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(2);
-  const [showControls, setShowControls] = useState(true);
-  const [autoOrbit, setAutoOrbit] = useState(false);
-  const [pruneStaleNodes, setPruneStaleNodes] = useState(false);
+  const [savedSettings] = useState(getVisualizerSettings);
+  const [showAmbiguousPaths, setShowAmbiguousPaths] = useState(savedSettings.showAmbiguousPaths);
+  const [showAmbiguousNodes, setShowAmbiguousNodes] = useState(savedSettings.showAmbiguousNodes);
+  const [useAdvertPathHints, setUseAdvertPathHints] = useState(savedSettings.useAdvertPathHints);
+  const [splitAmbiguousByTraffic, setSplitAmbiguousByTraffic] = useState(
+    savedSettings.splitAmbiguousByTraffic
+  );
+  const [chargeStrength, setChargeStrength] = useState(savedSettings.chargeStrength);
+  const [observationWindowSec, setObservationWindowSec] = useState(
+    savedSettings.observationWindowSec
+  );
+  const [letEmDrift, setLetEmDrift] = useState(savedSettings.letEmDrift);
+  const [particleSpeedMultiplier, setParticleSpeedMultiplier] = useState(
+    savedSettings.particleSpeedMultiplier
+  );
+  const [showControls, setShowControls] = useState(savedSettings.showControls);
+  const [autoOrbit, setAutoOrbit] = useState(savedSettings.autoOrbit);
+  const [pruneStaleNodes, setPruneStaleNodes] = useState(savedSettings.pruneStaleNodes);
   const [repeaterAdvertPaths, setRepeaterAdvertPaths] = useState<ContactAdvertPathSummary[]>([]);
+
+  // Persist visualizer controls to localStorage on change
+  useEffect(() => {
+    saveVisualizerSettings({
+      showAmbiguousPaths,
+      showAmbiguousNodes,
+      useAdvertPathHints,
+      splitAmbiguousByTraffic,
+      chargeStrength,
+      observationWindowSec,
+      letEmDrift,
+      particleSpeedMultiplier,
+      pruneStaleNodes,
+      autoOrbit,
+      showControls,
+    });
+  }, [
+    showAmbiguousPaths,
+    showAmbiguousNodes,
+    useAdvertPathHints,
+    splitAmbiguousByTraffic,
+    chargeStrength,
+    observationWindowSec,
+    letEmDrift,
+    particleSpeedMultiplier,
+    pruneStaleNodes,
+    autoOrbit,
+    showControls,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
