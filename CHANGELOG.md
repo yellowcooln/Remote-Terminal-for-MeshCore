@@ -1,3 +1,15 @@
+## [2.3.0] - 2026-03-01
+
+Feature: Click path description to reset to flood
+Feature: Add MQTT publishing
+Feature: Visualizer remembers settings
+Bugfix: Fix prefetch usage
+Bugfix: Fixed an issue where busy channels can result in double-display of incoming messages
+Misc: Drop py3.12 requirement
+Misc: Performance, documentation, test, and file structure optimizations
+Misc: Add arrows between route nodes on contact info
+Misc: Show repeater path/type in title bar
+
 ## [2.2.0] - 2026-02-28
 
 Feature: Track advert paths and use to disambiguate repeater identity in visualizer
