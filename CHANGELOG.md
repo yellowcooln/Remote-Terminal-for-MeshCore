@@ -1,3 +1,9 @@
+## [2.4.0] - 2026-03-02
+
+Feature: Add community MQTT reporting (e.g. LetsMesh.net)
+Misc: Build scripts and library attribution
+Misc: Add sign of life to E2E tests
+
 ## [2.3.0] - 2026-03-01
 
 Feature: Click path description to reset to flood
