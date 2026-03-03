@@ -20,6 +20,7 @@ import time
 from datetime import datetime
 from typing import Any
 
+import aiomqtt
 import nacl.bindings
 
 from app.models import AppSettings
@@ -252,6 +253,12 @@ def _format_raw_packet(data: dict[str, Any], device_name: str, public_key_hex: s
     return packet
 
 
+def _build_status_topic(settings: AppSettings, pubkey_hex: str) -> str:
+    """Build the ``meshcore/{IATA}/{PUBKEY}/status`` topic string."""
+    iata = settings.community_mqtt_iata.upper().strip()
+    return f"meshcore/{iata}/{pubkey_hex}/status"
+
+
 class CommunityMqttPublisher(BaseMqttPublisher):
     """Manages the community MQTT connection and publishes raw packets."""
 
@@ -308,6 +315,15 @@ class CommunityMqttPublisher(BaseMqttPublisher):
 
         tls_context = ssl.create_default_context()
 
+        status_topic = _build_status_topic(settings, pubkey_hex)
+        offline_payload = json.dumps(
+            {
+                "status": "offline",
+                "origin_id": pubkey_hex,
+                "client": _CLIENT_ID,
+            }
+        )
+
         return {
             "hostname": broker_host,
             "port": broker_port,
@@ -316,12 +332,39 @@ class CommunityMqttPublisher(BaseMqttPublisher):
             "websocket_path": "/",
             "username": f"v1_{pubkey_hex}",
             "password": jwt_token,
+            "will": aiomqtt.Will(status_topic, offline_payload, retain=True),
         }
 
     def _on_connected(self, settings: AppSettings) -> tuple[str, str]:
         broker_host = settings.community_mqtt_broker_host or _DEFAULT_BROKER
         broker_port = settings.community_mqtt_broker_port or _DEFAULT_PORT
         return ("Community MQTT connected", f"{broker_host}:{broker_port}")
+
+    async def _on_connected_async(self, settings: AppSettings) -> None:
+        """Publish a retained online status message after connecting."""
+        from app.keystore import get_public_key
+        from app.radio import radio_manager
+
+        public_key = get_public_key()
+        if public_key is None:
+            return
+
+        pubkey_hex = public_key.hex().upper()
+
+        device_name = ""
+        if radio_manager.meshcore and radio_manager.meshcore.self_info:
+            device_name = radio_manager.meshcore.self_info.get("name", "")
+
+        status_topic = _build_status_topic(settings, pubkey_hex)
+        payload = {
+            "status": "online",
+            "timestamp": datetime.now().isoformat(),
+            "origin": device_name or "MeshCore Device",
+            "origin_id": pubkey_hex,
+            "client": _CLIENT_ID,
+        }
+
+        await self.publish(status_topic, payload, retain=True)
 
     def _on_error(self) -> tuple[str, str]:
         return (

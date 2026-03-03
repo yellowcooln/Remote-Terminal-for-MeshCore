@@ -109,6 +109,32 @@ class TestMqttPublisher:
         assert call_args[0][0] == "test/topic"
 
     @pytest.mark.asyncio
+    async def test_publish_passes_retain_flag(self):
+        pub = MqttPublisher()
+        pub.connected = True
+        mock_client = AsyncMock()
+        pub._client = mock_client
+
+        await pub.publish("test/topic", {"msg": "hello"}, retain=True)
+
+        mock_client.publish.assert_called_once()
+        call_args = mock_client.publish.call_args
+        assert call_args[0][0] == "test/topic"
+        assert call_args[1]["retain"] is True
+
+    @pytest.mark.asyncio
+    async def test_publish_retain_defaults_false(self):
+        pub = MqttPublisher()
+        pub.connected = True
+        mock_client = AsyncMock()
+        pub._client = mock_client
+
+        await pub.publish("test/topic", {"msg": "hello"})
+
+        call_args = mock_client.publish.call_args
+        assert call_args[1]["retain"] is False
+
+    @pytest.mark.asyncio
     async def test_publish_handles_exception_gracefully(self):
         pub = MqttPublisher()
         pub.connected = True

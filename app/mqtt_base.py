@@ -79,12 +79,12 @@ class BaseMqttPublisher(ABC):
         await self.stop()
         await self.start(settings)
 
-    async def publish(self, topic: str, payload: dict[str, Any]) -> None:
+    async def publish(self, topic: str, payload: dict[str, Any], *, retain: bool = False) -> None:
         """Publish a JSON payload. Drops silently if not connected."""
         if self._client is None or not self.connected:
             return
         try:
-            await self._client.publish(topic, json.dumps(payload))
+            await self._client.publish(topic, json.dumps(payload), retain=retain)
         except Exception as e:
             logger.warning("%s publish failed on %s: %s", self._log_prefix, topic, e)
             self.connected = False
@@ -123,6 +123,13 @@ class BaseMqttPublisher(ABC):
     def _on_not_configured(self) -> None:
         """Called each time the loop finds the publisher not configured."""
         return  # no-op by default; subclasses may override
+
+    async def _on_connected_async(self, settings: AppSettings) -> None:
+        """Async hook called after connection succeeds (before health broadcast).
+
+        Subclasses can override to publish messages immediately after connecting.
+        """
+        return  # no-op by default
 
     # ── Connection loop ────────────────────────────────────────────────
 
@@ -170,6 +177,7 @@ class BaseMqttPublisher(ABC):
 
                     title, detail = self._on_connected(settings)
                     broadcast_success(title, detail)
+                    await self._on_connected_async(settings)
                     _broadcast_health()
 
                     # Wait until cancelled or settings version changes.
