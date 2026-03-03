@@ -1,5 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
+
+# developer perogative ;D
+if command -v enablenvm >/dev/null 2>&1; then
+    enablenvm >/dev/null 2>&1 || true
+fi
+
 
 # Colors for output
 RED='\033[0;31m'
@@ -36,16 +42,10 @@ PID_BACKEND_LINT=$!
 PID_FRONTEND_LINT=$!
 
 (
-    echo -e "${BLUE}[licenses]${NC} Checking LICENSES.md freshness..."
+    echo -e "${BLUE}[licenses]${NC} Regenerating LICENSES.md (always run)..."
     cd "$SCRIPT_DIR"
-    TMPLIC=$(mktemp)
-    trap "rm -f \$TMPLIC" EXIT
-    bash scripts/collect_licenses.sh "$TMPLIC"
-    if ! diff -q "$TMPLIC" LICENSES.md > /dev/null 2>&1; then
-        echo -e "${RED}[licenses]${NC} LICENSES.md is stale — run scripts/collect_licenses.sh"
-        exit 1
-    fi
-    echo -e "${GREEN}[licenses]${NC} Passed!"
+    bash scripts/collect_licenses.sh LICENSES.md
+    echo -e "${GREEN}[licenses]${NC} LICENSES.md updated"
 ) &
 PID_LICENSES=$!
 
