@@ -23,14 +23,14 @@ Feature: Contact info pane
 Feature: Overhaul repeater interface
 Bugfix: Misc. frontend rendering + perf improvements
 Bugfix: Better behavior around radio locking and autofetch/polling
-Bugifx: Clear channel name field on new-channel modal tab change
+Bugfix: Clear channel name field on new-channel modal tab change
 Bugfix: Repeater inforbox can scroll
 Bugfix: Better handling of historical DM encrypts
 Bugfix: Handle errors if returned in prefetch phase
 Misc: Radio event response failure is logged/surfaced better
 Misc: Improve test coverage and remove dead code
-Misc: Documentatin and errata improvements
-Misc: Databse storage optimization
+Misc: Documentation and errata improvements
+Misc: Database storage optimization
 
 ## [2.1.0] - 2026-02-23
 
@@ -70,11 +70,11 @@ Bugfix: Fix missing trigger condition on statistics pane expansion on mobile
 
 Feature: Frontend UX + log overhaul
 Bugfix: Use contact object from DB for broadcast rather than handrolling
-Bugfix: Fix our of order path WS messages voerwriting each other
+Bugfix: Fix out of order path WS messages overwriting each other
 Bugfix: Make broadcast timestamp match fallback logic used in storage code
-Bugfix: Fir repeater command timestamp selection logic
+Bugfix: Fix repeater command timestamp selection logic
 Bugfix: Use actual pubkey matching for path update, and don't action serial path update events (use RX packet)
-Bugfix: Add missing radio operation locks in a few sports
+Bugfix: Add missing radio operation locks in a few spots
 Bugfix: Fix dedupe for frontend raw packet delivery (mesh visualizer much more active now!)
 Bugfix: Less aggressive dedupe for advert packets (we don't care about the payload, we care about the path, duh)
 Misc: Visualizer layout refinement & option labels
@@ -100,7 +100,7 @@ Feature: Upgrade the room finder to support two-word rooms
 ## [1.9.2] - 2026-02-12
 
 Feature: Options dialog sucks less
-Bugix: Move tests to isolated memory DB
+Bugfix: Move tests to isolated memory DB
 Bugfix: Mention case sensitivity
 Bugfix: Stale header retention on settings page view
 Bugfix: Non-isolated path writing
@@ -159,7 +159,7 @@ Feature: Clickable hyperlinks
 Bugfix: More consistent public key normalization
 Bugfix: Use more reliable cursor paging
 Bugfix: Fix null timestamp dedupe failure
-Bugfix: More concistent prefix-based message claiming on key reciept
+Bugfix: More consistent prefix-based message claiming on key receipt
 Misc: Bot can respond to its own messages
 Misc: Additional tests
 Misc: Remove unneeded message dedupe logic

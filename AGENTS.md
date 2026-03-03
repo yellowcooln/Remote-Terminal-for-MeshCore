@@ -297,7 +297,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | GET | `/api/messages` | List with filters |
 | POST | `/api/messages/direct` | Send direct message |
 | POST | `/api/messages/channel` | Send channel message |
-| POST | `/api/messages/channel/{message_id}/resend` | Resend an outgoing channel message (within 30 seconds) |
+| POST | `/api/messages/channel/{message_id}/resend` | Resend channel message (default: byte-perfect within 30s; `?new_timestamp=true`: fresh timestamp, no time limit, creates new message row) |
 | GET | `/api/packets/undecrypted/count` | Count of undecrypted packets |
 | POST | `/api/packets/decrypt/historical` | Decrypt stored packets |
 | POST | `/api/packets/maintenance` | Delete old packets and vacuum |
@@ -324,6 +324,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 - `1` - Client (regular node)
 - `2` - Repeater
 - `3` - Room
+- `4` - Sensor
 
 ### Channel Keys
 

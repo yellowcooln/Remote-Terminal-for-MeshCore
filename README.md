@@ -50,8 +50,11 @@ winget install usbipd
 # restart console
 # then find device ID
 usbipd list
-# attach device to WSL
+# make device shareable
 usbipd bind --busid 3-8 # (or whatever the right ID is)
+# attach device to WSL (run this each time you plug in the device)
+usbipd attach --wsl --busid 3-8
+# device will appear in WSL as /dev/ttyUSB0 or /dev/ttyACM0
 ```
 </details>
 
