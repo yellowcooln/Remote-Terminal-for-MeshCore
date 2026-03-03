@@ -1030,6 +1030,7 @@ export function PacketVisualizer3D({
   // Persist visualizer controls to localStorage on change
   useEffect(() => {
     saveVisualizerSettings({
+      ...getVisualizerSettings(),
       showAmbiguousPaths,
       showAmbiguousNodes,
       useAdvertPathHints,

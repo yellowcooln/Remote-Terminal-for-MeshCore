@@ -5,6 +5,7 @@ import { PacketVisualizer3D } from './PacketVisualizer3D';
 import { RawPacketList } from './RawPacketList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { cn } from '@/lib/utils';
+import { getVisualizerSettings, saveVisualizerSettings } from '../utils/visualizerSettings';
 
 interface VisualizerViewProps {
   packets: RawPacket[];
@@ -13,9 +14,17 @@ interface VisualizerViewProps {
 }
 
 export function VisualizerView({ packets, contacts, config }: VisualizerViewProps) {
-  const [fullScreen, setFullScreen] = useState(false);
+  const [fullScreen, setFullScreen] = useState(() => getVisualizerSettings().hidePacketFeed);
   const [paneFullScreen, setPaneFullScreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Persist packet feed visibility to localStorage
+  useEffect(() => {
+    const current = getVisualizerSettings();
+    if (current.hidePacketFeed !== fullScreen) {
+      saveVisualizerSettings({ ...current, hidePacketFeed: fullScreen });
+    }
+  }, [fullScreen]);
 
   // Sync state when browser exits fullscreen (Escape, F11, etc.)
   useEffect(() => {

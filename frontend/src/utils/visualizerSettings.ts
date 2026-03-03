@@ -12,6 +12,7 @@ export interface VisualizerSettings {
   pruneStaleNodes: boolean;
   autoOrbit: boolean;
   showControls: boolean;
+  hidePacketFeed: boolean;
 }
 
 export const VISUALIZER_DEFAULTS: VisualizerSettings = {
@@ -26,6 +27,7 @@ export const VISUALIZER_DEFAULTS: VisualizerSettings = {
   pruneStaleNodes: false,
   autoOrbit: false,
   showControls: true,
+  hidePacketFeed: false,
 };
 
 export function getVisualizerSettings(): VisualizerSettings {
@@ -74,6 +76,10 @@ export function getVisualizerSettings(): VisualizerSettings {
         typeof parsed.showControls === 'boolean'
           ? parsed.showControls
           : VISUALIZER_DEFAULTS.showControls,
+      hidePacketFeed:
+        typeof parsed.hidePacketFeed === 'boolean'
+          ? parsed.hidePacketFeed
+          : VISUALIZER_DEFAULTS.hidePacketFeed,
     };
   } catch {
     return { ...VISUALIZER_DEFAULTS };
