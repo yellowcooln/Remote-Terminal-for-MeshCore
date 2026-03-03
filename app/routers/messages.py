@@ -399,6 +399,7 @@ async def resend_channel_message(
             sender_timestamp=now,
             received_at=now,
             outgoing=True,
+            sender_name=radio_name or None,
         )
         if new_msg_id is None:
             # Timestamp-second collision (same text+channel within the same second).

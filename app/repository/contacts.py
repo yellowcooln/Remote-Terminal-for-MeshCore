@@ -216,6 +216,19 @@ class ContactRepository:
         await db.conn.commit()
 
     @staticmethod
+    async def clear_on_radio_except(keep_keys: list[str]) -> None:
+        """Set on_radio=False for all contacts NOT in keep_keys."""
+        if not keep_keys:
+            await db.conn.execute("UPDATE contacts SET on_radio = 0 WHERE on_radio = 1")
+        else:
+            placeholders = ",".join("?" * len(keep_keys))
+            await db.conn.execute(
+                f"UPDATE contacts SET on_radio = 0 WHERE on_radio = 1 AND public_key NOT IN ({placeholders})",
+                keep_keys,
+            )
+        await db.conn.commit()
+
+    @staticmethod
     async def delete(public_key: str) -> None:
         normalized = public_key.lower()
         await db.conn.execute(

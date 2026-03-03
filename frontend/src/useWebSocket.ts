@@ -20,6 +20,8 @@ interface UseWebSocketOptions {
   onHealth?: (health: HealthStatus) => void;
   onMessage?: (message: Message) => void;
   onContact?: (contact: Contact) => void;
+  onContactDeleted?: (publicKey: string) => void;
+  onChannelDeleted?: (key: string) => void;
   onRawPacket?: (packet: RawPacket) => void;
   onMessageAcked?: (messageId: number, ackCount: number, paths?: MessagePath[]) => void;
   onError?: (error: ErrorEvent) => void;
@@ -102,6 +104,12 @@ export function useWebSocket(options: UseWebSocketOptions) {
             break;
           case 'contact':
             handlers.onContact?.(msg.data as Contact);
+            break;
+          case 'contact_deleted':
+            handlers.onContactDeleted?.((msg.data as { public_key: string }).public_key);
+            break;
+          case 'channel_deleted':
+            handlers.onChannelDeleted?.((msg.data as { key: string }).key);
             break;
           case 'raw_packet':
             handlers.onRawPacket?.(msg.data as RawPacket);

@@ -287,6 +287,14 @@ export function App() {
       onContact: (contact: Contact) => {
         setContacts((prev) => mergeContactIntoList(prev, contact));
       },
+      onContactDeleted: (publicKey: string) => {
+        setContacts((prev) => prev.filter((c) => c.public_key !== publicKey));
+        messageCache.remove(publicKey);
+      },
+      onChannelDeleted: (key: string) => {
+        setChannels((prev) => prev.filter((c) => c.key !== key));
+        messageCache.remove(key);
+      },
       onRawPacket: (packet: RawPacket) => {
         setRawPackets((prev) => appendRawPacketUnique(prev, packet, MAX_RAW_PACKETS));
       },
@@ -306,6 +314,7 @@ export function App() {
       setConfig,
       activeConversationRef,
       setContacts,
+      setChannels,
       triggerReconcile,
       refreshUnreads,
       fetchAllContacts,

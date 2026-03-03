@@ -271,15 +271,20 @@ async def sync_contacts_from_radio() -> dict:
     contacts = result.payload
     count = 0
 
+    synced_keys: list[str] = []
     for public_key, contact_data in contacts.items():
         lower_key = public_key.lower()
         await ContactRepository.upsert(
             Contact.from_radio_dict(lower_key, contact_data, on_radio=True)
         )
+        synced_keys.append(lower_key)
         claimed = await MessageRepository.claim_prefix_messages(lower_key)
         if claimed > 0:
             logger.info("Claimed %d prefix DM message(s) for contact %s", claimed, public_key[:12])
         count += 1
+
+    # Clear on_radio for contacts not found on the radio
+    await ContactRepository.clear_on_radio_except(synced_keys)
 
     logger.info("Synced %d contacts from radio", count)
     return {"synced": count}
@@ -367,6 +372,10 @@ async def delete_contact(public_key: str) -> dict:
     # Delete from database
     await ContactRepository.delete(contact.public_key)
     logger.info("Deleted contact %s", contact.public_key[:12])
+
+    from app.websocket import broadcast_event
+
+    broadcast_event("contact_deleted", {"public_key": contact.public_key})
 
     return {"status": "ok"}
 

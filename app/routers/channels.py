@@ -127,4 +127,9 @@ async def delete_channel(key: str) -> dict:
     """
     logger.info("Deleting channel %s from database", key)
     await ChannelRepository.delete(key)
+
+    from app.websocket import broadcast_event
+
+    broadcast_event("channel_deleted", {"key": key})
+
     return {"status": "ok"}
