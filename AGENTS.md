@@ -19,6 +19,7 @@ A web interface for MeshCore mesh radio networks. The backend connects to a Mesh
 **For detailed component documentation, see these primary AGENTS.md files:**
 - `app/AGENTS.md` - Backend (FastAPI, database, radio connection, packet decryption)
 - `frontend/AGENTS.md` - Frontend (React, state management, WebSocket, components)
+
 Ancillary AGENTS.md files which should generally not be reviewed unless specific work is being performed on those features include:
 - `app/AGENTS_MQTT.md` - MQTT architecture (private broker, community analytics, JWT auth, packet format protocol)
 - `frontend/src/components/AGENTS_packet_visualizer.md` - Packet visualizer (force-directed graph, advert-path identity, layout engine)

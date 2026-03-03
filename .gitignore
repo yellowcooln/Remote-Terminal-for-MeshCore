@@ -12,7 +12,6 @@ frontend/test-results/
 
 # Frontend build output (built from source by end users)
 frontend/dist/
-frontend/package-lock.json
 frontend/.eslintcache
 
 # reference libraries
