@@ -115,11 +115,11 @@ export function SettingsMqttSection({
         &mdash; you don&apos;t hear your own advertisements unless they&apos;re echoed back to you.
         So, your own advert echoes may result in you being listed on LetsMesh/etc., but if
         you&apos;re alone in your mesh, your node will appear as an ingest source within LetsMesh,
-        but will not report GPS data/etc. that would otherwise be captured by an advertisement, as
-        we faithfully report only traffic heard on the radio (and don&apos;t reconstruct synthetic
-        advertisement events to submit). Rely on the &ldquo;My Nodes&rdquo; or view heard packets to
-        validate that your radio is submitting to community sources; if you&apos;re alone in your
-        local mesh, the radio itself may not appear as a heard/mapped source.
+        without GPS data/etc. derived from adverts -- we faithfully report only traffic heard on the
+        radio (and don&apos;t reconstruct synthetic advertisement events to submit). Rely on the
+        &ldquo;My Nodes&rdquo; or view heard packets to validate that your radio is submitting to
+        community sources; if you&apos;re alone in your local mesh, the radio itself may not appear
+        as a heard/mapped source.
       </div>
 
       {/* Private MQTT Broker */}
