@@ -48,6 +48,7 @@ loop:
   ├─ Connect with aiomqtt.Client
   ├─ Set connected=True, broadcast success toast via _on_connected()
   ├─ Wait in 60s intervals:
+  │   ├─ _on_periodic_wake(elapsed) → subclass hook (e.g., periodic status republish)
   │   ├─ Settings version changed? → break, reconnect with new settings
   │   ├─ _should_break_wait()? → break (e.g., JWT expiry)
   │   └─ Otherwise keep waiting (paho-mqtt handles keepalive internally)
@@ -71,6 +72,7 @@ loop:
 | `_pre_connect(settings)` | `return True` | Async setup before connect; return `False` to retry |
 | `_should_break_wait(elapsed)` | `return False` | Force reconnect while connected (e.g., token renewal) |
 | `_on_not_configured()` | no-op | Called repeatedly while waiting for configuration |
+| `_on_periodic_wake(elapsed)` | no-op | Called every ~60s while connected (e.g., periodic status republish) |
 
 ### Lifecycle Methods
 
@@ -183,6 +185,42 @@ The community broker authenticates via Ed25519-signed JWT tokens.
 **Signing:** MeshCore uses an "expanded" 64-byte Ed25519 key format (`scalar[32] || prefix[32]`, the "orlp" format). Standard Ed25519 libraries expect seed format and would re-hash the key. The `_ed25519_sign_expanded()` function performs signing manually using `nacl.bindings.crypto_scalarmult_ed25519_base_noclamp()` — a direct port of meshcore-packet-capture's `ed25519_sign_with_expanded_key()`.
 
 **Token lifetime:** 24 hours. The `_should_break_wait()` hook forces a reconnect at the 23-hour mark to renew before expiry.
+
+### Status Messages
+
+On connect and every 5 minutes thereafter, the community publisher sends a retained status message to `meshcore/{IATA}/{PUBKEY}/status` with device info and radio telemetry:
+
+```json
+{
+  "status":            "online",
+  "timestamp":         "2024-01-15T10:30:00.000000",
+  "origin":            "NodeName",
+  "origin_id":         "PUBKEY_HEX_UPPER",
+  "client":            "RemoteTerm (github.com/...)",
+  "model":             "T-Deck",
+  "firmware_version":  "v2.2.2 (Build: 2025-01-15)",
+  "radio":             "915.0MHz BW250.0 SF10 CR8",
+  "client_version":    "RemoteTerm/2.4.0",
+  "stats": {
+    "battery_mv": 4200,
+    "uptime_secs": 3600,
+    "errors": 0,
+    "queue_len": 0,
+    "noise_floor": -120,
+    "last_rssi": -85,
+    "last_snr": 10.5,
+    "tx_air_secs": 42,
+    "rx_air_secs": 150
+  }
+}
+```
+
+- `model` and `firmware_version` are fetched once per connection via `send_device_query()` (requires firmware version >= 3)
+- `radio` is formatted from `self_info` radio parameters (freq, BW, SF, CR)
+- `client_version` is read from Python package metadata (`remoteterm-meshcore`)
+- `stats` is fetched from `get_stats_core()` + `get_stats_radio()` every 5 minutes; omitted if firmware doesn't support stats commands
+- All radio queries use `blocking=False` — if the radio is busy, cached values are used. No user-facing operations are ever blocked.
+- LWT (Last Will and Testament) publishes `{"status": "offline", ...}` on the same topic with retain
 
 ### Packet Formatting
 

@@ -131,6 +131,10 @@ class BaseMqttPublisher(ABC):
         """
         return  # no-op by default
 
+    async def _on_periodic_wake(self, elapsed: float) -> None:
+        """Called every ~60s while connected. Subclasses may override."""
+        return
+
     # ── Connection loop ────────────────────────────────────────────────
 
     async def _connection_loop(self) -> None:
@@ -189,6 +193,7 @@ class BaseMqttPublisher(ABC):
                             await asyncio.wait_for(self._version_event.wait(), timeout=60)
                         except asyncio.TimeoutError:
                             elapsed = time.monotonic() - connect_time
+                            await self._on_periodic_wake(elapsed)
                             if self._should_break_wait(elapsed):
                                 break
                             continue

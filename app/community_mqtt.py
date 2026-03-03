@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import importlib.metadata
 import json
 import logging
 import re
@@ -35,6 +36,10 @@ _CLIENT_ID = "RemoteTerm (github.com/jkingsman/Remote-Terminal-for-MeshCore)"
 # Proactive JWT renewal: reconnect 1 hour before the 24h token expires
 _TOKEN_LIFETIME = 86400  # 24 hours (must match _generate_jwt_token exp)
 _TOKEN_RENEWAL_THRESHOLD = _TOKEN_LIFETIME - 3600  # 23 hours
+
+# Periodic status republish interval (matches meshcore-packet-capture reference)
+_STATS_REFRESH_INTERVAL = 300  # 5 minutes
+_STATS_MIN_CACHE_SECS = 60  # Don't re-fetch stats within 60s
 
 # Ed25519 group order
 _L = 2**252 + 27742317777372353535851937790883648493
@@ -259,6 +264,33 @@ def _build_status_topic(settings: AppSettings, pubkey_hex: str) -> str:
     return f"meshcore/{iata}/{pubkey_hex}/status"
 
 
+def _build_radio_info() -> str:
+    """Format the radio parameters string from self_info, or 'unknown'."""
+    from app.radio import radio_manager
+
+    try:
+        if radio_manager.meshcore and radio_manager.meshcore.self_info:
+            info = radio_manager.meshcore.self_info
+            freq = info.get("radio_freq")
+            bw = info.get("radio_bw")
+            sf = info.get("radio_sf")
+            cr = info.get("radio_cr")
+            if freq is not None and bw is not None and sf is not None and cr is not None:
+                return f"{freq}MHz BW{bw} SF{sf} CR{cr}"
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _get_client_version() -> str:
+    """Return a client version string like 'RemoteTerm/2.4.0'."""
+    try:
+        version = importlib.metadata.version("remoteterm-meshcore")
+        return f"RemoteTerm/{version}"
+    except Exception:
+        return "RemoteTerm/unknown"
+
+
 class CommunityMqttPublisher(BaseMqttPublisher):
     """Manages the community MQTT connection and publishes raw packets."""
 
@@ -269,9 +301,19 @@ class CommunityMqttPublisher(BaseMqttPublisher):
     def __init__(self) -> None:
         super().__init__()
         self._key_unavailable_warned: bool = False
+        self._cached_device_info: dict[str, str] | None = None
+        self._cached_stats: dict[str, Any] | None = None
+        self._stats_supported: bool | None = None
+        self._last_stats_fetch: float = 0.0
+        self._last_status_publish: float = 0.0
 
     async def start(self, settings: AppSettings) -> None:
         self._key_unavailable_warned = False
+        self._cached_device_info = None
+        self._cached_stats = None
+        self._stats_supported = None
+        self._last_stats_fetch = 0.0
+        self._last_status_publish = 0.0
         await super().start(settings)
 
     def _on_not_configured(self) -> None:
@@ -340,8 +382,96 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         broker_port = settings.community_mqtt_broker_port or _DEFAULT_PORT
         return ("Community MQTT connected", f"{broker_host}:{broker_port}")
 
-    async def _on_connected_async(self, settings: AppSettings) -> None:
-        """Publish a retained online status message after connecting."""
+    async def _fetch_device_info(self) -> dict[str, str]:
+        """Fetch firmware model/version from the radio (cached for the connection)."""
+        if self._cached_device_info is not None:
+            return self._cached_device_info
+
+        from app.radio import RadioDisconnectedError, RadioOperationBusyError, radio_manager
+
+        fallback = {"model": "unknown", "firmware_version": "unknown"}
+        try:
+            async with radio_manager.radio_operation(
+                "community_stats_device_info", blocking=False
+            ) as mc:
+                event = await mc.commands.send_device_query()
+                from meshcore.events import EventType
+
+                if event.type == EventType.DEVICE_INFO:
+                    fw_ver = event.payload.get("fw ver", 0)
+                    if fw_ver >= 3:
+                        model = event.payload.get("model", "unknown") or "unknown"
+                        ver = event.payload.get("ver", "unknown") or "unknown"
+                        fw_build = event.payload.get("fw_build", "") or ""
+                        fw_str = f"v{ver} (Build: {fw_build})" if fw_build else f"v{ver}"
+                        self._cached_device_info = {
+                            "model": model,
+                            "firmware_version": fw_str,
+                        }
+                    else:
+                        # Old firmware — cache what we can
+                        self._cached_device_info = {
+                            "model": "unknown",
+                            "firmware_version": f"v{fw_ver}" if fw_ver else "unknown",
+                        }
+                    return self._cached_device_info
+        except (RadioOperationBusyError, RadioDisconnectedError):
+            pass
+        except Exception as e:
+            logger.debug("Community MQTT: device info fetch failed: %s", e)
+
+        # Don't cache transient failures — allow retry on next status publish
+        return fallback
+
+    async def _fetch_stats(self) -> dict[str, Any] | None:
+        """Fetch core + radio stats from the radio (best-effort, cached)."""
+        if self._stats_supported is False:
+            return self._cached_stats
+
+        now = time.monotonic()
+        if (
+            now - self._last_stats_fetch
+        ) < _STATS_MIN_CACHE_SECS and self._cached_stats is not None:
+            return self._cached_stats
+
+        from app.radio import RadioDisconnectedError, RadioOperationBusyError, radio_manager
+
+        try:
+            async with radio_manager.radio_operation("community_stats_fetch", blocking=False) as mc:
+                from meshcore.events import EventType
+
+                result: dict[str, Any] = {}
+
+                core_event = await mc.commands.get_stats_core()
+                if core_event.type == EventType.ERROR:
+                    logger.info("Community MQTT: firmware does not support stats commands")
+                    self._stats_supported = False
+                    return self._cached_stats
+                if core_event.type == EventType.STATS_CORE:
+                    result.update(core_event.payload)
+
+                radio_event = await mc.commands.get_stats_radio()
+                if radio_event.type == EventType.ERROR:
+                    logger.info("Community MQTT: firmware does not support stats commands")
+                    self._stats_supported = False
+                    return self._cached_stats
+                if radio_event.type == EventType.STATS_RADIO:
+                    result.update(radio_event.payload)
+
+                if result:
+                    self._cached_stats = result
+                    self._last_stats_fetch = now
+                    return self._cached_stats
+
+        except (RadioOperationBusyError, RadioDisconnectedError):
+            pass
+        except Exception as e:
+            logger.debug("Community MQTT: stats fetch failed: %s", e)
+
+        return self._cached_stats
+
+    async def _publish_status(self, settings: AppSettings, *, refresh_stats: bool = True) -> None:
+        """Build and publish the enriched retained status message."""
         from app.keystore import get_public_key
         from app.radio import radio_manager
 
@@ -355,16 +485,37 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         if radio_manager.meshcore and radio_manager.meshcore.self_info:
             device_name = radio_manager.meshcore.self_info.get("name", "")
 
+        device_info = await self._fetch_device_info()
+        stats = await self._fetch_stats() if refresh_stats else self._cached_stats
+
         status_topic = _build_status_topic(settings, pubkey_hex)
-        payload = {
+        payload: dict[str, Any] = {
             "status": "online",
             "timestamp": datetime.now().isoformat(),
             "origin": device_name or "MeshCore Device",
             "origin_id": pubkey_hex,
             "client": _CLIENT_ID,
+            "model": device_info.get("model", "unknown"),
+            "firmware_version": device_info.get("firmware_version", "unknown"),
+            "radio": _build_radio_info(),
+            "client_version": _get_client_version(),
         }
+        if stats:
+            payload["stats"] = stats
 
         await self.publish(status_topic, payload, retain=True)
+        self._last_status_publish = time.monotonic()
+
+    async def _on_connected_async(self, settings: AppSettings) -> None:
+        """Publish a retained online status message after connecting."""
+        await self._publish_status(settings)
+
+    async def _on_periodic_wake(self, elapsed: float) -> None:
+        if not self._settings:
+            return
+        now = time.monotonic()
+        if (now - self._last_status_publish) >= _STATS_REFRESH_INTERVAL:
+            await self._publish_status(self._settings, refresh_stats=True)
 
     def _on_error(self) -> tuple[str, str]:
         return (

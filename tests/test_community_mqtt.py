@@ -1,7 +1,9 @@
 """Tests for community MQTT publisher."""
 
 import json
-from unittest.mock import MagicMock, patch
+import time
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import nacl.bindings
 import pytest
@@ -9,13 +11,16 @@ import pytest
 from app.community_mqtt import (
     _CLIENT_ID,
     _DEFAULT_BROKER,
+    _STATS_REFRESH_INTERVAL,
     CommunityMqttPublisher,
     _base64url_encode,
+    _build_radio_info,
     _build_status_topic,
     _calculate_packet_hash,
     _ed25519_sign_expanded,
     _format_raw_packet,
     _generate_jwt_token,
+    _get_client_version,
     community_mqtt_broadcast,
 )
 from app.models import AppSettings
@@ -475,9 +480,7 @@ class TestLwtAndStatusPublish:
 
     @pytest.mark.asyncio
     async def test_on_connected_async_publishes_online_status(self):
-        """_on_connected_async should publish a retained online status."""
-        from unittest.mock import AsyncMock
-
+        """_on_connected_async should publish a retained online status with enriched fields."""
         pub = CommunityMqttPublisher()
         private_key, public_key = _make_test_keys()
         pubkey_hex = public_key.hex().upper()
@@ -493,6 +496,17 @@ class TestLwtAndStatusPublish:
         with (
             patch("app.keystore.get_public_key", return_value=public_key),
             patch("app.radio.radio_manager", mock_radio),
+            patch.object(
+                pub,
+                "_fetch_device_info",
+                new_callable=AsyncMock,
+                return_value={"model": "T-Deck", "firmware_version": "v2.2.2 (Build: 2025-01-15)"},
+            ),
+            patch.object(
+                pub, "_fetch_stats", new_callable=AsyncMock, return_value={"battery_mv": 4200}
+            ),
+            patch("app.community_mqtt._build_radio_info", return_value="915.0MHz BW250.0 SF10 CR8"),
+            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/2.4.0"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
             await pub._on_connected_async(settings)
@@ -509,6 +523,11 @@ class TestLwtAndStatusPublish:
         assert payload["origin_id"] == pubkey_hex
         assert payload["client"] == _CLIENT_ID
         assert "timestamp" in payload
+        assert payload["model"] == "T-Deck"
+        assert payload["firmware_version"] == "v2.2.2 (Build: 2025-01-15)"
+        assert payload["radio"] == "915.0MHz BW250.0 SF10 CR8"
+        assert payload["client_version"] == "RemoteTerm/2.4.0"
+        assert payload["stats"] == {"battery_mv": 4200}
 
     def test_lwt_and_online_share_same_topic(self):
         """LWT and on-connect status should use the same topic path."""
@@ -533,8 +552,6 @@ class TestLwtAndStatusPublish:
     @pytest.mark.asyncio
     async def test_on_connected_async_skips_when_no_public_key(self):
         """_on_connected_async should no-op when public key is unavailable."""
-        from unittest.mock import AsyncMock
-
         pub = CommunityMqttPublisher()
         settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
@@ -549,8 +566,6 @@ class TestLwtAndStatusPublish:
     @pytest.mark.asyncio
     async def test_on_connected_async_uses_fallback_device_name(self):
         """Should use 'MeshCore Device' when radio name is unavailable."""
-        from unittest.mock import AsyncMock
-
         pub = CommunityMqttPublisher()
         _, public_key = _make_test_keys()
         settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
@@ -561,9 +576,458 @@ class TestLwtAndStatusPublish:
         with (
             patch("app.keystore.get_public_key", return_value=public_key),
             patch("app.radio.radio_manager", mock_radio),
+            patch.object(
+                pub,
+                "_fetch_device_info",
+                new_callable=AsyncMock,
+                return_value={"model": "unknown", "firmware_version": "unknown"},
+            ),
+            patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
+            patch("app.community_mqtt._build_radio_info", return_value="unknown"),
+            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/unknown"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
             await pub._on_connected_async(settings)
 
         payload = mock_publish.call_args[0][1]
         assert payload["origin"] == "MeshCore Device"
+
+
+def _mock_radio_operation(mc_mock):
+    """Create a mock async context manager for radio_operation."""
+
+    @asynccontextmanager
+    async def _op(*args, **kwargs):
+        yield mc_mock
+
+    return _op
+
+
+class TestFetchDeviceInfo:
+    @pytest.mark.asyncio
+    async def test_success_fw_ver_3(self):
+        """Should extract model and firmware_version from DEVICE_INFO with fw ver >= 3."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.send_device_query = AsyncMock(
+            return_value=Event(
+                EventType.DEVICE_INFO,
+                {"fw ver": 3, "model": "T-Deck", "ver": "2.2.2", "fw_build": "2025-01-15"},
+            )
+        )
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            result = await pub._fetch_device_info()
+
+        assert result["model"] == "T-Deck"
+        assert result["firmware_version"] == "v2.2.2 (Build: 2025-01-15)"
+        # Should be cached
+        assert pub._cached_device_info == result
+
+    @pytest.mark.asyncio
+    async def test_fw_ver_below_3_caches_old_version(self):
+        """Should cache old firmware version string when fw ver < 3."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.send_device_query = AsyncMock(
+            return_value=Event(EventType.DEVICE_INFO, {"fw ver": 2})
+        )
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            result = await pub._fetch_device_info()
+
+        assert result["model"] == "unknown"
+        assert result["firmware_version"] == "v2"
+        # Should be cached (firmware doesn't change mid-connection)
+        assert pub._cached_device_info == result
+
+    @pytest.mark.asyncio
+    async def test_error_returns_fallback_not_cached(self):
+        """Should return unknowns when device query returns ERROR, without caching."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.send_device_query = AsyncMock(return_value=Event(EventType.ERROR, {}))
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            result = await pub._fetch_device_info()
+
+        assert result["model"] == "unknown"
+        assert result["firmware_version"] == "unknown"
+        # Should NOT be cached — allows retry on next status publish
+        assert pub._cached_device_info is None
+
+    @pytest.mark.asyncio
+    async def test_radio_busy_returns_fallback_not_cached(self):
+        """Should return unknowns when radio is busy, without caching."""
+        from app.radio import RadioOperationBusyError
+
+        pub = CommunityMqttPublisher()
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = MagicMock(side_effect=RadioOperationBusyError("busy"))
+            result = await pub._fetch_device_info()
+
+        assert result["model"] == "unknown"
+        assert result["firmware_version"] == "unknown"
+        # Should NOT be cached — allows retry when radio becomes available
+        assert pub._cached_device_info is None
+
+    @pytest.mark.asyncio
+    async def test_cached_result_returned_on_second_call(self):
+        """Should return cached result without re-querying the radio."""
+        pub = CommunityMqttPublisher()
+        pub._cached_device_info = {"model": "T-Deck", "firmware_version": "v2.2.2"}
+
+        # No radio mock needed — should return cached
+        result = await pub._fetch_device_info()
+        assert result["model"] == "T-Deck"
+
+    @pytest.mark.asyncio
+    async def test_no_fw_build_omits_build_suffix(self):
+        """When fw_build is empty, firmware_version should just be 'vX.Y.Z'."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.send_device_query = AsyncMock(
+            return_value=Event(
+                EventType.DEVICE_INFO,
+                {"fw ver": 3, "model": "Heltec", "ver": "1.0.0", "fw_build": ""},
+            )
+        )
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            result = await pub._fetch_device_info()
+
+        assert result["firmware_version"] == "v1.0.0"
+
+
+class TestFetchStats:
+    @pytest.mark.asyncio
+    async def test_success_merges_core_and_radio(self):
+        """Should merge STATS_CORE and STATS_RADIO payloads."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.get_stats_core = AsyncMock(
+            return_value=Event(
+                EventType.STATS_CORE,
+                {"battery_mv": 4200, "uptime_secs": 3600, "errors": 0, "queue_len": 0},
+            )
+        )
+        mc_mock.commands.get_stats_radio = AsyncMock(
+            return_value=Event(
+                EventType.STATS_RADIO,
+                {
+                    "noise_floor": -120,
+                    "last_rssi": -85,
+                    "last_snr": 10.5,
+                    "tx_air_secs": 42,
+                    "rx_air_secs": 150,
+                },
+            )
+        )
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            result = await pub._fetch_stats()
+
+        assert result is not None
+        assert result["battery_mv"] == 4200
+        assert result["noise_floor"] == -120
+        assert result["tx_air_secs"] == 42
+
+    @pytest.mark.asyncio
+    async def test_core_error_sets_stats_unsupported(self):
+        """Should set _stats_supported=False when STATS_CORE returns ERROR."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.get_stats_core = AsyncMock(return_value=Event(EventType.ERROR, {}))
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            result = await pub._fetch_stats()
+
+        assert pub._stats_supported is False
+        assert result is None  # no cached stats yet
+
+    @pytest.mark.asyncio
+    async def test_radio_error_sets_stats_unsupported(self):
+        """Should set _stats_supported=False when STATS_RADIO returns ERROR."""
+        from meshcore.events import Event, EventType
+
+        pub = CommunityMqttPublisher()
+        mc_mock = MagicMock()
+        mc_mock.commands.get_stats_core = AsyncMock(
+            return_value=Event(
+                EventType.STATS_CORE,
+                {"battery_mv": 4200, "uptime_secs": 3600, "errors": 0, "queue_len": 0},
+            )
+        )
+        mc_mock.commands.get_stats_radio = AsyncMock(return_value=Event(EventType.ERROR, {}))
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = _mock_radio_operation(mc_mock)
+            await pub._fetch_stats()
+
+        assert pub._stats_supported is False
+
+    @pytest.mark.asyncio
+    async def test_stats_unsupported_skips_radio(self):
+        """When _stats_supported=False, should return cached stats without radio call."""
+        pub = CommunityMqttPublisher()
+        pub._stats_supported = False
+        pub._cached_stats = {"battery_mv": 4000}
+
+        result = await pub._fetch_stats()
+        assert result == {"battery_mv": 4000}
+
+    @pytest.mark.asyncio
+    async def test_cache_guard_prevents_refetch(self):
+        """Should return cached stats when within cache window."""
+        pub = CommunityMqttPublisher()
+        pub._cached_stats = {"battery_mv": 4200}
+        pub._last_stats_fetch = time.monotonic()  # Just fetched
+
+        result = await pub._fetch_stats()
+        assert result == {"battery_mv": 4200}
+
+    @pytest.mark.asyncio
+    async def test_radio_busy_returns_cached(self):
+        """Should return cached stats when radio is busy."""
+        from app.radio import RadioOperationBusyError
+
+        pub = CommunityMqttPublisher()
+        pub._cached_stats = {"battery_mv": 3900}
+
+        with patch("app.radio.radio_manager") as mock_rm:
+            mock_rm.radio_operation = MagicMock(side_effect=RadioOperationBusyError("busy"))
+            result = await pub._fetch_stats()
+
+        assert result == {"battery_mv": 3900}
+
+
+class TestBuildRadioInfo:
+    def test_formatted_string(self):
+        """Should return formatted radio info string."""
+        mock_radio = MagicMock()
+        mock_radio.meshcore = MagicMock()
+        mock_radio.meshcore.self_info = {
+            "radio_freq": 915.0,
+            "radio_bw": 250.0,
+            "radio_sf": 10,
+            "radio_cr": 8,
+        }
+
+        with patch("app.radio.radio_manager", mock_radio):
+            result = _build_radio_info()
+
+        assert result == "915.0MHz BW250.0 SF10 CR8"
+
+    def test_fallback_when_no_meshcore(self):
+        """Should return 'unknown' when meshcore is None."""
+        mock_radio = MagicMock()
+        mock_radio.meshcore = None
+
+        with patch("app.radio.radio_manager", mock_radio):
+            result = _build_radio_info()
+
+        assert result == "unknown"
+
+    def test_fallback_when_self_info_missing_fields(self):
+        """Should return 'unknown' when self_info lacks radio fields."""
+        mock_radio = MagicMock()
+        mock_radio.meshcore = MagicMock()
+        mock_radio.meshcore.self_info = {"name": "TestNode"}
+
+        with patch("app.radio.radio_manager", mock_radio):
+            result = _build_radio_info()
+
+        assert result == "unknown"
+
+
+class TestGetClientVersion:
+    def test_returns_remoteterm_prefix(self):
+        """Should return 'RemoteTerm/...' string."""
+        result = _get_client_version()
+        assert result.startswith("RemoteTerm/")
+
+    def test_returns_version_from_metadata(self):
+        """Should use importlib.metadata to get version."""
+        with patch("app.community_mqtt.importlib.metadata.version", return_value="1.2.3"):
+            result = _get_client_version()
+        assert result == "RemoteTerm/1.2.3"
+
+    def test_fallback_on_error(self):
+        """Should return 'RemoteTerm/unknown' if metadata lookup fails."""
+        with patch(
+            "app.community_mqtt.importlib.metadata.version", side_effect=Exception("not found")
+        ):
+            result = _get_client_version()
+        assert result == "RemoteTerm/unknown"
+
+
+class TestPublishStatus:
+    @pytest.mark.asyncio
+    async def test_enriched_payload_fields(self):
+        """_publish_status should include all enriched fields."""
+        pub = CommunityMqttPublisher()
+        _, public_key = _make_test_keys()
+        pubkey_hex = public_key.hex().upper()
+        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+
+        mock_radio = MagicMock()
+        mock_radio.meshcore = MagicMock()
+        mock_radio.meshcore.self_info = {"name": "TestNode"}
+
+        stats = {"battery_mv": 4200, "uptime_secs": 3600, "noise_floor": -120}
+
+        with (
+            patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
+            patch.object(
+                pub,
+                "_fetch_device_info",
+                new_callable=AsyncMock,
+                return_value={"model": "T-Deck", "firmware_version": "v2.2.2 (Build: 2025-01-15)"},
+            ),
+            patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=stats),
+            patch("app.community_mqtt._build_radio_info", return_value="915.0MHz BW250.0 SF10 CR8"),
+            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/2.4.0"),
+            patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
+        ):
+            await pub._publish_status(settings)
+
+        payload = mock_publish.call_args[0][1]
+        assert payload["status"] == "online"
+        assert payload["origin"] == "TestNode"
+        assert payload["origin_id"] == pubkey_hex
+        assert payload["client"] == _CLIENT_ID
+        assert payload["model"] == "T-Deck"
+        assert payload["firmware_version"] == "v2.2.2 (Build: 2025-01-15)"
+        assert payload["radio"] == "915.0MHz BW250.0 SF10 CR8"
+        assert payload["client_version"] == "RemoteTerm/2.4.0"
+        assert payload["stats"] == stats
+
+    @pytest.mark.asyncio
+    async def test_stats_omitted_when_none(self):
+        """Should not include 'stats' key when stats are None."""
+        pub = CommunityMqttPublisher()
+        _, public_key = _make_test_keys()
+        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+
+        mock_radio = MagicMock()
+        mock_radio.meshcore = None
+
+        with (
+            patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
+            patch.object(
+                pub,
+                "_fetch_device_info",
+                new_callable=AsyncMock,
+                return_value={"model": "unknown", "firmware_version": "unknown"},
+            ),
+            patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
+            patch("app.community_mqtt._build_radio_info", return_value="unknown"),
+            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/unknown"),
+            patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
+        ):
+            await pub._publish_status(settings)
+
+        payload = mock_publish.call_args[0][1]
+        assert "stats" not in payload
+
+    @pytest.mark.asyncio
+    async def test_updates_last_status_publish(self):
+        """Should update _last_status_publish after publishing."""
+        pub = CommunityMqttPublisher()
+        _, public_key = _make_test_keys()
+        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+
+        mock_radio = MagicMock()
+        mock_radio.meshcore = None
+
+        before = time.monotonic()
+
+        with (
+            patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
+            patch.object(
+                pub,
+                "_fetch_device_info",
+                new_callable=AsyncMock,
+                return_value={"model": "unknown", "firmware_version": "unknown"},
+            ),
+            patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
+            patch("app.community_mqtt._build_radio_info", return_value="unknown"),
+            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/unknown"),
+            patch.object(pub, "publish", new_callable=AsyncMock),
+        ):
+            await pub._publish_status(settings)
+
+        assert pub._last_status_publish >= before
+
+    @pytest.mark.asyncio
+    async def test_no_publish_key_returns_none(self):
+        """Should skip publish when public key is unavailable."""
+        pub = CommunityMqttPublisher()
+        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+
+        with (
+            patch("app.keystore.get_public_key", return_value=None),
+            patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
+        ):
+            await pub._publish_status(settings)
+
+        mock_publish.assert_not_called()
+
+
+class TestPeriodicWake:
+    @pytest.mark.asyncio
+    async def test_skips_before_interval(self):
+        """Should not republish before _STATS_REFRESH_INTERVAL."""
+        pub = CommunityMqttPublisher()
+        pub._settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        pub._last_status_publish = time.monotonic()  # Just published
+
+        with patch.object(pub, "_publish_status", new_callable=AsyncMock) as mock_ps:
+            await pub._on_periodic_wake(60.0)
+
+        mock_ps.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_publishes_after_interval(self):
+        """Should republish after _STATS_REFRESH_INTERVAL elapsed."""
+        pub = CommunityMqttPublisher()
+        pub._settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        pub._last_status_publish = time.monotonic() - _STATS_REFRESH_INTERVAL - 1
+
+        with patch.object(pub, "_publish_status", new_callable=AsyncMock) as mock_ps:
+            await pub._on_periodic_wake(360.0)
+
+        mock_ps.assert_called_once_with(pub._settings, refresh_stats=True)
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_settings(self):
+        """Should no-op when settings are None."""
+        pub = CommunityMqttPublisher()
+        pub._settings = None
+
+        with patch.object(pub, "_publish_status", new_callable=AsyncMock) as mock_ps:
+            await pub._on_periodic_wake(360.0)
+
+        mock_ps.assert_not_called()
