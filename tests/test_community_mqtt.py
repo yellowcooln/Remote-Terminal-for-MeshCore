@@ -11,6 +11,7 @@ from app.community_mqtt import (
     _DEFAULT_BROKER,
     CommunityMqttPublisher,
     _base64url_encode,
+    _build_status_topic,
     _calculate_packet_hash,
     _ed25519_sign_expanded,
     _format_raw_packet,
@@ -432,3 +433,137 @@ class TestPublishFailureSetsDisconnected:
         pub._client = mock_client
         await pub.publish("topic", {"data": "test"})
         assert pub.connected is False
+
+
+class TestBuildStatusTopic:
+    def test_builds_correct_topic(self):
+        settings = AppSettings(community_mqtt_iata="LAX")
+        topic = _build_status_topic(settings, "AABB1122")
+        assert topic == "meshcore/LAX/AABB1122/status"
+
+    def test_iata_uppercased_and_stripped(self):
+        settings = AppSettings(community_mqtt_iata=" lax ")
+        topic = _build_status_topic(settings, "PUBKEY")
+        assert topic == "meshcore/LAX/PUBKEY/status"
+
+
+class TestLwtAndStatusPublish:
+    def test_build_client_kwargs_includes_will(self):
+        """_build_client_kwargs should return a will with offline status."""
+        pub = CommunityMqttPublisher()
+        private_key, public_key = _make_test_keys()
+        pubkey_hex = public_key.hex().upper()
+        settings = AppSettings(
+            community_mqtt_enabled=True,
+            community_mqtt_iata="SFO",
+        )
+
+        with (
+            patch("app.keystore.get_private_key", return_value=private_key),
+            patch("app.keystore.get_public_key", return_value=public_key),
+        ):
+            kwargs = pub._build_client_kwargs(settings)
+
+        assert "will" in kwargs
+        will = kwargs["will"]
+        assert will.topic == f"meshcore/SFO/{pubkey_hex}/status"
+        assert will.retain is True
+        payload = json.loads(will.payload)
+        assert payload["status"] == "offline"
+        assert payload["origin_id"] == pubkey_hex
+        assert payload["client"] == _CLIENT_ID
+
+    @pytest.mark.asyncio
+    async def test_on_connected_async_publishes_online_status(self):
+        """_on_connected_async should publish a retained online status."""
+        from unittest.mock import AsyncMock
+
+        pub = CommunityMqttPublisher()
+        private_key, public_key = _make_test_keys()
+        pubkey_hex = public_key.hex().upper()
+        settings = AppSettings(
+            community_mqtt_enabled=True,
+            community_mqtt_iata="LAX",
+        )
+
+        mock_radio = MagicMock()
+        mock_radio.meshcore = MagicMock()
+        mock_radio.meshcore.self_info = {"name": "TestNode"}
+
+        with (
+            patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
+            patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
+        ):
+            await pub._on_connected_async(settings)
+
+        mock_publish.assert_called_once()
+        topic = mock_publish.call_args[0][0]
+        payload = mock_publish.call_args[0][1]
+        retain = mock_publish.call_args[1]["retain"]
+
+        assert topic == f"meshcore/LAX/{pubkey_hex}/status"
+        assert retain is True
+        assert payload["status"] == "online"
+        assert payload["origin"] == "TestNode"
+        assert payload["origin_id"] == pubkey_hex
+        assert payload["client"] == _CLIENT_ID
+        assert "timestamp" in payload
+
+    def test_lwt_and_online_share_same_topic(self):
+        """LWT and on-connect status should use the same topic path."""
+        pub = CommunityMqttPublisher()
+        private_key, public_key = _make_test_keys()
+        pubkey_hex = public_key.hex().upper()
+        settings = AppSettings(
+            community_mqtt_enabled=True,
+            community_mqtt_iata="JFK",
+        )
+
+        with (
+            patch("app.keystore.get_private_key", return_value=private_key),
+            patch("app.keystore.get_public_key", return_value=public_key),
+        ):
+            kwargs = pub._build_client_kwargs(settings)
+
+        lwt_topic = kwargs["will"].topic
+        expected_topic = _build_status_topic(settings, pubkey_hex)
+        assert lwt_topic == expected_topic
+
+    @pytest.mark.asyncio
+    async def test_on_connected_async_skips_when_no_public_key(self):
+        """_on_connected_async should no-op when public key is unavailable."""
+        from unittest.mock import AsyncMock
+
+        pub = CommunityMqttPublisher()
+        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+
+        with (
+            patch("app.keystore.get_public_key", return_value=None),
+            patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
+        ):
+            await pub._on_connected_async(settings)
+
+        mock_publish.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_on_connected_async_uses_fallback_device_name(self):
+        """Should use 'MeshCore Device' when radio name is unavailable."""
+        from unittest.mock import AsyncMock
+
+        pub = CommunityMqttPublisher()
+        _, public_key = _make_test_keys()
+        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+
+        mock_radio = MagicMock()
+        mock_radio.meshcore = None
+
+        with (
+            patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
+            patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
+        ):
+            await pub._on_connected_async(settings)
+
+        payload = mock_publish.call_args[0][1]
+        assert payload["origin"] == "MeshCore Device"
