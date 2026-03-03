@@ -98,6 +98,7 @@ export function CrackerPanel({
   const twoWordModeRef = useRef(false);
   const undecryptedIdsRef = useRef<Set<number>>(new Set());
   const seenPayloadsRef = useRef<Set<string>>(new Set());
+  const existingChannelKeysRef = useRef<Set<string>>(new Set());
 
   // Initialize cracker and NoSleep
   useEffect(() => {
@@ -154,6 +155,10 @@ export function CrackerPanel({
     () => new Set(channels.map((c) => c.key.toUpperCase())),
     [channels]
   );
+
+  useEffect(() => {
+    existingChannelKeysRef.current = existingChannelKeys;
+  }, [existingChannelKeys]);
 
   // Filter packets to only undecrypted GROUP_TEXT
   const undecryptedGroupText = packets.filter(
@@ -365,7 +370,7 @@ export function CrackerPanel({
 
         // Auto-add channel if not already exists
         const keyUpper = result.key.toUpperCase();
-        if (!existingChannelKeys.has(keyUpper)) {
+        if (!existingChannelKeysRef.current.has(keyUpper)) {
           try {
             const channelName = '#' + result.roomName;
             await onChannelCreate(channelName, result.key);
@@ -426,7 +431,7 @@ export function CrackerPanel({
     if (isRunningRef.current) {
       setTimeout(() => processNext(), 100);
     }
-  }, [existingChannelKeys, onChannelCreate]);
+  }, [onChannelCreate]);
 
   // Start/stop handlers
   const handleStart = () => {
