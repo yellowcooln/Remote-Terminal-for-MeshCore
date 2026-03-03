@@ -602,7 +602,7 @@ export function Sidebar({
         )}
 
         {/* Mark All Read */}
-        {!query && Object.keys(unreadCounts).length > 0 && (
+        {!query && Object.values(unreadCounts).some((c) => c > 0) && (
           <div
             className="px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]"
             onClick={onMarkAllRead}
