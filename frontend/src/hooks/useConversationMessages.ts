@@ -142,7 +142,12 @@ export function useConversationMessages(
   // don't need cancellation.
   const fetchMessages = useCallback(
     async (showLoading = false, signal?: AbortSignal) => {
-      if (!activeConversation || activeConversation.type === 'raw') {
+      if (
+        !activeConversation ||
+        activeConversation.type === 'raw' ||
+        activeConversation.type === 'map' ||
+        activeConversation.type === 'visualizer'
+      ) {
         setMessages([]);
         setHasOlderMessages(false);
         return;
@@ -332,8 +337,13 @@ export function useConversationMessages(
     // fetch is irrelevant now (its stale-check will discard the response).
     setLoadingOlder(false);
 
-    // Clear state for new conversation
-    if (!activeConversation || activeConversation.type === 'raw') {
+    // Clear state for non-message views
+    if (
+      !activeConversation ||
+      activeConversation.type === 'raw' ||
+      activeConversation.type === 'map' ||
+      activeConversation.type === 'visualizer'
+    ) {
       setMessages([]);
       setHasOlderMessages(false);
       return;
