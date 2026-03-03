@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     ble_pin: str = ""
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     database_path: str = "data/meshcore.db"
+    disable_bots: bool = False
 
     @model_validator(mode="after")
     def validate_transport_exclusivity(self) -> "Settings":

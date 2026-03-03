@@ -246,6 +246,7 @@ export function SettingsModal(props: SettingsModalProps) {
           {isSectionVisible('bot') && appSettings && (
             <SettingsBotSection
               appSettings={appSettings}
+              health={health}
               isMobileLayout={isMobileLayout}
               onSaveAppSettings={onSaveAppSettings}
               className={sectionContentClass}

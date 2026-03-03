@@ -6,6 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.config import settings as server_settings
 from app.models import AppSettings, BotConfig
 from app.repository import AppSettingsRepository
 
@@ -181,6 +182,10 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         kwargs["advert_interval"] = interval
 
     if update.bots is not None:
+        if server_settings.disable_bots:
+            raise HTTPException(
+                status_code=403, detail="Bot system disabled by server configuration"
+            )
         validate_all_bots(update.bots)
         logger.info("Updating bots (count=%d)", len(update.bots))
         kwargs["bots"] = update.bots

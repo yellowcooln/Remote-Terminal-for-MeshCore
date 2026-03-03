@@ -19,6 +19,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.config import settings as server_settings
+
 logger = logging.getLogger(__name__)
 
 # Limit concurrent bot executions to prevent resource exhaustion
@@ -288,6 +290,9 @@ async def run_bot_for_message(
         path: Hex-encoded routing path
         is_outgoing: Whether this is our own outgoing message
     """
+    if server_settings.disable_bots:
+        return
+
     # Early check if any bots are enabled (will re-check after sleep)
     from app.repository import AppSettingsRepository
 

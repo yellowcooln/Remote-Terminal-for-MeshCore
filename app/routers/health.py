@@ -18,6 +18,7 @@ class HealthResponse(BaseModel):
     oldest_undecrypted_timestamp: int | None
     mqtt_status: str | None = None
     community_mqtt_status: str | None = None
+    bots_disabled: bool = False
 
 
 async def build_health_data(radio_connected: bool, connection_info: str | None) -> dict:
@@ -67,6 +68,7 @@ async def build_health_data(radio_connected: bool, connection_info: str | None) 
         "oldest_undecrypted_timestamp": oldest_ts,
         "mqtt_status": mqtt_status,
         "community_mqtt_status": community_mqtt_status,
+        "bots_disabled": settings.disable_bots,
     }
 
 

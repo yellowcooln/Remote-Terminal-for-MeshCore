@@ -11,7 +11,7 @@ Backend server + browser interface for MeshCore mesh radio networks. Connect you
 * Forward packets to MQTT brokers (private: decrypted messages and/or raw packets; community aggregators like LetsMesh.net: raw packets only)
 * Visualize the mesh as a map or node set, view repeater stats, and more!
 
-**Warning:** This app has no auth, and is for trusted environments only. _Do not put this on an untrusted network, or open it to the public._ The bots can execute arbitrary Python code which means anyone on your network can, too. If you need access control, consider using a reverse proxy like Nginx, or extending FastAPI; access control and user management are outside the scope of this app.
+**Warning:** This app has no auth, and is for trusted environments only. _Do not put this on an untrusted network, or open it to the public._ The bots can execute arbitrary Python code which means anyone on your network can, too. To completely disable the bot system, start the server with `MESHCORE_DISABLE_BOTS=true` — this prevents all bot execution and blocks bot configuration changes via the API. If you need access control, consider using a reverse proxy like Nginx, or extending FastAPI; access control and user management are outside the scope of this app.
 
 ![Screenshot of the application's web interface](app_screenshot.png)
 
@@ -222,6 +222,7 @@ npm run build                        # build the frontend
 | `MESHCORE_BLE_PIN` | | BLE PIN (required when BLE address is set) |
 | `MESHCORE_LOG_LEVEL` | INFO | DEBUG, INFO, WARNING, ERROR |
 | `MESHCORE_DATABASE_PATH` | data/meshcore.db | SQLite database path |
+| `MESHCORE_DISABLE_BOTS` | false | Disable bot system entirely (blocks execution and config) |
 
 Only one transport may be active at a time. If multiple are set, the server will refuse to start.
 

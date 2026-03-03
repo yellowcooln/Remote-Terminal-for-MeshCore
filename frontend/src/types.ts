@@ -31,6 +31,7 @@ export interface HealthStatus {
   oldest_undecrypted_timestamp: number | null;
   mqtt_status: string | null;
   community_mqtt_status: string | null;
+  bots_disabled: boolean;
 }
 
 export interface MaintenanceResult {

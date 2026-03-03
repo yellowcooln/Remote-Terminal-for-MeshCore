@@ -97,7 +97,7 @@ The following are **deliberate design choices**, not bugs. They are documented i
 
 1. **No CORS restrictions**: The backend allows all origins (`allow_origins=["*"]`). This lets users access their radio from any device/origin on their network without configuration hassle.
 2. **No authentication or authorization**: There is no login, no API keys, no session management. The app is designed for trusted networks (home LAN, VPN). The README warns users not to expose it to untrusted networks.
-3. **Arbitrary bot code execution**: The bot system (`app/bot.py`) executes user-provided Python via `exec()` with full `__builtins__`. This is intentional — bots are a power-user feature for automation. The README explicitly warns that anyone on the network can execute arbitrary code through this.
+3. **Arbitrary bot code execution**: The bot system (`app/bot.py`) executes user-provided Python via `exec()` with full `__builtins__`. This is intentional — bots are a power-user feature for automation. The README explicitly warns that anyone on the network can execute arbitrary code through this. Operators can set `MESHCORE_DISABLE_BOTS=true` to completely disable the bot system at startup — this skips all bot execution, returns 403 on bot settings updates, and shows a disabled message in the frontend.
 
 ## Intentional Packet Handling Decision
 
@@ -421,6 +421,7 @@ mc.subscribe(EventType.ACK, handler)
 | `MESHCORE_SERIAL_BAUDRATE` | `115200` | Serial baud rate |
 | `MESHCORE_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
 | `MESHCORE_DATABASE_PATH` | `data/meshcore.db` | SQLite database location |
+| `MESHCORE_DISABLE_BOTS` | `false` | Disable bot system entirely (blocks execution and config) |
 
 **Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, `bots`, all MQTT configuration (`mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`), and community MQTT configuration (`community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`). They are configured via `GET/PATCH /api/settings` (and related settings endpoints).
 

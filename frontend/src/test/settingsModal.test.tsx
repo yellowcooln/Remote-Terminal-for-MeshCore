@@ -40,6 +40,7 @@ const baseHealth: HealthStatus = {
   oldest_undecrypted_timestamp: null,
   mqtt_status: null,
   community_mqtt_status: null,
+  bots_disabled: false,
 };
 
 const baseSettings: AppSettings = {

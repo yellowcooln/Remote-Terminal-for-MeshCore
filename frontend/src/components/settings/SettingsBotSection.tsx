@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import { toast } from '../ui/sonner';
 import { handleKeyboardActivate } from '../../utils/a11y';
-import type { AppSettings, AppSettingsUpdate, BotConfig } from '../../types';
+import type { AppSettings, AppSettingsUpdate, BotConfig, HealthStatus } from '../../types';
 
 const BotCodeEditor = lazy(() =>
   import('../BotCodeEditor').then((m) => ({ default: m.BotCodeEditor }))
@@ -50,11 +50,13 @@ const DEFAULT_BOT_CODE = `def bot(
 
 export function SettingsBotSection({
   appSettings,
+  health,
   isMobileLayout,
   onSaveAppSettings,
   className,
 }: {
   appSettings: AppSettings;
+  health: HealthStatus | null;
   isMobileLayout: boolean;
   onSaveAppSettings: (update: AppSettingsUpdate) => Promise<void>;
   className?: string;
@@ -138,6 +140,14 @@ export function SettingsBotSection({
   const handleResetBotCode = (botId: string) => {
     setBots(bots.map((b) => (b.id === botId ? { ...b, code: DEFAULT_BOT_CODE } : b)));
   };
+
+  if (health?.bots_disabled) {
+    return (
+      <div className={className}>
+        <p className="text-sm text-muted-foreground">Bot system disabled by server startup flag.</p>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
