@@ -13,7 +13,7 @@ Backend server + browser interface for MeshCore mesh radio networks. Connect you
 
 **Warning:** This app has no auth, and is for trusted environments only. _Do not put this on an untrusted network, or open it to the public._ The bots can execute arbitrary Python code which means anyone on your network can, too. If you need access control, consider using a reverse proxy like Nginx, or extending FastAPI; access control and user management are outside the scope of this app.
 
-![Screenshot of the application's web interface](screenshot.png)
+![Screenshot of the application's web interface](app_screenshot.png)
 
 ## Disclaimer
 

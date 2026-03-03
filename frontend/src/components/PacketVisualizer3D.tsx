@@ -1928,7 +1928,7 @@ export function PacketVisualizer3D({
                     {node.ambiguousNames.join(', ')}
                   </div>
                 )}
-                {pinnedNodeId && node.type !== 'self' && (
+                {node.type !== 'self' && (
                   <div className="text-muted-foreground border-t border-border pt-1 mt-1">
                     <div>Last active: {formatRelativeTime(node.lastActivity)}</div>
                     {node.lastActivityReason && <div>Reason: {node.lastActivityReason}</div>}
