@@ -63,7 +63,7 @@ app/
 2. Message is persisted as outgoing.
 3. Endpoint broadcasts WS `message` event so all live clients update.
 4. ACK/repeat updates arrive later as `message_acked` events.
-5. Channel resend (`POST /messages/channel/{id}/resend`) strips the sender name prefix by exact match against the current radio name. This assumes the radio name hasn't changed between the original send and the resend — a safe assumption since name changes require a radio config update and are not something that happens mid-conversation.
+5. Channel resend (`POST /messages/channel/{id}/resend`) strips the sender name prefix by exact match against the current radio name. This assumes the radio name hasn't changed between the original send and the resend. Name changes require an explicit radio config update and are rare, but the `new_timestamp=true` resend path has no time window, so a mismatch is possible if the name was changed between the original send and a later resend.
 
 ### Connection lifecycle
 
@@ -283,6 +283,7 @@ tests/
 ├── test_packet_pipeline.py     # End-to-end packet processing
 ├── test_packets_router.py      # Packets router endpoints (decrypt, maintenance)
 ├── test_radio.py               # RadioManager, serial detection
+├── test_real_crypto.py         # Real cryptographic operations
 ├── test_radio_operation.py     # radio_operation() context manager
 ├── test_radio_router.py        # Radio router endpoints
 ├── test_radio_sync.py          # Polling, sync, advertisement

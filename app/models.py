@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class Contact(BaseModel):
     public_key: str = Field(description="Public key (64-char hex)")
     name: str | None = None
-    type: int = 0  # 0=unknown, 1=client, 2=repeater, 3=room
+    type: int = 0  # 0=unknown, 1=client, 2=repeater, 3=room, 4=sensor
     flags: int = 0
     last_path: str | None = None
     last_path_len: int = -1

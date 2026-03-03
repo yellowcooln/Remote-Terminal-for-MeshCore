@@ -8,7 +8,7 @@ Backend server + browser interface for MeshCore mesh radio networks. Connect you
 * Monitor unlimited contacts and channels (radio limits don't apply -- packets are decrypted server-side)
 * Access your radio remotely over your network or VPN
 * Search for hashtag room names for channels you don't have keys for yet
-* Forward decrypted packets to MQTT brokers (both private and community aggregators like LetsMesh.net)
+* Forward packets to MQTT brokers (private: decrypted messages and/or raw packets; community aggregators like LetsMesh.net: raw packets only)
 * Visualize the mesh as a map or node set, view repeater stats, and more!
 
 **Warning:** This app has no auth, and is for trusted environments only. _Do not put this on an untrusted network, or open it to the public._ The bots can execute arbitrary Python code which means anyone on your network can, too. If you need access control, consider using a reverse proxy like Nginx, or extending FastAPI; access control and user management are outside the scope of this app.

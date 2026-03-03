@@ -48,6 +48,8 @@ frontend/src/
 │   ├── contactAvatar.ts        # Avatar color derivation from public key
 │   ├── rawPacketIdentity.ts    # observation_id vs id dedup helpers
 │   ├── visualizerUtils.ts      # 3D visualizer node types, colors, particles
+│   ├── visualizerSettings.ts   # LocalStorage persistence for visualizer options
+│   ├── a11y.ts                 # Keyboard accessibility helper
 │   ├── lastViewedConversation.ts   # localStorage for last-viewed conversation
 │   ├── contactMerge.ts            # Merge WS contact updates into list
 │   ├── localLabel.ts              # Local label (text + color) in localStorage
@@ -69,6 +71,7 @@ frontend/src/
 │   ├── BotCodeEditor.tsx
 │   ├── ContactAvatar.tsx
 │   ├── ContactInfoPane.tsx     # Contact detail sheet (stats, name history, paths)
+│   ├── ContactStatusInfo.tsx   # Contact status info component
 │   ├── RepeaterDashboard.tsx   # Layout shell — delegates to repeater/ panes
 │   ├── RepeaterLogin.tsx       # Repeater login form (password + guest)
 │   ├── NeighborsMiniMap.tsx    # Leaflet mini-map for repeater neighbor locations
@@ -94,7 +97,8 @@ frontend/src/
 │   │   └── RepeaterConsolePane.tsx      # CLI console with history
 │   └── ui/                     # shadcn/ui primitives
 ├── types/
-│   └── d3-force-3d.d.ts       # Type declarations for d3-force-3d
+│   ├── d3-force-3d.d.ts       # Type declarations for d3-force-3d
+│   └── globals.d.ts           # Global type declarations (__APP_VERSION__, __COMMIT_HASH__)
 └── test/
     ├── setup.ts
     ├── fixtures/websocket_events.json
@@ -114,6 +118,8 @@ frontend/src/
     ├── repeaterLogin.test.tsx
     ├── repeaterMessageParsing.test.ts
     ├── localLabel.test.ts
+    ├── messageInput.test.tsx
+    ├── newMessageModal.test.tsx
     ├── settingsModal.test.tsx
     ├── sidebar.test.tsx
     ├── unreadCounts.test.ts
@@ -121,6 +127,7 @@ frontend/src/
     ├── useConversationMessages.test.ts
     ├── useConversationMessages.race.test.ts
     ├── useRepeaterDashboard.test.ts
+    ├── useContactsAndChannels.test.ts
     ├── useWebSocket.dispatch.test.ts
     └── useWebSocket.lifecycle.test.ts
 ```
@@ -146,7 +153,7 @@ frontend/src/
 
 ### New Message modal
 
-`NewMessageModal` intentionally preserves form state (tab, inputs, checkboxes) when closed and reopened. The component instance persists across open/close cycles. This is by design so users don't lose in-progress input if they accidentally dismiss the dialog.
+`NewMessageModal` resets form state on close. The component instance persists across open/close cycles for smooth animations.
 
 ### Message behavior
 

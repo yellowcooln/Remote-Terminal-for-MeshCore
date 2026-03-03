@@ -240,6 +240,7 @@ Key test files:
 - `tests/test_ack_tracking_wiring.py` - DM ACK tracking extraction and wiring
 - `tests/test_health_mqtt_status.py` - Health endpoint MQTT status field
 - `tests/test_community_mqtt.py` - Community MQTT publisher (JWT, packet format, hash, broadcast)
+- `tests/test_real_crypto.py` - Real cryptographic operations
 
 ### Frontend (Vitest)
 
