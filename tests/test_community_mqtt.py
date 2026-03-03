@@ -463,9 +463,14 @@ class TestLwtAndStatusPublish:
             community_mqtt_iata="SFO",
         )
 
+        mock_radio = MagicMock()
+        mock_radio.meshcore = MagicMock()
+        mock_radio.meshcore.self_info = {"name": "TestNode"}
+
         with (
             patch("app.keystore.get_private_key", return_value=private_key),
             patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
         ):
             kwargs = pub._build_client_kwargs(settings)
 
@@ -475,8 +480,10 @@ class TestLwtAndStatusPublish:
         assert will.retain is True
         payload = json.loads(will.payload)
         assert payload["status"] == "offline"
+        assert payload["origin"] == "TestNode"
         assert payload["origin_id"] == pubkey_hex
-        assert payload["client"] == _CLIENT_ID
+        assert "timestamp" in payload
+        assert "client" not in payload
 
     @pytest.mark.asyncio
     async def test_on_connected_async_publishes_online_status(self):
@@ -505,7 +512,7 @@ class TestLwtAndStatusPublish:
             patch.object(
                 pub, "_fetch_stats", new_callable=AsyncMock, return_value={"battery_mv": 4200}
             ),
-            patch("app.community_mqtt._build_radio_info", return_value="915.0MHz BW250.0 SF10 CR8"),
+            patch("app.community_mqtt._build_radio_info", return_value="915.0,250.0,10,8"),
             patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/2.4.0"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
@@ -521,11 +528,11 @@ class TestLwtAndStatusPublish:
         assert payload["status"] == "online"
         assert payload["origin"] == "TestNode"
         assert payload["origin_id"] == pubkey_hex
-        assert payload["client"] == _CLIENT_ID
+        assert "client" not in payload
         assert "timestamp" in payload
         assert payload["model"] == "T-Deck"
         assert payload["firmware_version"] == "v2.2.2 (Build: 2025-01-15)"
-        assert payload["radio"] == "915.0MHz BW250.0 SF10 CR8"
+        assert payload["radio"] == "915.0,250.0,10,8"
         assert payload["client_version"] == "RemoteTerm/2.4.0"
         assert payload["stats"] == {"battery_mv": 4200}
 
@@ -539,9 +546,13 @@ class TestLwtAndStatusPublish:
             community_mqtt_iata="JFK",
         )
 
+        mock_radio = MagicMock()
+        mock_radio.meshcore = None
+
         with (
             patch("app.keystore.get_private_key", return_value=private_key),
             patch("app.keystore.get_public_key", return_value=public_key),
+            patch("app.radio.radio_manager", mock_radio),
         ):
             kwargs = pub._build_client_kwargs(settings)
 
@@ -583,7 +594,7 @@ class TestLwtAndStatusPublish:
                 return_value={"model": "unknown", "firmware_version": "unknown"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
-            patch("app.community_mqtt._build_radio_info", return_value="unknown"),
+            patch("app.community_mqtt._build_radio_info", return_value="0,0,0,0"),
             patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/unknown"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
@@ -822,7 +833,7 @@ class TestFetchStats:
 
 class TestBuildRadioInfo:
     def test_formatted_string(self):
-        """Should return formatted radio info string."""
+        """Should return comma-separated radio info matching reference format."""
         mock_radio = MagicMock()
         mock_radio.meshcore = MagicMock()
         mock_radio.meshcore.self_info = {
@@ -835,20 +846,20 @@ class TestBuildRadioInfo:
         with patch("app.radio.radio_manager", mock_radio):
             result = _build_radio_info()
 
-        assert result == "915.0MHz BW250.0 SF10 CR8"
+        assert result == "915.0,250.0,10,8"
 
     def test_fallback_when_no_meshcore(self):
-        """Should return 'unknown' when meshcore is None."""
+        """Should return '0,0,0,0' when meshcore is None."""
         mock_radio = MagicMock()
         mock_radio.meshcore = None
 
         with patch("app.radio.radio_manager", mock_radio):
             result = _build_radio_info()
 
-        assert result == "unknown"
+        assert result == "0,0,0,0"
 
     def test_fallback_when_self_info_missing_fields(self):
-        """Should return 'unknown' when self_info lacks radio fields."""
+        """Should use 0 defaults when self_info lacks radio fields."""
         mock_radio = MagicMock()
         mock_radio.meshcore = MagicMock()
         mock_radio.meshcore.self_info = {"name": "TestNode"}
@@ -856,7 +867,7 @@ class TestBuildRadioInfo:
         with patch("app.radio.radio_manager", mock_radio):
             result = _build_radio_info()
 
-        assert result == "unknown"
+        assert result == "0,0,0,0"
 
 
 class TestGetClientVersion:
@@ -905,7 +916,7 @@ class TestPublishStatus:
                 return_value={"model": "T-Deck", "firmware_version": "v2.2.2 (Build: 2025-01-15)"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=stats),
-            patch("app.community_mqtt._build_radio_info", return_value="915.0MHz BW250.0 SF10 CR8"),
+            patch("app.community_mqtt._build_radio_info", return_value="915.0,250.0,10,8"),
             patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/2.4.0"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
@@ -915,10 +926,10 @@ class TestPublishStatus:
         assert payload["status"] == "online"
         assert payload["origin"] == "TestNode"
         assert payload["origin_id"] == pubkey_hex
-        assert payload["client"] == _CLIENT_ID
+        assert "client" not in payload
         assert payload["model"] == "T-Deck"
         assert payload["firmware_version"] == "v2.2.2 (Build: 2025-01-15)"
-        assert payload["radio"] == "915.0MHz BW250.0 SF10 CR8"
+        assert payload["radio"] == "915.0,250.0,10,8"
         assert payload["client_version"] == "RemoteTerm/2.4.0"
         assert payload["stats"] == stats
 
@@ -942,7 +953,7 @@ class TestPublishStatus:
                 return_value={"model": "unknown", "firmware_version": "unknown"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
-            patch("app.community_mqtt._build_radio_info", return_value="unknown"),
+            patch("app.community_mqtt._build_radio_info", return_value="0,0,0,0"),
             patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/unknown"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
@@ -973,7 +984,7 @@ class TestPublishStatus:
                 return_value={"model": "unknown", "firmware_version": "unknown"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
-            patch("app.community_mqtt._build_radio_info", return_value="unknown"),
+            patch("app.community_mqtt._build_radio_info", return_value="0,0,0,0"),
             patch("app.community_mqtt._get_client_version", return_value="RemoteTerm/unknown"),
             patch.object(pub, "publish", new_callable=AsyncMock),
         ):

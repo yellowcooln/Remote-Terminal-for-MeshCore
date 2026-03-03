@@ -341,7 +341,16 @@ export function SettingsMqttSection({
           <div className="px-4 pb-4 space-y-3 border-t border-input">
             <p className="text-xs text-muted-foreground pt-3">
               Share raw packet data with the MeshCore community for coverage mapping and network
-              analysis. Only raw RF packets are shared — never decrypted messages.
+              analysis. Only raw RF packets are shared — never decrypted messages. General parity
+              with{' '}
+              <a
+                href="https://github.com/agessaman/meshcore-packet-capture"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                meshcore-packet-capture
+              </a>
+              .
             </p>
             <label className="flex items-center gap-3 cursor-pointer">
               <input

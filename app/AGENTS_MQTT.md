@@ -196,10 +196,9 @@ On connect and every 5 minutes thereafter, the community publisher sends a retai
   "timestamp":         "2024-01-15T10:30:00.000000",
   "origin":            "NodeName",
   "origin_id":         "PUBKEY_HEX_UPPER",
-  "client":            "RemoteTerm (github.com/...)",
   "model":             "T-Deck",
   "firmware_version":  "v2.2.2 (Build: 2025-01-15)",
-  "radio":             "915.0MHz BW250.0 SF10 CR8",
+  "radio":             "915.0,250.0,10,8",
   "client_version":    "RemoteTerm/2.4.0",
   "stats": {
     "battery_mv": 4200,
@@ -216,7 +215,7 @@ On connect and every 5 minutes thereafter, the community publisher sends a retai
 ```
 
 - `model` and `firmware_version` are fetched once per connection via `send_device_query()` (requires firmware version >= 3)
-- `radio` is formatted from `self_info` radio parameters (freq, BW, SF, CR)
+- `radio` is comma-separated raw values from `self_info` (freq, BW, SF, CR) matching the reference format
 - `client_version` is read from Python package metadata (`remoteterm-meshcore`)
 - `stats` is fetched from `get_stats_core()` + `get_stats_radio()` every 5 minutes; omitted if firmware doesn't support stats commands
 - All radio queries use `blocking=False` — if the radio is busy, cached values are used. No user-facing operations are ever blocked.

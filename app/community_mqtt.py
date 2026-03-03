@@ -265,21 +265,24 @@ def _build_status_topic(settings: AppSettings, pubkey_hex: str) -> str:
 
 
 def _build_radio_info() -> str:
-    """Format the radio parameters string from self_info, or 'unknown'."""
+    """Format the radio parameters string from self_info.
+
+    Matches the reference format: ``"freq,bw,sf,cr"`` (comma-separated raw
+    values).  Falls back to ``"0,0,0,0"`` when unavailable.
+    """
     from app.radio import radio_manager
 
     try:
         if radio_manager.meshcore and radio_manager.meshcore.self_info:
             info = radio_manager.meshcore.self_info
-            freq = info.get("radio_freq")
-            bw = info.get("radio_bw")
-            sf = info.get("radio_sf")
-            cr = info.get("radio_cr")
-            if freq is not None and bw is not None and sf is not None and cr is not None:
-                return f"{freq}MHz BW{bw} SF{sf} CR{cr}"
+            freq = info.get("radio_freq", 0)
+            bw = info.get("radio_bw", 0)
+            sf = info.get("radio_sf", 0)
+            cr = info.get("radio_cr", 0)
+            return f"{freq},{bw},{sf},{cr}"
     except Exception:
         pass
-    return "unknown"
+    return "0,0,0,0"
 
 
 def _get_client_version() -> str:
@@ -340,6 +343,7 @@ class CommunityMqttPublisher(BaseMqttPublisher):
 
     def _build_client_kwargs(self, settings: AppSettings) -> dict[str, Any]:
         from app.keystore import get_private_key, get_public_key
+        from app.radio import radio_manager
 
         private_key = get_private_key()
         public_key = get_public_key()
@@ -357,12 +361,17 @@ class CommunityMqttPublisher(BaseMqttPublisher):
 
         tls_context = ssl.create_default_context()
 
+        device_name = ""
+        if radio_manager.meshcore and radio_manager.meshcore.self_info:
+            device_name = radio_manager.meshcore.self_info.get("name", "")
+
         status_topic = _build_status_topic(settings, pubkey_hex)
         offline_payload = json.dumps(
             {
                 "status": "offline",
+                "timestamp": datetime.now().isoformat(),
+                "origin": device_name or "MeshCore Device",
                 "origin_id": pubkey_hex,
-                "client": _CLIENT_ID,
             }
         )
 
@@ -494,7 +503,6 @@ class CommunityMqttPublisher(BaseMqttPublisher):
             "timestamp": datetime.now().isoformat(),
             "origin": device_name or "MeshCore Device",
             "origin_id": pubkey_hex,
-            "client": _CLIENT_ID,
             "model": device_info.get("model", "unknown"),
             "firmware_version": device_info.get("firmware_version", "unknown"),
             "radio": _build_radio_info(),
