@@ -529,8 +529,10 @@ def decrypt_direct_message(payload: bytes, shared_secret: bytes) -> DecryptedDir
     message_bytes = decrypted[5:]
     try:
         message_text = message_bytes.decode("utf-8")
-        # Remove null terminator and any padding
-        message_text = message_text.rstrip("\x00")
+        # Truncate at first null terminator (consistent with channel message handling)
+        null_idx = message_text.find("\x00")
+        if null_idx >= 0:
+            message_text = message_text[:null_idx]
     except UnicodeDecodeError:
         return None
 
