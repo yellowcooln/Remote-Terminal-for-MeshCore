@@ -103,6 +103,24 @@ export function SettingsMqttSection({
         .
       </div>
 
+      <div className="rounded-md border border-blue-600/50 bg-blue-950/30 px-4 py-3 text-sm text-blue-200">
+        Outgoing messages (DMs and group messages) will be reported to private MQTT brokers in
+        decrypted/plaintext form. The raw outgoing packets will NOT be reported to any MQTT broker,
+        private or community. This means that{' '}
+        <strong>
+          your advertisements will not be reported to community analytics (LetsMesh/etc.) due to
+          fundamental limitations of the radio
+        </strong>{' '}
+        &mdash; you don&apos;t hear your own advertisements unless they&apos;re echoed back to you.
+        So, your own advert echoes may result in you being listed on LetsMesh/etc., but if
+        you&apos;re alone in your mesh, your node will appear as an ingest source within LetsMesh,
+        but will not report GPS data/etc. that would otherwise be captured by an advertisement, as
+        we faithfully report only traffic heard on the radio (and don&apos;t reconstruct synthetic
+        advertisement events to submit). Rely on the &ldquo;My Nodes&rdquo; or view heard packets to
+        validate that your radio is submitting to community sources; if you&apos;re alone in your
+        local mesh, the radio itself may not appear as a heard/mapped source.
+      </div>
+
       {/* Private MQTT Broker */}
       <div className="border border-input rounded-md overflow-hidden">
         <button

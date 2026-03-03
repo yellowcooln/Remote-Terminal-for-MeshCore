@@ -62,7 +62,7 @@ test.describe('Contacts sidebar & info pane', () => {
     // Scope to the Contact Info pane to avoid matching the header pubkey
     const infoPane = page.getByLabel('Contact Info');
     await expect(infoPane.locator('[title="Click to copy"]')).toBeVisible({ timeout: 10_000 });
-    await expect(infoPane.getByText(named.public_key.slice(0, 8))).toBeVisible();
+    await expect(infoPane.getByText(named.public_key.slice(0, 8)).first()).toBeVisible();
   });
 
   test('copy public key from contact info pane', async ({ page }) => {
