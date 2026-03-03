@@ -29,10 +29,12 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        ws: true,
       },
     },
     watch: {

@@ -42,6 +42,12 @@ ls /dev/ttyUSB* /dev/ttyACM*
 #######
 ls /dev/cu.usbserial-* /dev/cu.usbmodem*
 
+###########
+# Windows
+###########
+# In PowerShell:
+Get-CimInstance Win32_SerialPort | Select-Object DeviceID, Caption
+
 ######
 # WSL2
 ######
@@ -86,6 +92,12 @@ MESHCORE_TCP_HOST=192.168.1.100 MESHCORE_TCP_PORT=4000 uv run uvicorn app.main:a
 
 # BLE (address and PIN both required)
 MESHCORE_BLE_ADDRESS=AA:BB:CC:DD:EE:FF MESHCORE_BLE_PIN=123456 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+On Windows (PowerShell), set environment variables as a separate statement:
+```powershell
+$env:MESHCORE_SERIAL_PORT="COM8" # or your COM port
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Access at http://localhost:8000
@@ -148,6 +160,15 @@ uv run uvicorn app.main:app --reload # autodetects serial port
 # Or with explicit serial port
 MESHCORE_SERIAL_PORT=/dev/ttyUSB0 uv run uvicorn app.main:app --reload
 ```
+
+On Windows (PowerShell):
+```powershell
+uv sync
+$env:MESHCORE_SERIAL_PORT="COM8" # or your COM port
+uv run uvicorn app.main:app --reload
+```
+
+> **Windows note:** I've seen an intermittent startup issue like `"Received empty packet: index out of range"` with failed contact sync. I can't figure out why this happens. The issue typically resolves on restart. If you can figure out why this happens, I will buy you a virtual or iRL six pack if you're in the PNW. As a former always-windows-girlie before embracing WSL2, I despise second-classing M$FT users, but I'm just stuck with this one.
 
 ### Frontend
 

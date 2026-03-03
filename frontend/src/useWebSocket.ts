@@ -49,11 +49,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
   const connect = useCallback(() => {
     // Determine WebSocket URL based on current location
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // In development, connect directly to backend; in production, use same host
-    const isDev = window.location.port === '5173';
-    const wsUrl = isDev
-      ? `ws://localhost:8000/api/ws`
-      : `${protocol}//${window.location.host}/api/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/api/ws`;
 
     const ws = new WebSocket(wsUrl);
 
