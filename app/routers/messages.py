@@ -243,6 +243,7 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
             sender_timestamp=now,
             received_at=now,
             outgoing=True,
+            sender_name=radio_name or None,
         )
         if message_id is None:
             raise HTTPException(
