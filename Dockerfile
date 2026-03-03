@@ -5,8 +5,8 @@ ARG COMMIT_HASH=unknown
 
 WORKDIR /build
 
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json ./
+RUN npm install
 
 COPY frontend/ ./
 RUN VITE_COMMIT_HASH=${COMMIT_HASH} npm run build

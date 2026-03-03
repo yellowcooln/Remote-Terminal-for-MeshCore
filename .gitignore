@@ -8,6 +8,7 @@ wheels/
 # Virtual environments
 .venv
 frontend/node_modules/
+frontend/package-lock.json
 frontend/test-results/
 
 # Frontend build output (built from source by end users)
