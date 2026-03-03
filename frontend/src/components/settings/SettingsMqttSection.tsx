@@ -4,6 +4,7 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import { toast } from '../ui/sonner';
+import { cn } from '@/lib/utils';
 import type { AppSettings, AppSettingsUpdate, HealthStatus } from '../../types';
 
 export function SettingsMqttSection({
@@ -133,22 +134,21 @@ export function SettingsMqttSection({
             {privateExpanded ? '▼' : '▶'}
           </span>
           <h4 className="text-sm font-medium">Private MQTT Broker</h4>
-          {health?.mqtt_status === 'connected' ? (
-            <>
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-xs text-green-400">Connected</span>
-            </>
-          ) : health?.mqtt_status === 'disconnected' ? (
-            <>
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-xs text-red-400">Disconnected</span>
-            </>
-          ) : (
-            <>
-              <div className="w-2 h-2 rounded-full bg-gray-500" />
-              <span className="text-xs text-muted-foreground">Disabled</span>
-            </>
-          )}
+          <div
+            className={cn(
+              'w-2 h-2 rounded-full transition-colors',
+              health?.mqtt_status === 'connected'
+                ? 'bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]'
+                : 'bg-muted-foreground'
+            )}
+          />
+          <span className="text-xs text-muted-foreground">
+            {health?.mqtt_status === 'connected'
+              ? 'Connected'
+              : health?.mqtt_status === 'disconnected'
+                ? 'Disconnected'
+                : 'Disabled'}
+          </span>
         </button>
 
         {privateExpanded && (
@@ -319,22 +319,21 @@ export function SettingsMqttSection({
             {communityExpanded ? '▼' : '▶'}
           </span>
           <h4 className="text-sm font-medium">Community Analytics</h4>
-          {health?.community_mqtt_status === 'connected' ? (
-            <>
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-xs text-green-400">Connected</span>
-            </>
-          ) : health?.community_mqtt_status === 'disconnected' ? (
-            <>
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-xs text-red-400">Disconnected</span>
-            </>
-          ) : (
-            <>
-              <div className="w-2 h-2 rounded-full bg-gray-500" />
-              <span className="text-xs text-muted-foreground">Disabled</span>
-            </>
-          )}
+          <div
+            className={cn(
+              'w-2 h-2 rounded-full transition-colors',
+              health?.community_mqtt_status === 'connected'
+                ? 'bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]'
+                : 'bg-muted-foreground'
+            )}
+          />
+          <span className="text-xs text-muted-foreground">
+            {health?.community_mqtt_status === 'connected'
+              ? 'Connected'
+              : health?.community_mqtt_status === 'disconnected'
+                ? 'Disconnected'
+                : 'Disabled'}
+          </span>
         </button>
 
         {communityExpanded && (
