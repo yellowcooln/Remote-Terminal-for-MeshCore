@@ -10,6 +10,7 @@ export interface VisualizerSettings {
   letEmDrift: boolean;
   particleSpeedMultiplier: number;
   pruneStaleNodes: boolean;
+  pruneStaleMinutes: number;
   autoOrbit: boolean;
   showControls: boolean;
   hidePacketFeed: boolean;
@@ -25,6 +26,7 @@ export const VISUALIZER_DEFAULTS: VisualizerSettings = {
   letEmDrift: true,
   particleSpeedMultiplier: 2,
   pruneStaleNodes: false,
+  pruneStaleMinutes: 5,
   autoOrbit: false,
   showControls: true,
   hidePacketFeed: false,
@@ -70,6 +72,10 @@ export function getVisualizerSettings(): VisualizerSettings {
         typeof parsed.pruneStaleNodes === 'boolean'
           ? parsed.pruneStaleNodes
           : VISUALIZER_DEFAULTS.pruneStaleNodes,
+      pruneStaleMinutes:
+        typeof parsed.pruneStaleMinutes === 'number' && parsed.pruneStaleMinutes >= 1
+          ? parsed.pruneStaleMinutes
+          : VISUALIZER_DEFAULTS.pruneStaleMinutes,
       autoOrbit:
         typeof parsed.autoOrbit === 'boolean' ? parsed.autoOrbit : VISUALIZER_DEFAULTS.autoOrbit,
       showControls:

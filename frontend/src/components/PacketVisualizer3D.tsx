@@ -138,6 +138,7 @@ interface UseVisualizerData3DOptions {
   particleSpeedMultiplier: number;
   observationWindowSec: number;
   pruneStaleNodes: boolean;
+  pruneStaleMinutes: number;
 }
 
 interface VisualizerData3D {
@@ -163,6 +164,7 @@ function useVisualizerData3D({
   particleSpeedMultiplier,
   observationWindowSec,
   pruneStaleNodes,
+  pruneStaleMinutes,
 }: UseVisualizerData3DOptions): VisualizerData3D {
   const nodesRef = useRef<Map<string, GraphNode>>(new Map());
   const linksRef = useRef<Map<string, GraphLink>>(new Map());
@@ -930,12 +932,12 @@ function useVisualizerData3D({
     };
   }, []);
 
-  // Prune nodes with no activity in the last 5 minutes
+  // Prune nodes with no recent activity
   useEffect(() => {
     if (!pruneStaleNodes) return;
 
-    const STALE_MS = 5 * 60 * 1000;
-    const PRUNE_INTERVAL_MS = 10_000;
+    const STALE_MS = pruneStaleMinutes * 60 * 1000;
+    const PRUNE_INTERVAL_MS = 1_000;
 
     const interval = setInterval(() => {
       const cutoff = Date.now() - STALE_MS;
@@ -962,7 +964,7 @@ function useVisualizerData3D({
     }, PRUNE_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [pruneStaleNodes, syncSimulation]);
+  }, [pruneStaleNodes, pruneStaleMinutes, syncSimulation]);
 
   return useMemo(
     () => ({
@@ -1044,6 +1046,7 @@ export function PacketVisualizer3D({
   const [showControls, setShowControls] = useState(savedSettings.showControls);
   const [autoOrbit, setAutoOrbit] = useState(savedSettings.autoOrbit);
   const [pruneStaleNodes, setPruneStaleNodes] = useState(savedSettings.pruneStaleNodes);
+  const [pruneStaleMinutes, setPruneStaleMinutes] = useState(savedSettings.pruneStaleMinutes);
   const [repeaterAdvertPaths, setRepeaterAdvertPaths] = useState<ContactAdvertPathSummary[]>([]);
 
   // Persist visualizer controls to localStorage on change
@@ -1059,6 +1062,7 @@ export function PacketVisualizer3D({
       letEmDrift,
       particleSpeedMultiplier,
       pruneStaleNodes,
+      pruneStaleMinutes,
       autoOrbit,
       showControls,
     });
@@ -1072,6 +1076,7 @@ export function PacketVisualizer3D({
     letEmDrift,
     particleSpeedMultiplier,
     pruneStaleNodes,
+    pruneStaleMinutes,
     autoOrbit,
     showControls,
   ]);
@@ -1123,6 +1128,7 @@ export function PacketVisualizer3D({
     particleSpeedMultiplier,
     observationWindowSec,
     pruneStaleNodes,
+    pruneStaleMinutes,
   });
   const dataRef = useRef(data);
   useEffect(() => {
@@ -1794,10 +1800,27 @@ export function PacketVisualizer3D({
                       checked={pruneStaleNodes}
                       onCheckedChange={(c) => setPruneStaleNodes(c === true)}
                     />
-                    <span title="Automatically remove nodes with no traffic in the last 5 minutes to keep the mesh manageable">
-                      Only show nodes heard/pathed in last 5min
+                    <span title="Automatically remove nodes with no traffic within the configured window to keep the mesh manageable">
+                      Only show recently heard/in-a-path nodes
                     </span>
                   </label>
+                  {pruneStaleNodes && (
+                    <div className="flex items-center gap-2 pl-6">
+                      <span className="text-muted-foreground whitespace-nowrap">Window:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={pruneStaleMinutes}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!isNaN(v) && v >= 1 && v <= 60) setPruneStaleMinutes(v);
+                        }}
+                        className="w-14 rounded border border-border bg-background px-2 py-0.5 text-sm"
+                      />
+                      <span className="text-muted-foreground">min</span>
+                    </div>
+                  )}
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={letEmDrift}
