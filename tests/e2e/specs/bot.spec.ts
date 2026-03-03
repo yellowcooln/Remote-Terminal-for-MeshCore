@@ -44,7 +44,7 @@ test.describe('Bot functionality', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /Bot/i }).click();
+    await page.getByRole('button', { name: /🤖 Bots/ }).click();
 
     // The bot name should be visible in the bot list
     await expect(page.getByText('E2E Test Bot')).toBeVisible();
