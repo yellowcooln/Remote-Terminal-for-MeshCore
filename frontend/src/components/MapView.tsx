@@ -186,7 +186,11 @@ export function MapView({ contacts, focusedKey }: MapViewProps) {
                 <Popup>
                   <div className="text-sm">
                     <div className="font-medium flex items-center gap-1">
-                      {isRepeater && <span title="Repeater">🛜</span>}
+                      {isRepeater && (
+                        <span title="Repeater" aria-hidden="true">
+                          🛜
+                        </span>
+                      )}
                       {displayName}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">

@@ -125,10 +125,13 @@ export function SettingsMqttSection({
       <div className="border border-input rounded-md overflow-hidden">
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40"
+          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          aria-expanded={privateExpanded}
           onClick={() => setPrivateExpanded(!privateExpanded)}
         >
-          <span className="text-muted-foreground">{privateExpanded ? '▼' : '▶'}</span>
+          <span className="text-muted-foreground" aria-hidden="true">
+            {privateExpanded ? '▼' : '▶'}
+          </span>
           <h4 className="text-sm font-medium">Private MQTT Broker</h4>
           {health?.mqtt_status === 'connected' ? (
             <>
@@ -308,10 +311,13 @@ export function SettingsMqttSection({
       <div className="border border-input rounded-md overflow-hidden">
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40"
+          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          aria-expanded={communityExpanded}
           onClick={() => setCommunityExpanded(!communityExpanded)}
         >
-          <span className="text-muted-foreground">{communityExpanded ? '▼' : '▶'}</span>
+          <span className="text-muted-foreground" aria-hidden="true">
+            {communityExpanded ? '▼' : '▶'}
+          </span>
           <h4 className="text-sm font-medium">Community Analytics</h4>
           {health?.community_mqtt_status === 'connected' ? (
             <>
@@ -427,7 +433,11 @@ export function SettingsMqttSection({
         {busy ? 'Saving...' : 'Save MQTT Settings'}
       </Button>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

@@ -47,11 +47,16 @@ export function RepeaterLogin({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Repeater password..."
+            aria-label="Repeater password"
             disabled={loading}
             autoFocus
           />
 
-          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+          {error && (
+            <p className="text-sm text-destructive text-center" role="alert">
+              {error}
+            </p>
+          )}
 
           <div className="flex flex-col gap-2">
             <Button type="submit" disabled={loading} className="w-full">

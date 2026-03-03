@@ -174,7 +174,15 @@ export function NewMessageModal({
                 contacts.map((contact) => (
                   <div
                     key={contact.public_key}
-                    className="cursor-pointer px-4 py-2 hover:bg-accent"
+                    className="cursor-pointer px-4 py-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        (e.currentTarget as HTMLElement).click();
+                      }
+                    }}
                     onClick={() => {
                       onSelectConversation({
                         type: 'contact',
@@ -246,8 +254,9 @@ export function NewMessageModal({
                     setRoomKey(hex);
                   }}
                   title="Generate random key"
+                  aria-label="Generate random key"
                 >
-                  🎲
+                  <span aria-hidden="true">🎲</span>
                 </Button>
               </div>
             </div>
@@ -309,7 +318,11 @@ export function NewMessageModal({
           </div>
         )}
 
-        {error && <div className="text-sm text-destructive">{error}</div>}
+        {error && (
+          <div className="text-sm text-destructive" role="alert">
+            {error}
+          </div>
+        )}
 
         <DialogFooter>
           <Button

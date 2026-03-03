@@ -276,7 +276,11 @@ export function SettingsRadioSection({
         </div>
       </div>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      )}
 
       <Button onClick={handleSave} disabled={busy || rebooting} className="w-full">
         {busy || rebooting ? 'Saving & Rebooting...' : 'Save Radio Config & Reboot'}

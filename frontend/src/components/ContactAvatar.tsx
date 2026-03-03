@@ -27,6 +27,7 @@ export function ContactAvatar({
         height: size,
         fontSize: size * 0.45,
       }}
+      aria-hidden="true"
     >
       {avatar.text}
     </div>

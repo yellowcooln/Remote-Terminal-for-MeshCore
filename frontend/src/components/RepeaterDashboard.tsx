@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { RepeaterLogin } from './RepeaterLogin';
 import { useRepeaterDashboard } from '../hooks/useRepeaterDashboard';
 import { isFavorite } from '../utils/favorites';
+import { handleKeyboardActivate } from '../utils/a11y';
 import { ContactStatusInfo } from './ContactStatusInfo';
 import type { Contact, Conversation, Favorite } from '../types';
 import { TelemetryPane } from './repeater/RepeaterTelemetryPane';
@@ -69,11 +70,14 @@ export function RepeaterDashboard({
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
-      <div className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
+      <header className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
         <span className="flex flex-wrap items-baseline gap-x-2 min-w-0 flex-1">
           <span className="flex-shrink-0 font-semibold text-base">{conversation.name}</span>
           <span
             className="font-normal text-[11px] text-muted-foreground font-mono truncate cursor-pointer hover:text-primary transition-colors"
+            role="button"
+            tabIndex={0}
+            onKeyDown={handleKeyboardActivate}
             onClick={() => {
               navigator.clipboard.writeText(conversation.id);
               toast.success('Contact key copied!');
@@ -91,22 +95,24 @@ export function RepeaterDashboard({
               size="sm"
               onClick={loadAll}
               disabled={anyLoading}
-              className="text-xs border-green-600 text-green-600 hover:bg-green-600/10 hover:text-green-600"
+              className="text-xs border-green-400 text-green-400 hover:bg-green-400/10 hover:text-green-400"
             >
               {anyLoading ? 'Loading...' : 'Load All'}
             </Button>
           )}
           <button
-            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors"
+            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={onTrace}
             title="Direct Trace"
+            aria-label="Direct Trace"
           >
-            &#x1F6CE;
+            <span aria-hidden="true">&#x1F6CE;</span>
           </button>
           <button
-            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors"
+            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => onToggleFavorite('contact', conversation.id)}
             title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}
           >
             {isFav ? (
               <span className="text-amber-400">&#9733;</span>
@@ -115,14 +121,15 @@ export function RepeaterDashboard({
             )}
           </button>
           <button
-            className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-lg leading-none transition-colors"
+            className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => onDeleteContact(conversation.id)}
             title="Delete"
+            aria-label="Delete"
           >
-            &#128465;
+            <span aria-hidden="true">&#128465;</span>
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4">

@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { getStateKey, type ConversationTimes, type SortOrder } from '../utils/conversationState';
 import { getContactDisplayName } from '../utils/pubkey';
+import { handleKeyboardActivate } from '../utils/a11y';
 import { ContactAvatar } from './ContactAvatar';
 import { isFavorite } from '../utils/favorites';
 import { Input } from './ui/input';
@@ -378,10 +379,14 @@ export function Sidebar({
     <div
       key={row.key}
       className={cn(
-        'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors',
+        'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isActive(row.type, row.id) && 'bg-accent border-l-primary',
         row.unreadCount > 0 && '[&_.name]:font-semibold [&_.name]:text-foreground'
       )}
+      role="button"
+      tabIndex={0}
+      aria-current={isActive(row.type, row.id) ? 'page' : undefined}
+      onKeyDown={handleKeyboardActivate}
       onClick={() =>
         handleSelectConversation({
           type: row.type,
@@ -407,6 +412,7 @@ export function Sidebar({
               ? 'bg-destructive text-destructive-foreground'
               : 'bg-primary/90 text-primary-foreground'
           )}
+          aria-label={`${row.unreadCount} unread message${row.unreadCount !== 1 ? 's' : ''}`}
         >
           {row.unreadCount}
         </span>
@@ -444,30 +450,37 @@ export function Sidebar({
       <div className="flex justify-between items-center px-3 py-2 pt-3.5">
         <button
           className={cn(
-            'flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors',
+            'flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
             isSearching && 'cursor-default'
           )}
+          aria-expanded={!effectiveCollapsed}
           onClick={() => {
             if (!isSearching) onToggle();
           }}
           title={effectiveCollapsed ? `Expand ${title}` : `Collapse ${title}`}
         >
-          <span className="text-[9px]">{effectiveCollapsed ? '▸' : '▾'}</span>
+          <span className="text-[9px]" aria-hidden="true">
+            {effectiveCollapsed ? '▸' : '▾'}
+          </span>
           <span>{title}</span>
         </button>
         {(showSortToggle || unreadCount > 0) && (
           <div className="ml-auto flex items-center gap-1.5">
             {showSortToggle && (
               <button
-                className="bg-transparent text-muted-foreground/60 px-1 py-0.5 text-[10px] rounded hover:text-foreground transition-colors"
+                className="bg-transparent text-muted-foreground/60 px-1 py-0.5 text-[10px] rounded hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={handleSortToggle}
+                aria-label={sortOrder === 'alpha' ? 'Sort by recent' : 'Sort alphabetically'}
                 title={sortOrder === 'alpha' ? 'Sort by recent' : 'Sort alphabetically'}
               >
                 {sortOrder === 'alpha' ? 'A-Z' : '⏱'}
               </button>
             )}
             {unreadCount > 0 && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+              <span
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground"
+                aria-label={`${unreadCount} unread`}
+              >
                 {unreadCount}
               </span>
             )}
@@ -478,7 +491,10 @@ export function Sidebar({
   };
 
   return (
-    <div className="sidebar w-60 h-full min-h-0 bg-card border-r border-border flex flex-col">
+    <nav
+      className="sidebar w-60 h-full min-h-0 bg-card border-r border-border flex flex-col"
+      aria-label="Conversations"
+    >
       {/* Header */}
       <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
         <h2 className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
@@ -489,6 +505,7 @@ export function Sidebar({
           size="sm"
           onClick={onNewMessage}
           title="New Message"
+          aria-label="New message"
           className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
         >
           +
@@ -500,15 +517,17 @@ export function Sidebar({
         <Input
           type="text"
           placeholder="Search..."
+          aria-label="Search conversations"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="h-7 text-[13px] pr-8 bg-background/50"
         />
         {searchQuery && (
           <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-lg leading-none transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             onClick={() => setSearchQuery('')}
             title="Clear search"
+            aria-label="Clear search"
           >
             ×
           </button>
@@ -521,9 +540,13 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive('raw', 'raw') && 'bg-accent border-l-primary'
             )}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive('raw', 'raw') ? 'page' : undefined}
+            onKeyDown={handleKeyboardActivate}
             onClick={() =>
               handleSelectConversation({
                 type: 'raw',
@@ -532,7 +555,9 @@ export function Sidebar({
               })
             }
           >
-            <span className="text-muted-foreground text-xs">📡</span>
+            <span className="text-muted-foreground text-xs" aria-hidden="true">
+              📡
+            </span>
             <span className="flex-1 truncate text-muted-foreground">Packet Feed</span>
           </div>
         )}
@@ -541,9 +566,13 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive('map', 'map') && 'bg-accent border-l-primary'
             )}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive('map', 'map') ? 'page' : undefined}
+            onKeyDown={handleKeyboardActivate}
             onClick={() =>
               handleSelectConversation({
                 type: 'map',
@@ -552,7 +581,9 @@ export function Sidebar({
               })
             }
           >
-            <span className="text-muted-foreground text-xs">🗺️</span>
+            <span className="text-muted-foreground text-xs" aria-hidden="true">
+              🗺️
+            </span>
             <span className="flex-1 truncate text-muted-foreground">Node Map</span>
           </div>
         )}
@@ -561,9 +592,13 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive('visualizer', 'visualizer') && 'bg-accent border-l-primary'
             )}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive('visualizer', 'visualizer') ? 'page' : undefined}
+            onKeyDown={handleKeyboardActivate}
             onClick={() =>
               handleSelectConversation({
                 type: 'visualizer',
@@ -572,7 +607,9 @@ export function Sidebar({
               })
             }
           >
-            <span className="text-muted-foreground text-xs">✨</span>
+            <span className="text-muted-foreground text-xs" aria-hidden="true">
+              ✨
+            </span>
             <span className="flex-1 truncate text-muted-foreground">Mesh Visualizer</span>
           </div>
         )}
@@ -581,12 +618,17 @@ export function Sidebar({
         {!query && (
           <div
             className={cn(
-              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]',
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               showCracker && 'bg-accent border-l-primary'
             )}
+            role="button"
+            tabIndex={0}
+            onKeyDown={handleKeyboardActivate}
             onClick={onToggleCracker}
           >
-            <span className="text-muted-foreground text-xs">🔓</span>
+            <span className="text-muted-foreground text-xs" aria-hidden="true">
+              🔓
+            </span>
             <span className="flex-1 truncate text-muted-foreground">
               {showCracker ? 'Hide' : 'Show'} Room Finder
               <span
@@ -604,10 +646,15 @@ export function Sidebar({
         {/* Mark All Read */}
         {!query && Object.values(unreadCounts).some((c) => c > 0) && (
           <div
-            className="px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px]"
+            className="px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            role="button"
+            tabIndex={0}
+            onKeyDown={handleKeyboardActivate}
             onClick={onMarkAllRead}
           >
-            <span className="text-muted-foreground text-xs">✓</span>
+            <span className="text-muted-foreground text-xs" aria-hidden="true">
+              ✓
+            </span>
             <span className="flex-1 truncate text-muted-foreground">Mark all as read</span>
           </div>
         )}
@@ -682,6 +729,6 @@ export function Sidebar({
             </div>
           )}
       </div>
-    </div>
+    </nav>
   );
 }

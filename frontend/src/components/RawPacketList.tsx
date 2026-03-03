@@ -209,7 +209,12 @@ export function RawPacketList({ packets }: RawPacketListProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 flex flex-col gap-2" ref={listRef}>
+    <div
+      className="h-full overflow-y-auto p-4 flex flex-col gap-2"
+      ref={listRef}
+      aria-live="polite"
+      aria-relevant="additions"
+    >
       {sortedPackets.map(({ packet, decoded }) => (
         <div
           key={getRawPacketObservationKey(packet)}
@@ -225,7 +230,11 @@ export function RawPacketList({ packets }: RawPacketListProps) {
             </span>
 
             {/* Encryption status */}
-            {!packet.decrypted && <span title="Encrypted">🔒</span>}
+            {!packet.decrypted && (
+              <span title="Encrypted" aria-hidden="true">
+                🔒
+              </span>
+            )}
 
             {/* Summary */}
             <span

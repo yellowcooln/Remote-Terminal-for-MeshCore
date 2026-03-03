@@ -66,7 +66,7 @@ export function RadioSettingsPane({
                 <span
                   className={cn(
                     'ml-2 text-xs',
-                    clockDrift.isLarge ? 'text-red-500' : 'text-muted-foreground'
+                    clockDrift.isLarge ? 'text-red-400' : 'text-muted-foreground'
                   )}
                 >
                   (drift: {clockDrift.text})

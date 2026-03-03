@@ -16,7 +16,7 @@ export function AclPane({
   const permColor: Record<number, string> = {
     0: 'bg-muted text-muted-foreground',
     1: 'bg-blue-500/10 text-blue-500',
-    2: 'bg-green-500/10 text-green-500',
+    2: 'bg-green-400/10 text-green-400',
     3: 'bg-amber-500/10 text-amber-500',
   };
 

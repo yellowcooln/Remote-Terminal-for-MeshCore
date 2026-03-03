@@ -251,6 +251,7 @@ export function SettingsDatabaseSection({
               onLocalLabelChange?.({ text, color: localLabelColor });
             }}
             placeholder="e.g. Home Base, Field Radio 2"
+            aria-label="Local label text"
             className="flex-1"
           />
           <input
@@ -262,6 +263,7 @@ export function SettingsDatabaseSection({
               setLocalLabel(localLabelText, color);
               onLocalLabelChange?.({ text: localLabelText, color });
             }}
+            aria-label="Local label color"
             className="w-10 h-9 rounded border border-input cursor-pointer bg-transparent p-0.5"
           />
         </div>
@@ -271,7 +273,11 @@ export function SettingsDatabaseSection({
         </p>
       </div>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      )}
 
       <Button onClick={handleSave} disabled={busy} className="w-full">
         {busy ? 'Saving...' : 'Save Settings'}

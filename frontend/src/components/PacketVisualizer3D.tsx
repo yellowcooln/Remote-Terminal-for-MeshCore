@@ -1649,7 +1649,12 @@ export function PacketVisualizer3D({
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-background relative overflow-hidden">
+    <div
+      ref={containerRef}
+      className="w-full h-full bg-background relative overflow-hidden"
+      role="img"
+      aria-label="3D mesh network visualizer showing radio nodes as colored spheres and packet transmissions as animated arcs between them"
+    >
       {/* Legend */}
       {showControls && (
         <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10">

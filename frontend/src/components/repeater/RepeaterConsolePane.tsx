@@ -40,6 +40,8 @@ export function ConsolePane({
       <div
         ref={outputRef}
         className="h-48 overflow-y-auto p-3 font-mono text-xs bg-black/50 text-green-400 space-y-1"
+        aria-live="polite"
+        aria-relevant="additions"
       >
         {history.length === 0 && (
           <p className="text-muted-foreground italic">Type a CLI command below...</p>
@@ -65,6 +67,7 @@ export function ConsolePane({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="CLI command..."
+          aria-label="Console command"
           disabled={loading}
           className="flex-1 font-mono text-sm"
         />

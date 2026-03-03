@@ -526,7 +526,7 @@ export function CrackerPanel({
         onClick={isRunning ? handleStop : handleStart}
         disabled={!wordlistLoaded || gpuAvailable === false}
         className={cn(
-          'w-48 px-4 py-1.5 rounded text-sm font-medium',
+          'w-48 px-4 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           isRunning
             ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
             : 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -548,7 +548,7 @@ export function CrackerPanel({
           Pending: <span className="text-foreground font-medium">{pendingCount}</span>
         </span>
         <span className="text-muted-foreground">
-          Cracked: <span className="text-green-500 font-medium">{crackedCount}</span>
+          Cracked: <span className="text-green-400 font-medium">{crackedCount}</span>
         </span>
         <span className="text-muted-foreground">
           Failed: <span className="text-destructive font-medium">{failedCount}</span>

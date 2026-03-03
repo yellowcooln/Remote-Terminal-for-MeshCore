@@ -16,7 +16,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
           // Muted error style - dark red-tinted background with readable text
           error:
-            'group-[.toaster]:bg-[#2a1a1a] group-[.toaster]:text-[#e8a0a0] group-[.toaster]:border-[#4a2a2a] [&_[data-description]]:text-[#d4a0a0]',
+            'group-[.toaster]:bg-[#2a1a1a] group-[.toaster]:text-[#e8a0a0] group-[.toaster]:border-[#4a2a2a] [&_[data-description]]:text-[#e8b0b0]',
         },
       }}
       {...props}

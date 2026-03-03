@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react';
 import type { HealthStatus, RadioConfig } from '../types';
 import { api } from '../api';
 import { toast } from './ui/sonner';
+import { handleKeyboardActivate } from '../utils/a11y';
 import { cn } from '@/lib/utils';
 
 interface StatusBarProps {
@@ -40,7 +41,7 @@ export function StatusBar({
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-card border-b border-border text-xs">
+    <header className="flex items-center gap-3 px-4 py-2.5 bg-card border-b border-border text-xs">
       {/* Mobile menu button - only visible on small screens */}
       {onMenuClick && (
         <button
@@ -66,7 +67,11 @@ export function StatusBar({
         RemoteTerm
       </h1>
 
-      <div className="flex items-center gap-1.5">
+      <div
+        className="flex items-center gap-1.5"
+        role="status"
+        aria-label={connected ? 'Connected' : 'Disconnected'}
+      >
         <div
           className={cn(
             'w-2 h-2 rounded-full transition-colors',
@@ -74,6 +79,7 @@ export function StatusBar({
               ? 'bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]'
               : 'bg-muted-foreground'
           )}
+          aria-hidden="true"
         />
         <span className="hidden lg:inline text-muted-foreground">
           {connected ? 'Connected' : 'Disconnected'}
@@ -85,6 +91,9 @@ export function StatusBar({
           <span className="text-foreground font-medium">{config.name || 'Unnamed'}</span>
           <span
             className="font-mono text-[11px] text-muted-foreground cursor-pointer hover:text-primary transition-colors"
+            role="button"
+            tabIndex={0}
+            onKeyDown={handleKeyboardActivate}
             onClick={() => {
               navigator.clipboard.writeText(config.public_key);
               toast.success('Public key copied!');
@@ -100,17 +109,17 @@ export function StatusBar({
         <button
           onClick={handleReconnect}
           disabled={reconnecting}
-          className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-md text-xs cursor-pointer hover:bg-amber-500/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-md text-xs cursor-pointer hover:bg-amber-500/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {reconnecting ? 'Reconnecting...' : 'Reconnect'}
         </button>
       )}
       <button
         onClick={onSettingsClick}
-        className="px-3 py-1.5 bg-secondary border border-border text-muted-foreground rounded-md text-xs cursor-pointer hover:bg-accent hover:text-foreground transition-colors"
+        className="px-3 py-1.5 bg-secondary border border-border text-muted-foreground rounded-md text-xs cursor-pointer hover:bg-accent hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {settingsMode ? 'Back to Chat' : 'Settings'}
       </button>
-    </div>
+    </header>
   );
 }

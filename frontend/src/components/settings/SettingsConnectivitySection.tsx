@@ -128,7 +128,11 @@ export function SettingsConnectivitySection({
         {rebooting ? 'Rebooting...' : 'Reboot Radio'}
       </Button>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

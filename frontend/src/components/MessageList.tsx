@@ -13,6 +13,7 @@ import { formatTime, parseSenderFromText } from '../utils/messageParser';
 import { formatHopCounts, type SenderInfo } from '../utils/pathUtils';
 import { ContactAvatar } from './ContactAvatar';
 import { PathModal } from './PathModal';
+import { handleKeyboardActivate } from '../utils/a11y';
 import { cn } from '@/lib/utils';
 
 interface MessageListProps {
@@ -125,6 +126,9 @@ function HopCountBadge({ paths, onClick, variant }: HopCountBadgeProps) {
   return (
     <span
       className={className}
+      role="button"
+      tabIndex={0}
+      onKeyDown={handleKeyboardActivate}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -377,7 +381,7 @@ export function MessageList({
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto p-5 text-center text-muted-foreground">
+      <div className="flex-1 overflow-y-auto p-5 text-center text-muted-foreground" role="status">
         Loading messages...
       </div>
     );
@@ -404,9 +408,11 @@ export function MessageList({
         className="h-full overflow-y-auto p-4 flex flex-col gap-0.5"
         ref={listRef}
         onScroll={handleScroll}
+        aria-live="polite"
+        aria-relevant="additions"
       >
         {loadingOlder && (
-          <div className="text-center py-2 text-muted-foreground text-sm">
+          <div className="text-center py-2 text-muted-foreground text-sm" role="status">
             Loading older messages...
           </div>
         )}
@@ -469,6 +475,15 @@ export function MessageList({
                 <div className="w-10 flex-shrink-0 flex items-start pt-0.5">
                   {showAvatar && avatarKey && (
                     <span
+                      role={
+                        onOpenContactInfo && !avatarKey.startsWith('name:') ? 'button' : undefined
+                      }
+                      tabIndex={onOpenContactInfo && !avatarKey.startsWith('name:') ? 0 : undefined}
+                      onKeyDown={
+                        onOpenContactInfo && !avatarKey.startsWith('name:')
+                          ? handleKeyboardActivate
+                          : undefined
+                      }
                       onClick={
                         onOpenContactInfo && !avatarKey.startsWith('name:')
                           ? () => onOpenContactInfo(avatarKey)
@@ -496,6 +511,9 @@ export function MessageList({
                     {canClickSender ? (
                       <span
                         className="cursor-pointer hover:text-primary transition-colors"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={handleKeyboardActivate}
                         onClick={() => onSenderClick(displaySender)}
                         title={`Mention ${displaySender}`}
                       >
@@ -552,6 +570,9 @@ export function MessageList({
                       msg.paths && msg.paths.length > 0 ? (
                         <span
                           className="text-muted-foreground cursor-pointer hover:text-primary"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={handleKeyboardActivate}
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedPath({
@@ -569,6 +590,9 @@ export function MessageList({
                     ) : onResendChannelMessage && msg.type === 'CHAN' ? (
                       <span
                         className="text-muted-foreground cursor-pointer hover:text-primary"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={handleKeyboardActivate}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedPath({
@@ -600,8 +624,9 @@ export function MessageList({
       {showScrollToBottom && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-4 right-4 w-9 h-9 rounded-full bg-card hover:bg-accent border border-border flex items-center justify-center shadow-lg transition-all hover:scale-105"
+          className="absolute bottom-4 right-4 w-9 h-9 rounded-full bg-card hover:bg-accent border border-border flex items-center justify-center shadow-lg transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title="Scroll to bottom"
+          aria-label="Scroll to bottom"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

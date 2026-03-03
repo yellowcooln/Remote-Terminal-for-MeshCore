@@ -465,7 +465,10 @@ export function App() {
   );
 
   const settingsSidebarContent = (
-    <div className="sidebar w-60 h-full min-h-0 bg-card border-r border-border flex flex-col">
+    <nav
+      className="sidebar w-60 h-full min-h-0 bg-card border-r border-border flex flex-col"
+      aria-label="Settings"
+    >
       <div className="flex justify-between items-center px-3 py-2.5 border-b border-border">
         <h2 className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
           Settings
@@ -473,7 +476,7 @@ export function App() {
         <button
           type="button"
           onClick={handleCloseSettingsView}
-          className="h-6 w-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="h-6 w-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title="Back to conversations"
           aria-label="Back to conversations"
         >
@@ -486,16 +489,17 @@ export function App() {
             key={section}
             type="button"
             className={cn(
-              'w-full px-3 py-2 text-left text-[13px] border-l-2 border-transparent hover:bg-accent transition-colors',
+              'w-full px-3 py-2 text-left text-[13px] border-l-2 border-transparent hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
               settingsSection === section && 'bg-accent border-l-primary'
             )}
+            aria-current={settingsSection === section ? 'true' : undefined}
             onClick={() => setSettingsSection(section)}
           >
             {SETTINGS_SECTION_LABELS[section]}
           </button>
         ))}
       </div>
-    </div>
+    </nav>
   );
 
   const activeSidebarContent = showSettings ? settingsSidebarContent : sidebarContent;

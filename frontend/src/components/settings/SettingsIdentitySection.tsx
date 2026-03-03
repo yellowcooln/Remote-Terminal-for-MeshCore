@@ -184,7 +184,11 @@ export function SettingsIdentitySection({
         )}
       </div>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

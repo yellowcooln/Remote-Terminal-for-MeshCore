@@ -160,6 +160,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
           type="text"
           autoComplete="off"
           name="chat-message-input"
+          aria-label={placeholder || 'Type a message'}
           data-lpignore="true"
           data-1p-ignore="true"
           data-bwignore="true"
@@ -185,7 +186,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               className={cn(
                 'tabular-nums',
                 limitState === 'error' || limitState === 'danger'
-                  ? 'text-red-500 font-medium'
+                  ? 'text-red-400 font-medium'
                   : limitState === 'warning'
                     ? 'text-yellow-500'
                     : 'text-muted-foreground'
@@ -195,7 +196,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               {remaining < 0 && ` (${remaining})`}
             </span>
             {warningMessage && (
-              <span className={cn(limitState === 'error' ? 'text-red-500' : 'text-yellow-500')}>
+              <span className={cn(limitState === 'error' ? 'text-red-400' : 'text-yellow-500')}>
                 — {warningMessage}
               </span>
             )}
@@ -208,7 +209,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                   className={cn(
                     'tabular-nums',
                     limitState === 'error' || limitState === 'danger'
-                      ? 'text-red-500 font-medium'
+                      ? 'text-red-400 font-medium'
                       : limitState === 'warning'
                         ? 'text-yellow-500'
                         : 'text-muted-foreground'
@@ -219,7 +220,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 </span>
               )}
               {warningMessage && (
-                <span className={cn(limitState === 'error' ? 'text-red-500' : 'text-yellow-500')}>
+                <span className={cn(limitState === 'error' ? 'text-red-400' : 'text-yellow-500')}>
                   — {warningMessage}
                 </span>
               )}

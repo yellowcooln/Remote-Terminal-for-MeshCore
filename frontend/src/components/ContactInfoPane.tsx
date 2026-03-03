@@ -4,6 +4,7 @@ import { formatTime } from '../utils/messageParser';
 import { isValidLocation, calculateDistance, formatDistance } from '../utils/pathUtils';
 import { getMapFocusHash } from '../utils/urlHash';
 import { isFavorite } from '../utils/favorites';
+import { handleKeyboardActivate } from '../utils/a11y';
 import { ContactAvatar } from './ContactAvatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { toast } from './ui/sonner';
@@ -110,6 +111,9 @@ export function ContactInfoPane({
                   </h2>
                   <span
                     className="text-xs font-mono text-muted-foreground cursor-pointer hover:text-primary transition-colors block truncate"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={handleKeyboardActivate}
                     onClick={() => {
                       navigator.clipboard.writeText(contact.public_key);
                       toast.success('Public key copied!');
@@ -167,6 +171,9 @@ export function ContactInfoPane({
                 <SectionLabel>Location</SectionLabel>
                 <span
                   className="text-sm font-mono cursor-pointer hover:text-primary hover:underline transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={handleKeyboardActivate}
                   onClick={() => {
                     const url =
                       window.location.origin +
@@ -256,6 +263,9 @@ export function ContactInfoPane({
                             ? 'cursor-pointer hover:text-primary transition-colors truncate'
                             : 'truncate'
                         }
+                        role={onNavigateToChannel ? 'button' : undefined}
+                        tabIndex={onNavigateToChannel ? 0 : undefined}
+                        onKeyDown={onNavigateToChannel ? handleKeyboardActivate : undefined}
                         onClick={() => onNavigateToChannel?.(room.channel_key)}
                       >
                         {room.channel_name.startsWith('#') || room.channel_name === 'Public'

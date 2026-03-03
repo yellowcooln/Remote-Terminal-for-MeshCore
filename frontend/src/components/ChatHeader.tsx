@@ -1,5 +1,6 @@
 import { toast } from './ui/sonner';
 import { isFavorite } from '../utils/favorites';
+import { handleKeyboardActivate } from '../utils/a11y';
 import { ContactAvatar } from './ContactAvatar';
 import { ContactStatusInfo } from './ContactStatusInfo';
 import type { Contact, Conversation, Favorite, RadioConfig } from '../types';
@@ -28,11 +29,14 @@ export function ChatHeader({
   onOpenContactInfo,
 }: ChatHeaderProps) {
   return (
-    <div className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
+    <header className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
       <span className="flex flex-wrap items-center gap-x-2 min-w-0 flex-1">
         {conversation.type === 'contact' && onOpenContactInfo && (
           <span
             className="flex-shrink-0 cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onKeyDown={handleKeyboardActivate}
             onClick={() => onOpenContactInfo(conversation.id)}
             title="View contact info"
           >
@@ -45,8 +49,15 @@ export function ChatHeader({
             />
           </span>
         )}
-        <span
+        <h2
           className={`flex-shrink-0 font-semibold text-base ${conversation.type === 'contact' && onOpenContactInfo ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+          role={conversation.type === 'contact' && onOpenContactInfo ? 'button' : undefined}
+          tabIndex={conversation.type === 'contact' && onOpenContactInfo ? 0 : undefined}
+          onKeyDown={
+            conversation.type === 'contact' && onOpenContactInfo
+              ? handleKeyboardActivate
+              : undefined
+          }
           onClick={
             conversation.type === 'contact' && onOpenContactInfo
               ? () => onOpenContactInfo(conversation.id)
@@ -59,9 +70,12 @@ export function ChatHeader({
             ? '#'
             : ''}
           {conversation.name}
-        </span>
+        </h2>
         <span
           className="font-normal text-[11px] text-muted-foreground font-mono truncate cursor-pointer hover:text-primary transition-colors"
+          role="button"
+          tabIndex={0}
+          onKeyDown={handleKeyboardActivate}
           onClick={(e) => {
             e.stopPropagation();
             navigator.clipboard.writeText(conversation.id);
@@ -90,21 +104,27 @@ export function ChatHeader({
         {/* Direct trace button (contacts only) */}
         {conversation.type === 'contact' && (
           <button
-            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors"
+            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={onTrace}
             title="Direct Trace"
+            aria-label="Direct Trace"
           >
-            &#x1F6CE;
+            <span aria-hidden="true">&#x1F6CE;</span>
           </button>
         )}
         {/* Favorite button */}
         {(conversation.type === 'channel' || conversation.type === 'contact') && (
           <button
-            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors"
+            className="p-1.5 rounded hover:bg-accent text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() =>
               onToggleFavorite(conversation.type as 'channel' | 'contact', conversation.id)
             }
             title={
+              isFavorite(favorites, conversation.type as 'channel' | 'contact', conversation.id)
+                ? 'Remove from favorites'
+                : 'Add to favorites'
+            }
+            aria-label={
               isFavorite(favorites, conversation.type as 'channel' | 'contact', conversation.id)
                 ? 'Remove from favorites'
                 : 'Add to favorites'
@@ -120,7 +140,7 @@ export function ChatHeader({
         {/* Delete button */}
         {!(conversation.type === 'channel' && conversation.name === 'Public') && (
           <button
-            className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-lg leading-none transition-colors"
+            className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => {
               if (conversation.type === 'channel') {
                 onDeleteChannel(conversation.id);
@@ -129,11 +149,12 @@ export function ChatHeader({
               }
             }}
             title="Delete"
+            aria-label="Delete"
           >
-            &#128465;
+            <span aria-hidden="true">&#128465;</span>
           </button>
         )}
       </div>
-    </div>
+    </header>
   );
 }

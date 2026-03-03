@@ -109,12 +109,13 @@ export function RepeaterPane({
             onClick={onRefresh}
             disabled={disabled || state.loading}
             className={cn(
-              'p-1 rounded transition-colors disabled:opacity-50',
+              'p-1 rounded transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               disabled || state.loading
                 ? 'text-muted-foreground'
                 : 'text-green-500 hover:bg-accent hover:text-green-400'
             )}
             title="Refresh"
+            aria-label={`Refresh ${title}`}
           >
             <RefreshIcon
               className={cn(

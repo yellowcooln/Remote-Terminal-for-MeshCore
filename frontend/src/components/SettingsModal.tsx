@@ -141,14 +141,21 @@ export function SettingsModal(props: SettingsModalProps) {
     : 'w-full h-full overflow-y-auto space-y-3';
 
   const sectionButtonClasses =
-    'w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/40';
+    'w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset';
 
   const renderSectionHeader = (section: SettingsSection): ReactNode => {
     if (!showSectionButton) return null;
     return (
-      <button type="button" className={sectionButtonClasses} onClick={() => toggleSection(section)}>
-        <span className="font-medium">{SETTINGS_SECTION_LABELS[section]}</span>
-        <span className="text-muted-foreground md:hidden">
+      <button
+        type="button"
+        className={sectionButtonClasses}
+        aria-expanded={expandedSections[section]}
+        onClick={() => toggleSection(section)}
+      >
+        <span className="font-medium" role="heading" aria-level={3}>
+          {SETTINGS_SECTION_LABELS[section]}
+        </span>
+        <span className="text-muted-foreground md:hidden" aria-hidden="true">
           {expandedSections[section] ? '−' : '+'}
         </span>
       </button>
@@ -164,7 +171,7 @@ export function SettingsModal(props: SettingsModalProps) {
   ) : (
     <div className={settingsContainerClass}>
       {shouldRenderSection('radio') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('radio')}
           {isSectionVisible('radio') && (
             <SettingsRadioSection
@@ -176,11 +183,11 @@ export function SettingsModal(props: SettingsModalProps) {
               className={sectionContentClass}
             />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('identity') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('identity')}
           {isSectionVisible('identity') && appSettings && (
             <SettingsIdentitySection
@@ -197,11 +204,11 @@ export function SettingsModal(props: SettingsModalProps) {
               className={sectionContentClass}
             />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('connectivity') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('connectivity')}
           {isSectionVisible('connectivity') && appSettings && (
             <SettingsConnectivitySection
@@ -214,11 +221,11 @@ export function SettingsModal(props: SettingsModalProps) {
               className={sectionContentClass}
             />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('database') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('database')}
           {isSectionVisible('database') && appSettings && (
             <SettingsDatabaseSection
@@ -230,11 +237,11 @@ export function SettingsModal(props: SettingsModalProps) {
               className={sectionContentClass}
             />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('bot') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('bot')}
           {isSectionVisible('bot') && appSettings && (
             <SettingsBotSection
@@ -244,11 +251,11 @@ export function SettingsModal(props: SettingsModalProps) {
               className={sectionContentClass}
             />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('mqtt') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('mqtt')}
           {isSectionVisible('mqtt') && appSettings && (
             <SettingsMqttSection
@@ -258,23 +265,23 @@ export function SettingsModal(props: SettingsModalProps) {
               className={sectionContentClass}
             />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('statistics') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('statistics')}
           {isSectionVisible('statistics') && (
             <SettingsStatisticsSection className={sectionContentClass} />
           )}
-        </div>
+        </section>
       )}
 
       {shouldRenderSection('about') && (
-        <div className={sectionWrapperClass}>
+        <section className={sectionWrapperClass}>
           {renderSectionHeader('about')}
           {isSectionVisible('about') && <SettingsAboutSection className={sectionContentClass} />}
-        </div>
+        </section>
       )}
     </div>
   );

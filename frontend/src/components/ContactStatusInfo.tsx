@@ -4,6 +4,7 @@ import { api } from '../api';
 import { formatTime } from '../utils/messageParser';
 import { isValidLocation, calculateDistance, formatDistance } from '../utils/pathUtils';
 import { getMapFocusHash } from '../utils/urlHash';
+import { handleKeyboardActivate } from '../utils/a11y';
 import type { Contact } from '../types';
 
 interface ContactStatusInfoProps {
@@ -30,6 +31,9 @@ export function ContactStatusInfo({ contact, ourLat, ourLon }: ContactStatusInfo
       <span
         key="path"
         className="cursor-pointer hover:text-primary hover:underline"
+        role="button"
+        tabIndex={0}
+        onKeyDown={handleKeyboardActivate}
         onClick={(e) => {
           e.stopPropagation();
           if (window.confirm('Reset path to flood?')) {
@@ -49,6 +53,9 @@ export function ContactStatusInfo({ contact, ourLat, ourLon }: ContactStatusInfo
       <span
         key="path"
         className="cursor-pointer hover:text-primary hover:underline"
+        role="button"
+        tabIndex={0}
+        onKeyDown={handleKeyboardActivate}
         onClick={(e) => {
           e.stopPropagation();
           if (window.confirm('Reset path to flood?')) {
@@ -74,6 +81,9 @@ export function ContactStatusInfo({ contact, ourLat, ourLon }: ContactStatusInfo
       <span key="coords">
         <span
           className="font-mono cursor-pointer hover:text-primary hover:underline"
+          role="button"
+          tabIndex={0}
+          onKeyDown={handleKeyboardActivate}
           onClick={(e) => {
             e.stopPropagation();
             const url =

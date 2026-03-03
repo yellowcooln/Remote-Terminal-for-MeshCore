@@ -42,9 +42,10 @@ export function VisualizerView({ packets, contacts, config }: VisualizerViewProp
       <div className="flex justify-between items-center px-4 py-3 border-b border-border font-medium text-lg">
         <span>Mesh Visualizer</span>
         <button
-          className="hidden md:inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          className="hidden md:inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={toggleFullScreen}
           title={paneFullScreen ? 'Exit fullscreen' : 'Fullscreen'}
+          aria-label={paneFullScreen ? 'Exit fullscreen' : 'Enter fullscreen'}
         >
           {paneFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
         </button>

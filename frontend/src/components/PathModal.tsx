@@ -426,6 +426,14 @@ function CoordinateLink({ lat, lon, publicKey }: { lat: number; lon: number; pub
   return (
     <span
       className="text-xs text-muted-foreground font-mono cursor-pointer hover:text-primary hover:underline ml-1"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).click();
+        }
+      }}
       onClick={handleClick}
       title="View on map"
     >

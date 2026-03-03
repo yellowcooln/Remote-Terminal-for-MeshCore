@@ -3,6 +3,7 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import { toast } from '../ui/sonner';
+import { handleKeyboardActivate } from '../../utils/a11y';
 import type { AppSettings, AppSettingsUpdate, BotConfig } from '../../types';
 
 const BotCodeEditor = lazy(() =>
@@ -141,7 +142,7 @@ export function SettingsBotSection({
   return (
     <div className={className}>
       <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md">
-        <p className="text-sm text-red-500">
+        <p className="text-sm text-red-400">
           <strong>Experimental:</strong> This is an alpha feature and introduces automated message
           sending to your radio; unexpected behavior may occur. Use with caution, and please report
           any bugs!
@@ -182,12 +183,16 @@ export function SettingsBotSection({
             <div key={bot.id} className="border border-input rounded-md overflow-hidden">
               <div
                 className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted/80"
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedBotId === bot.id}
+                onKeyDown={handleKeyboardActivate}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest('input, button')) return;
                   setExpandedBotId(expandedBotId === bot.id ? null : bot.id);
                 }}
               >
-                <span className="text-muted-foreground">
+                <span className="text-muted-foreground" aria-hidden="true">
                   {expandedBotId === bot.id ? '▼' : '▶'}
                 </span>
 
@@ -211,6 +216,9 @@ export function SettingsBotSection({
                 ) : (
                   <span
                     className="text-sm font-medium flex-1 hover:text-primary cursor-text"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={handleKeyboardActivate}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleStartEditingName(bot);
@@ -244,8 +252,9 @@ export function SettingsBotSection({
                     handleDeleteBot(bot.id);
                   }}
                   title="Delete bot"
+                  aria-label="Delete bot"
                 >
-                  🗑
+                  <span aria-hidden="true">🗑</span>
                 </Button>
               </div>
 
@@ -303,7 +312,11 @@ export function SettingsBotSection({
         </p>
       </div>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      )}
 
       <Button onClick={handleSave} disabled={busy} className="w-full">
         {busy ? 'Saving...' : 'Save Bot Settings'}

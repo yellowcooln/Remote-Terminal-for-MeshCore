@@ -101,7 +101,7 @@ export function NeighborsPane({
                   const dist = n.distance;
                   const snrStr = n.snr >= 0 ? `+${n.snr.toFixed(1)}` : n.snr.toFixed(1);
                   const snrColor =
-                    n.snr >= 6 ? 'text-green-500' : n.snr >= 0 ? 'text-yellow-500' : 'text-red-500';
+                    n.snr >= 6 ? 'text-green-400' : n.snr >= 0 ? 'text-yellow-500' : 'text-red-400';
                   return (
                     <tr key={i} className="border-t border-border/50">
                       <td className="py-1">{n.name || n.pubkey_prefix}</td>
