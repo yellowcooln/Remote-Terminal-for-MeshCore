@@ -6,10 +6,10 @@ from meshcore import EventType
 from pydantic import BaseModel, Field
 
 from app.dependencies import require_connected
-from app.models import Channel
+from app.models import Channel, ChannelDetail, ChannelMessageCounts, ChannelTopSender
 from app.radio import radio_manager
 from app.radio_sync import upsert_channel_from_radio_slot
-from app.repository import ChannelRepository
+from app.repository import ChannelRepository, MessageRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/channels", tags=["channels"])
@@ -27,6 +27,24 @@ class CreateChannelRequest(BaseModel):
 async def list_channels() -> list[Channel]:
     """List all channels from the database."""
     return await ChannelRepository.get_all()
+
+
+@router.get("/{key}/detail", response_model=ChannelDetail)
+async def get_channel_detail(key: str) -> ChannelDetail:
+    """Get comprehensive channel profile data with message statistics."""
+    channel = await ChannelRepository.get_by_key(key)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    stats = await MessageRepository.get_channel_stats(channel.key)
+
+    return ChannelDetail(
+        channel=channel,
+        message_counts=ChannelMessageCounts(**stats["message_counts"]),
+        first_message_at=stats["first_message_at"],
+        unique_sender_count=stats["unique_sender_count"],
+        top_senders_24h=[ChannelTopSender(**s) for s in stats["top_senders_24h"]],
+    )
 
 
 @router.get("/{key}", response_model=Channel)

@@ -34,6 +34,7 @@ import {
 } from './components/settings/settingsConstants';
 import { RawPacketList } from './components/RawPacketList';
 import { ContactInfoPane } from './components/ContactInfoPane';
+import { ChannelInfoPane } from './components/ChannelInfoPane';
 import { CONTACT_TYPE_REPEATER } from './types';
 
 // Lazy-load heavy components to reduce initial bundle
@@ -73,6 +74,7 @@ export function App() {
   const [crackerRunning, setCrackerRunning] = useState(false);
   const [localLabel, setLocalLabel] = useState(getLocalLabel);
   const [infoPaneContactKey, setInfoPaneContactKey] = useState<string | null>(null);
+  const [infoPaneChannelKey, setInfoPaneChannelKey] = useState<string | null>(null);
 
   // Defer CrackerPanel mount until first opened (lazy-loaded, but keep mounted after for state)
   const crackerMounted = useRef(false);
@@ -441,6 +443,14 @@ export function App() {
     setInfoPaneContactKey(null);
   }, []);
 
+  const handleOpenChannelInfo = useCallback((channelKey: string) => {
+    setInfoPaneChannelKey(channelKey);
+  }, []);
+
+  const handleCloseChannelInfo = useCallback(() => {
+    setInfoPaneChannelKey(null);
+  }, []);
+
   const handleNavigateToChannel = useCallback(
     (channelKey: string) => {
       const channel = channels.find((c) => c.key === channelKey);
@@ -613,6 +623,7 @@ export function App() {
                   <ChatHeader
                     conversation={activeConversation}
                     contacts={contacts}
+                    channels={channels}
                     config={config}
                     favorites={favorites}
                     onTrace={handleTrace}
@@ -620,6 +631,7 @@ export function App() {
                     onDeleteChannel={handleDeleteChannel}
                     onDeleteContact={handleDeleteContact}
                     onOpenContactInfo={handleOpenContactInfo}
+                    onOpenChannelInfo={handleOpenChannelInfo}
                   />
                   <MessageList
                     key={activeConversation.id}
@@ -758,6 +770,14 @@ export function App() {
         favorites={favorites}
         onToggleFavorite={handleToggleFavorite}
         onNavigateToChannel={handleNavigateToChannel}
+      />
+
+      <ChannelInfoPane
+        channelKey={infoPaneChannelKey}
+        onClose={handleCloseChannelInfo}
+        channels={channels}
+        favorites={favorites}
+        onToggleFavorite={handleToggleFavorite}
       />
 
       <Toaster position="top-right" />

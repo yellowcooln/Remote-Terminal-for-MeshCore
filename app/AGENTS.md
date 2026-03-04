@@ -170,6 +170,7 @@ app/
 
 ### Channels
 - `GET /channels`
+- `GET /channels/{key}/detail`
 - `GET /channels/{key}`
 - `POST /channels`
 - `DELETE /channels/{key}`

@@ -389,6 +389,72 @@ class MessageRepository:
         return row["cnt"] if row else 0
 
     @staticmethod
+    async def get_channel_stats(conversation_key: str) -> dict:
+        """Get channel message statistics: time-windowed counts, first message, unique senders, top senders.
+
+        Returns a dict with message_counts, first_message_at, unique_sender_count, top_senders_24h.
+        """
+        import time as _time
+
+        now = int(_time.time())
+        t_1h = now - 3600
+        t_24h = now - 86400
+        t_48h = now - 172800
+        t_7d = now - 604800
+
+        cursor = await db.conn.execute(
+            """
+            SELECT COUNT(*) AS all_time,
+                SUM(CASE WHEN received_at >= ? THEN 1 ELSE 0 END) AS last_1h,
+                SUM(CASE WHEN received_at >= ? THEN 1 ELSE 0 END) AS last_24h,
+                SUM(CASE WHEN received_at >= ? THEN 1 ELSE 0 END) AS last_48h,
+                SUM(CASE WHEN received_at >= ? THEN 1 ELSE 0 END) AS last_7d,
+                MIN(received_at) AS first_message_at,
+                COUNT(DISTINCT sender_key) AS unique_sender_count
+            FROM messages WHERE type = 'CHAN' AND conversation_key = ?
+            """,
+            (t_1h, t_24h, t_48h, t_7d, conversation_key),
+        )
+        row = await cursor.fetchone()
+        assert row is not None  # Aggregate query always returns a row
+
+        message_counts = {
+            "last_1h": row["last_1h"] or 0,
+            "last_24h": row["last_24h"] or 0,
+            "last_48h": row["last_48h"] or 0,
+            "last_7d": row["last_7d"] or 0,
+            "all_time": row["all_time"] or 0,
+        }
+
+        cursor2 = await db.conn.execute(
+            """
+            SELECT COALESCE(sender_name, sender_key, 'Unknown') AS display_name,
+                sender_key, COUNT(*) AS cnt
+            FROM messages
+            WHERE type = 'CHAN' AND conversation_key = ?
+                AND received_at >= ? AND sender_key IS NOT NULL
+            GROUP BY sender_key ORDER BY cnt DESC LIMIT 5
+            """,
+            (conversation_key, t_24h),
+        )
+        top_rows = await cursor2.fetchall()
+        top_senders = [
+            {
+                "sender_name": r["display_name"],
+                "sender_key": r["sender_key"],
+                "message_count": r["cnt"],
+            }
+            for r in top_rows
+        ]
+
+        return {
+            "message_counts": message_counts,
+            "first_message_at": row["first_message_at"],
+            "unique_sender_count": row["unique_sender_count"] or 0,
+            "top_senders_24h": top_senders,
+        }
+
+    @staticmethod
     async def get_most_active_rooms(sender_key: str, limit: int = 5) -> list[tuple[str, str, int]]:
         """Get channels where a contact has sent the most messages.
 

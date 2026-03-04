@@ -259,6 +259,18 @@ Clicking a contact's avatar in `ChatHeader` or `MessageList` opens a `ContactInf
 
 State: `infoPaneContactKey` in App.tsx controls open/close. Live contact data from WebSocket updates is preferred over the initial detail snapshot.
 
+## Channel Info Pane
+
+Clicking a channel name in `ChatHeader` opens a `ChannelInfoPane` sheet (right drawer) showing channel details fetched from `GET /api/channels/{key}/detail`:
+
+- Header: channel name, key (clickable copy), type badge (hashtag/private key), on-radio badge
+- Favorite toggle
+- Message activity: time-windowed counts (1h, 24h, 48h, 7d, all time) + unique senders
+- First message date
+- Top senders in last 24h (name + count)
+
+State: `infoPaneChannelKey` in App.tsx controls open/close. Live channel data from the `channels` array is preferred over the initial detail snapshot.
+
 ## Repeater Dashboard
 
 For repeater contacts (`type=2`), App.tsx renders `RepeaterDashboard` instead of the normal chat UI (ChatHeader + MessageList + MessageInput).

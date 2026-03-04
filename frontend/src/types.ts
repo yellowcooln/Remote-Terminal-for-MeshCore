@@ -109,6 +109,28 @@ export interface Channel {
   last_read_at: number | null;
 }
 
+export interface ChannelMessageCounts {
+  last_1h: number;
+  last_24h: number;
+  last_48h: number;
+  last_7d: number;
+  all_time: number;
+}
+
+export interface ChannelTopSender {
+  sender_name: string;
+  sender_key: string | null;
+  message_count: number;
+}
+
+export interface ChannelDetail {
+  channel: Channel;
+  message_counts: ChannelMessageCounts;
+  first_message_at: number | null;
+  unique_sender_count: number;
+  top_senders_24h: ChannelTopSender[];
+}
+
 /** A single path that a message took to reach us */
 export interface MessagePath {
   /** Hex-encoded routing path (2 chars per hop) */

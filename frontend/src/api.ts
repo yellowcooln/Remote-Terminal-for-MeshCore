@@ -2,6 +2,7 @@ import type {
   AppSettings,
   AppSettingsUpdate,
   Channel,
+  ChannelDetail,
   CommandResponse,
   Contact,
   ContactAdvertPath,
@@ -148,6 +149,7 @@ export const api = {
     }),
   deleteChannel: (key: string) =>
     fetchJson<{ status: string }>(`/channels/${key}`, { method: 'DELETE' }),
+  getChannelDetail: (key: string) => fetchJson<ChannelDetail>(`/channels/${key}/detail`),
   markChannelRead: (key: string) =>
     fetchJson<{ status: string; key: string }>(`/channels/${key}/mark-read`, {
       method: 'POST',

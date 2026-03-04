@@ -145,6 +145,34 @@ class Channel(BaseModel):
     last_read_at: int | None = None  # Server-side read state tracking
 
 
+class ChannelMessageCounts(BaseModel):
+    """Time-windowed message counts for a channel."""
+
+    last_1h: int = 0
+    last_24h: int = 0
+    last_48h: int = 0
+    last_7d: int = 0
+    all_time: int = 0
+
+
+class ChannelTopSender(BaseModel):
+    """A top sender in a channel over the last 24 hours."""
+
+    sender_name: str
+    sender_key: str | None = None
+    message_count: int
+
+
+class ChannelDetail(BaseModel):
+    """Comprehensive channel profile data."""
+
+    channel: Channel
+    message_counts: ChannelMessageCounts = Field(default_factory=ChannelMessageCounts)
+    first_message_at: int | None = None
+    unique_sender_count: int = 0
+    top_senders_24h: list[ChannelTopSender] = Field(default_factory=list)
+
+
 class MessagePath(BaseModel):
     """A single path that a message took to reach us."""
 

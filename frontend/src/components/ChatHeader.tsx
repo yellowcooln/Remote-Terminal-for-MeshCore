@@ -3,11 +3,12 @@ import { isFavorite } from '../utils/favorites';
 import { handleKeyboardActivate } from '../utils/a11y';
 import { ContactAvatar } from './ContactAvatar';
 import { ContactStatusInfo } from './ContactStatusInfo';
-import type { Contact, Conversation, Favorite, RadioConfig } from '../types';
+import type { Channel, Contact, Conversation, Favorite, RadioConfig } from '../types';
 
 interface ChatHeaderProps {
   conversation: Conversation;
   contacts: Contact[];
+  channels: Channel[];
   config: RadioConfig | null;
   favorites: Favorite[];
   onTrace: () => void;
@@ -15,11 +16,13 @@ interface ChatHeaderProps {
   onDeleteChannel: (key: string) => void;
   onDeleteContact: (publicKey: string) => void;
   onOpenContactInfo?: (publicKey: string) => void;
+  onOpenChannelInfo?: (channelKey: string) => void;
 }
 
 export function ChatHeader({
   conversation,
   contacts,
+  channels,
   config,
   favorites,
   onTrace,
@@ -27,7 +30,11 @@ export function ChatHeader({
   onDeleteChannel,
   onDeleteContact,
   onOpenContactInfo,
+  onOpenChannelInfo,
 }: ChatHeaderProps) {
+  const titleClickable =
+    (conversation.type === 'contact' && onOpenContactInfo) ||
+    (conversation.type === 'channel' && onOpenChannelInfo);
   return (
     <header className="flex justify-between items-center px-4 py-2.5 border-b border-border gap-2">
       <span className="flex flex-wrap items-center gap-x-2 min-w-0 flex-1">
@@ -50,23 +57,25 @@ export function ChatHeader({
           </span>
         )}
         <h2
-          className={`flex-shrink-0 font-semibold text-base ${conversation.type === 'contact' && onOpenContactInfo ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-          role={conversation.type === 'contact' && onOpenContactInfo ? 'button' : undefined}
-          tabIndex={conversation.type === 'contact' && onOpenContactInfo ? 0 : undefined}
-          onKeyDown={
-            conversation.type === 'contact' && onOpenContactInfo
-              ? handleKeyboardActivate
-              : undefined
-          }
+          className={`flex-shrink-0 font-semibold text-base ${titleClickable ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+          role={titleClickable ? 'button' : undefined}
+          tabIndex={titleClickable ? 0 : undefined}
+          onKeyDown={titleClickable ? handleKeyboardActivate : undefined}
           onClick={
-            conversation.type === 'contact' && onOpenContactInfo
-              ? () => onOpenContactInfo(conversation.id)
+            titleClickable
+              ? () => {
+                  if (conversation.type === 'contact' && onOpenContactInfo) {
+                    onOpenContactInfo(conversation.id);
+                  } else if (conversation.type === 'channel' && onOpenChannelInfo) {
+                    onOpenChannelInfo(conversation.id);
+                  }
+                }
               : undefined
           }
         >
           {conversation.type === 'channel' &&
           !conversation.name.startsWith('#') &&
-          conversation.name !== 'Public'
+          channels.find((c) => c.key === conversation.id)?.is_hashtag
             ? '#'
             : ''}
           {conversation.name}

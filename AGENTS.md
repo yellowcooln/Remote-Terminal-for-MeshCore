@@ -290,6 +290,7 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | POST | `/api/contacts/{public_key}/repeater/owner-info` | Fetch owner info |
 
 | GET | `/api/channels` | List channels |
+| GET | `/api/channels/{key}/detail` | Comprehensive channel profile (message stats, top senders) |
 | GET | `/api/channels/{key}` | Get channel by key |
 | POST | `/api/channels` | Create channel |
 | DELETE | `/api/channels/{key}` | Delete channel |
