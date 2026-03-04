@@ -346,6 +346,191 @@ class TestHistoricalDMDecryptionPipeline:
         assert "1 message" in args[1]
 
 
+class TestLiveDMDecryptionPipeline:
+    """Integration test: process a real DM packet through the live
+    process_raw_packet → _process_direct_message → try_decrypt_dm pipeline
+    with no crypto mocking."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_keystore(self):
+        """Reset the global keystore state between tests."""
+        import app.keystore as ks
+
+        orig_priv, orig_pub = ks._private_key, ks._public_key
+        ks._private_key = None
+        ks._public_key = None
+        yield
+        ks._private_key, ks._public_key = orig_priv, orig_pub
+
+    @pytest.mark.asyncio
+    async def test_process_dm_packet_end_to_end(self, test_db, captured_broadcasts):
+        """process_raw_packet decrypts a real DM packet and stores the message
+        with correct text, direction, and contact attribution."""
+        from app.keystore import set_private_key
+
+        # Set up: client2 is "us" (receiver), client1 is the sender
+        set_private_key(CLIENT2_PRIVATE)
+
+        # Register client1 as a known contact
+        await ContactRepository.upsert(
+            {
+                "public_key": CLIENT1_PUBLIC_HEX,
+                "name": "Client1",
+                "type": 1,
+            }
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            from app.packet_processor import process_raw_packet
+
+            result = await process_raw_packet(raw_bytes=DM_PACKET)
+
+        # Verify process_raw_packet reports successful decryption
+        assert result is not None
+        assert result["decrypted"] is True
+        assert result["contact_name"] == "Client1"
+        assert result["message_id"] is not None
+
+        # Verify message stored in DB with correct fields
+        messages = await MessageRepository.get_all(
+            msg_type="PRIV", conversation_key=CLIENT1_PUBLIC_HEX.lower(), limit=10
+        )
+        assert len(messages) == 1
+        msg = messages[0]
+        assert msg.text == DM_PLAINTEXT
+        assert msg.outgoing is False  # We are client2, message is FROM client1
+        assert msg.type == "PRIV"
+
+        # Verify a "message" broadcast was sent
+        msg_broadcasts = [b for b in broadcasts if b["type"] == "message"]
+        assert len(msg_broadcasts) == 1
+        assert msg_broadcasts[0]["data"]["text"] == DM_PLAINTEXT
+        assert msg_broadcasts[0]["data"]["outgoing"] is False
+
+    @pytest.mark.asyncio
+    async def test_dm_from_unknown_contact_not_decrypted(self, test_db, captured_broadcasts):
+        """DM from an unknown contact (not in DB) is stored but not decrypted."""
+        from app.keystore import set_private_key
+
+        set_private_key(CLIENT2_PRIVATE)
+        # No contacts registered — client1 is unknown
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            from app.packet_processor import process_raw_packet
+
+            result = await process_raw_packet(raw_bytes=DM_PACKET)
+
+        # Raw packet is stored but not decrypted
+        assert result is not None
+        assert result["decrypted"] is False
+
+        # No messages created (can't decrypt without knowing the contact)
+        messages = await MessageRepository.get_all(
+            msg_type="PRIV", conversation_key=CLIENT1_PUBLIC_HEX.lower(), limit=10
+        )
+        assert len(messages) == 0
+
+    @pytest.mark.asyncio
+    async def test_dm_without_private_key_not_decrypted(self, test_db, captured_broadcasts):
+        """Without a private key in the keystore, DMs are stored but not decrypted."""
+        # Don't call set_private_key — keystore is empty
+
+        await ContactRepository.upsert(
+            {
+                "public_key": CLIENT1_PUBLIC_HEX,
+                "name": "Client1",
+                "type": 1,
+            }
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            from app.packet_processor import process_raw_packet
+
+            result = await process_raw_packet(raw_bytes=DM_PACKET)
+
+        assert result is not None
+        assert result["decrypted"] is False
+
+    @pytest.mark.asyncio
+    async def test_dm_duplicate_packet_deduplicates(self, test_db, captured_broadcasts):
+        """Processing the same DM packet twice doesn't create duplicate messages."""
+        from app.keystore import set_private_key
+
+        set_private_key(CLIENT2_PRIVATE)
+
+        await ContactRepository.upsert(
+            {
+                "public_key": CLIENT1_PUBLIC_HEX,
+                "name": "Client1",
+                "type": 1,
+            }
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            from app.packet_processor import process_raw_packet
+
+            result1 = await process_raw_packet(raw_bytes=DM_PACKET)
+            await process_raw_packet(raw_bytes=DM_PACKET)
+
+        # First processing succeeds
+        assert result1["decrypted"] is True
+        assert result1["message_id"] is not None
+
+        # Only one message stored (dedup via unique constraint)
+        messages = await MessageRepository.get_all(
+            msg_type="PRIV", conversation_key=CLIENT1_PUBLIC_HEX.lower(), limit=10
+        )
+        assert len(messages) == 1
+
+    @pytest.mark.asyncio
+    async def test_historical_then_live_deduplicates(self, test_db, captured_broadcasts):
+        """A DM decrypted historically and then received live doesn't duplicate."""
+        from app.keystore import set_private_key
+        from app.packet_processor import process_raw_packet, run_historical_dm_decryption
+
+        set_private_key(CLIENT2_PRIVATE)
+
+        await ContactRepository.upsert(
+            {
+                "public_key": CLIENT1_PUBLIC_HEX,
+                "name": "Client1",
+                "type": 1,
+            }
+        )
+
+        broadcasts, mock_broadcast = captured_broadcasts
+
+        with patch("app.packet_processor.broadcast_event", mock_broadcast):
+            # First: store packet undecrypted, then run historical decryption
+            await RawPacketRepository.create(DM_PACKET, 1700000000)
+
+            with patch("app.websocket.broadcast_success"):
+                await run_historical_dm_decryption(
+                    private_key_bytes=CLIENT2_PRIVATE,
+                    contact_public_key_bytes=CLIENT1_PUBLIC,
+                    contact_public_key_hex=CLIENT1_PUBLIC_HEX,
+                    display_name="Client1",
+                )
+
+            # Then: same packet arrives again via live pipeline
+            await process_raw_packet(raw_bytes=DM_PACKET)
+
+        # Only one message stored despite both paths processing it
+        messages = await MessageRepository.get_all(
+            msg_type="PRIV", conversation_key=CLIENT1_PUBLIC_HEX.lower(), limit=10
+        )
+        assert len(messages) == 1
+        assert messages[0].text == DM_PLAINTEXT
+
+
 class TestHistoricalChannelDecryptionPipeline:
     """Integration test: store a real channel packet, process it through
     the channel message pipeline, verify correct message in DB."""

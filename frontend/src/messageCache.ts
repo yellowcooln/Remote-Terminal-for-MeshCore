@@ -76,6 +76,9 @@ export function addMessage(id: string, msg: Message, contentKey: string): boolea
       .sort((a, b) => b.received_at - a.received_at)
       .slice(0, MAX_MESSAGES_PER_ENTRY);
   }
+  // Promote to MRU so actively-messaged conversations aren't evicted
+  cache.delete(id);
+  cache.set(id, entry);
   return true;
 }
 

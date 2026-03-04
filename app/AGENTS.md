@@ -212,6 +212,8 @@ app/
 - `message` — new message (channel or DM, from packet processor or send endpoints)
 - `message_acked` — ACK/echo update for existing message (ack count + paths)
 - `raw_packet` — every incoming RF packet (for real-time packet feed UI)
+- `contact_deleted` — contact removed from database (payload: `{ public_key }`)
+- `channel_deleted` — channel removed from database (payload: `{ key }`)
 - `error` — toast notification (reconnect failure, missing private key, etc.)
 - `success` — toast notification (historical decrypt complete, etc.)
 
@@ -271,6 +273,7 @@ tests/
 ├── test_config.py              # Configuration validation
 ├── test_contacts_router.py     # Contacts router endpoints
 ├── test_decoder.py             # Packet parsing/decryption
+├── test_disable_bots.py        # MESHCORE_DISABLE_BOTS=true feature
 ├── test_echo_dedup.py          # Echo/repeat deduplication (incl. concurrent)
 ├── test_event_handlers.py      # ACK tracking, event registration, cleanup
 ├── test_frontend_static.py     # Frontend static file serving

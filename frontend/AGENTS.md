@@ -27,6 +27,7 @@ frontend/src/
 ├── prefetch.ts             # Consumes prefetched API promises started in index.html
 ├── index.css               # Global styles/utilities
 ├── styles.css              # Additional global app styles
+├── themes.css              # Color theme definitions
 ├── lib/
 │   └── utils.ts            # cn() — clsx + tailwind-merge helper
 ├── hooks/
@@ -53,7 +54,8 @@ frontend/src/
 │   ├── lastViewedConversation.ts   # localStorage for last-viewed conversation
 │   ├── contactMerge.ts            # Merge WS contact updates into list
 │   ├── localLabel.ts              # Local label (text + color) in localStorage
-│   └── radioPresets.ts            # LoRa radio preset configurations
+│   ├── radioPresets.ts            # LoRa radio preset configurations
+│   └── theme.ts                   # Theme switching helpers
 ├── components/
 │   ├── StatusBar.tsx
 │   ├── Sidebar.tsx
@@ -75,6 +77,7 @@ frontend/src/
 │   ├── ContactStatusInfo.tsx   # Contact status info component
 │   ├── RepeaterDashboard.tsx   # Layout shell — delegates to repeater/ panes
 │   ├── RepeaterLogin.tsx       # Repeater login form (password + guest)
+│   ├── ChannelInfoPane.tsx     # Channel detail sheet (stats, top senders)
 │   ├── NeighborsMiniMap.tsx    # Leaflet mini-map for repeater neighbor locations
 │   ├── settings/
 │   │   ├── settingsConstants.ts          # Settings section type, ordering, labels
@@ -85,7 +88,8 @@ frontend/src/
 │   │   ├── SettingsDatabaseSection.tsx   # DB size, cleanup, auto-decrypt, local label
 │   │   ├── SettingsBotSection.tsx        # Bot list, code editor, add/delete/reset
 │   │   ├── SettingsStatisticsSection.tsx # Read-only mesh network stats
-│   │   └── SettingsAboutSection.tsx     # Version, author, license, links
+│   │   ├── SettingsAboutSection.tsx     # Version, author, license, links
+│   │   └── ThemeSelector.tsx           # Color theme picker
 │   ├── repeater/
 │   │   ├── repeaterPaneShared.tsx        # Shared: RepeaterPane, KvRow, format helpers
 │   │   ├── RepeaterTelemetryPane.tsx    # Battery, airtime, packet counts
@@ -125,6 +129,10 @@ frontend/src/
     ├── sidebar.test.tsx
     ├── unreadCounts.test.ts
     ├── urlHash.test.ts
+    ├── appSearchJump.test.tsx
+    ├── channelInfoKeyVisibility.test.tsx
+    ├── chatHeaderKeyVisibility.test.tsx
+    ├── searchView.test.tsx
     ├── useConversationMessages.test.ts
     ├── useConversationMessages.race.test.ts
     ├── useRepeaterDashboard.test.ts
@@ -177,7 +185,7 @@ frontend/src/
 
 - Auto reconnect (3s) with cleanup guard on unmount.
 - Heartbeat ping every 30s.
-- Event handlers: `health`, `message`, `contact`, `raw_packet`, `message_acked`, `error`, `success`, `pong` (ignored).
+- Event handlers: `health`, `message`, `contact`, `raw_packet`, `message_acked`, `contact_deleted`, `channel_deleted`, `error`, `success`, `pong` (ignored).
 - For `raw_packet` events, use `observation_id` as event identity; `id` is a storage reference and may repeat.
 
 ## URL Hash Navigation (`utils/urlHash.ts`)
@@ -310,7 +318,7 @@ Do not rely on old class-only layout assumptions.
 
 ## Testing
 
-Run all quality checks (backend + frontend, parallelized) from the repo root:
+Run all quality checks (backend + frontend) from the repo root:
 
 ```bash
 ./scripts/all_quality.sh

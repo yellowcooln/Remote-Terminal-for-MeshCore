@@ -307,10 +307,20 @@ export function App() {
       onContactDeleted: (publicKey: string) => {
         setContacts((prev) => prev.filter((c) => c.public_key !== publicKey));
         messageCache.remove(publicKey);
+        const active = activeConversationRef.current;
+        if (active?.type === 'contact' && active.id === publicKey) {
+          pendingDeleteFallbackRef.current = true;
+          setActiveConversation(null);
+        }
       },
       onChannelDeleted: (key: string) => {
         setChannels((prev) => prev.filter((c) => c.key !== key));
         messageCache.remove(key);
+        const active = activeConversationRef.current;
+        if (active?.type === 'channel' && active.id === key) {
+          pendingDeleteFallbackRef.current = true;
+          setActiveConversation(null);
+        }
       },
       onRawPacket: (packet: RawPacket) => {
         setRawPackets((prev) => appendRawPacketUnique(prev, packet, MAX_RAW_PACKETS));
@@ -331,6 +341,7 @@ export function App() {
       setConfig,
       activeConversationRef,
       hasNewerMessagesRef,
+      setActiveConversation,
       setContacts,
       setChannels,
       triggerReconcile,

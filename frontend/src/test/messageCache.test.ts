@@ -239,6 +239,23 @@ describe('messageCache', () => {
       expect(entry!.seenContent.has('CHAN-channel123-First contact-1700000000')).toBe(true);
     });
 
+    it('promotes entry to MRU on addMessage', () => {
+      // Fill cache to capacity
+      for (let i = 0; i < MAX_CACHED_CONVERSATIONS; i++) {
+        messageCache.set(`conv${i}`, createEntry([createMessage({ id: i })]));
+      }
+
+      // addMessage to conv0 (currently LRU) should promote it
+      const msg = createMessage({ id: 999, text: 'Incoming WS message' });
+      messageCache.addMessage('conv0', msg, 'CHAN-channel123-Incoming WS message-1700000000');
+
+      // Add one more — conv1 should now be LRU and get evicted, not conv0
+      messageCache.set('conv_new', createEntry());
+
+      expect(messageCache.get('conv0')).toBeDefined(); // Was promoted by addMessage
+      expect(messageCache.get('conv1')).toBeUndefined(); // Was LRU, evicted
+    });
+
     it('returns false for duplicate delivery to auto-created entry', () => {
       const msg = createMessage({ id: 10, text: 'Echo' });
       const contentKey = 'CHAN-channel123-Echo-1700000000';

@@ -10,7 +10,7 @@ If instructed to "run all tests" or "get ready for a commit" or other summative,
 ./scripts/all_quality.sh
 ```
 
-This runs all linting, formatting, type checking, tests, and builds for both backend and frontend in parallel. All checks must pass green.
+This runs all linting, formatting, type checking, tests, and builds for both backend and frontend sequentially. All checks must pass green.
 
 ## Overview
 
@@ -170,7 +170,7 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   │       └── ...
 │   └── vite.config.ts
 ├── scripts/
-│   ├── all_quality.sh      # Run all lint, format, typecheck, tests, build (parallelized)
+│   ├── all_quality.sh      # Run all lint, format, typecheck, tests, build (sequential)
 │   ├── collect_licenses.sh # Gather third-party license attributions
 │   ├── e2e.sh              # End-to-end test runner
 │   └── publish.sh          # Version bump, changelog, docker build & push
@@ -242,6 +242,7 @@ Key test files:
 - `tests/test_health_mqtt_status.py` - Health endpoint MQTT status field
 - `tests/test_community_mqtt.py` - Community MQTT publisher (JWT, packet format, hash, broadcast)
 - `tests/test_real_crypto.py` - Real cryptographic operations
+- `tests/test_disable_bots.py` - MESHCORE_DISABLE_BOTS=true feature
 
 ### Frontend (Vitest)
 
@@ -252,7 +253,7 @@ npm run test:run
 
 ### Before Completing Changes
 
-**Always run `./scripts/all_quality.sh` before finishing any changes.** This runs all linting, formatting, type checking, tests, and builds in parallel, catching type mismatches, breaking changes, and compilation errors.
+**Always run `./scripts/all_quality.sh` before finishing any changes.** This runs all linting, formatting, type checking, tests, and builds sequentially, catching type mismatches, breaking changes, and compilation errors.
 
 ## API Summary
 
