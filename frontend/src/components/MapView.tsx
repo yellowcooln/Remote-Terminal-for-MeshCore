@@ -94,13 +94,16 @@ function MapBoundsHandler({
 }
 
 export function MapView({ contacts, focusedKey }: MapViewProps) {
-  // Filter to contacts with GPS coordinates, heard within the last 7 days
+  // Filter to contacts with GPS coordinates, heard within the last 7 days.
+  // Always include the focused contact so "view on map" links work for older nodes.
   const mappableContacts = useMemo(() => {
     const sevenDaysAgo = Date.now() / 1000 - 7 * 24 * 60 * 60;
     return contacts.filter(
-      (c) => isValidLocation(c.lat, c.lon) && c.last_seen != null && c.last_seen > sevenDaysAgo
+      (c) =>
+        isValidLocation(c.lat, c.lon) &&
+        (c.public_key === focusedKey || (c.last_seen != null && c.last_seen > sevenDaysAgo))
     );
-  }, [contacts]);
+  }, [contacts, focusedKey]);
 
   // Find the focused contact by key
   const focusedContact = useMemo(() => {
