@@ -67,13 +67,13 @@ export function PathModal({
             ) : hasSinglePath ? (
               <>
                 This shows <em>one route</em> that this message traveled through the mesh network.
-                Routers may be incorrectly identified due to prefix collisions between heard and
-                non-heard router advertisements.
+                Repeaters may be incorrectly identified due to prefix collisions between heard and
+                non-heard repeater advertisements.
               </>
             ) : (
               <>
                 This message was received via <strong>{paths.length} different routes</strong>.
-                Routers may be incorrectly identified due to prefix collisions.
+                Repeaters may be incorrectly identified due to prefix collisions.
               </>
             )}
           </DialogDescription>
