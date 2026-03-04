@@ -120,6 +120,15 @@ function formatRelativeTime(timestamp: number): string {
   return secs > 0 ? `${minutes}m ${secs}s ago` : `${minutes}m ago`;
 }
 
+function normalizePacketTimestampMs(timestamp: number | null | undefined): number {
+  if (!Number.isFinite(timestamp) || !timestamp || timestamp <= 0) {
+    return Date.now();
+  }
+  const ts = Number(timestamp);
+  // Backend currently sends Unix seconds; tolerate millis if already provided.
+  return ts > 1_000_000_000_000 ? ts : ts * 1000;
+}
+
 // =============================================================================
 // DATA LAYER HOOK (3D variant)
 // =============================================================================
@@ -353,11 +362,13 @@ function useVisualizerData3D({
       isAmbiguous: boolean,
       probableIdentity?: string | null,
       ambiguousNames?: string[],
-      lastSeen?: number | null
+      lastSeen?: number | null,
+      activityAtMs?: number
     ) => {
+      const activityAt = activityAtMs ?? Date.now();
       const existing = nodesRef.current.get(id);
       if (existing) {
-        existing.lastActivity = Date.now();
+        existing.lastActivity = Math.max(existing.lastActivity, activityAt);
         if (name) existing.name = name;
         if (probableIdentity !== undefined) existing.probableIdentity = probableIdentity;
         if (ambiguousNames) existing.ambiguousNames = ambiguousNames;
@@ -372,7 +383,7 @@ function useVisualizerData3D({
           name,
           type,
           isAmbiguous,
-          lastActivity: Date.now(),
+          lastActivity: activityAt,
           probableIdentity,
           lastSeen,
           ambiguousNames,
@@ -385,13 +396,14 @@ function useVisualizerData3D({
     []
   );
 
-  const addLink = useCallback((sourceId: string, targetId: string) => {
+  const addLink = useCallback((sourceId: string, targetId: string, activityAtMs?: number) => {
+    const activityAt = activityAtMs ?? Date.now();
     const key = [sourceId, targetId].sort().join('->');
     const existing = linksRef.current.get(key);
     if (existing) {
-      existing.lastActivity = Date.now();
+      existing.lastActivity = Math.max(existing.lastActivity, activityAt);
     } else {
-      linksRef.current.set(key, { source: sourceId, target: targetId, lastActivity: Date.now() });
+      linksRef.current.set(key, { source: sourceId, target: targetId, lastActivity: activityAt });
     }
   }, []);
 
@@ -473,6 +485,7 @@ function useVisualizerData3D({
       isRepeater: boolean,
       showAmbiguous: boolean,
       myPrefix: string | null,
+      activityAtMs: number,
       trafficContext?: { packetSource: string | null; nextPrefix: string | null }
     ): string | null => {
       if (source.type === 'pubkey') {
@@ -487,7 +500,8 @@ function useVisualizerData3D({
           false,
           undefined,
           undefined,
-          contact?.last_seen
+          contact?.last_seen,
+          activityAtMs
         );
         return nodeId;
       }
@@ -504,12 +518,22 @@ function useVisualizerData3D({
             false,
             undefined,
             undefined,
-            contact.last_seen
+            contact.last_seen,
+            activityAtMs
           );
           return nodeId;
         }
         const nodeId = `name:${source.value}`;
-        addNode(nodeId, source.value, 'client', false, undefined);
+        addNode(
+          nodeId,
+          source.value,
+          'client',
+          false,
+          undefined,
+          undefined,
+          undefined,
+          activityAtMs
+        );
         return nodeId;
       }
 
@@ -526,7 +550,8 @@ function useVisualizerData3D({
           false,
           undefined,
           undefined,
-          contact.last_seen
+          contact.last_seen,
+          activityAtMs
         );
         return nodeId;
       }
@@ -539,7 +564,16 @@ function useVisualizerData3D({
         if (filtered.length === 1) {
           const c = filtered[0];
           const nodeId = c.public_key.slice(0, 12).toLowerCase();
-          addNode(nodeId, c.name, getNodeType(c), false, undefined, undefined, c.last_seen);
+          addNode(
+            nodeId,
+            c.name,
+            getNodeType(c),
+            false,
+            undefined,
+            undefined,
+            c.last_seen,
+            activityAtMs
+          );
           return nodeId;
         }
 
@@ -599,7 +633,8 @@ function useVisualizerData3D({
             true,
             probableIdentity,
             ambiguousNames,
-            lastSeen
+            lastSeen,
+            activityAtMs
           );
           return nodeId;
         }
@@ -620,7 +655,8 @@ function useVisualizerData3D({
     (
       parsed: ReturnType<typeof parsePacket>,
       packet: RawPacket,
-      myPrefix: string | null
+      myPrefix: string | null,
+      activityAtMs: number
     ): string[] => {
       if (!parsed) return [];
       const path: string[] = [];
@@ -631,7 +667,8 @@ function useVisualizerData3D({
           { type: 'pubkey', value: parsed.advertPubkey },
           false,
           false,
-          myPrefix
+          myPrefix,
+          activityAtMs
         );
         if (nodeId) {
           path.push(nodeId);
@@ -642,7 +679,8 @@ function useVisualizerData3D({
           { type: 'pubkey', value: parsed.anonRequestPubkey },
           false,
           false,
-          myPrefix
+          myPrefix,
+          activityAtMs
         );
         if (nodeId) {
           path.push(nodeId);
@@ -657,7 +695,8 @@ function useVisualizerData3D({
             { type: 'prefix', value: parsed.srcHash },
             false,
             showAmbiguousNodes,
-            myPrefix
+            myPrefix,
+            activityAtMs
           );
           if (nodeId) {
             path.push(nodeId);
@@ -667,10 +706,16 @@ function useVisualizerData3D({
       } else if (parsed.payloadType === PayloadType.GroupText) {
         const senderName = parsed.groupTextSender || packet.decrypted_info?.sender;
         if (senderName) {
-          const nodeId = resolveNode({ type: 'name', value: senderName }, false, false, myPrefix);
-          if (nodeId) {
-            path.push(nodeId);
-            packetSource = nodeId;
+          const resolved = resolveNode(
+            { type: 'name', value: senderName },
+            false,
+            false,
+            myPrefix,
+            activityAtMs
+          );
+          if (resolved) {
+            path.push(resolved);
+            packetSource = resolved;
           }
         }
       }
@@ -683,6 +728,7 @@ function useVisualizerData3D({
           true,
           showAmbiguousPaths,
           myPrefix,
+          activityAtMs,
           { packetSource, nextPrefix }
         );
         if (nodeId) path.push(nodeId);
@@ -696,7 +742,8 @@ function useVisualizerData3D({
             { type: 'prefix', value: parsed.dstHash },
             false,
             showAmbiguousNodes,
-            myPrefix
+            myPrefix,
+            activityAtMs
           );
           if (nodeId) path.push(nodeId);
           else path.push('self');
@@ -734,7 +781,8 @@ function useVisualizerData3D({
       const parsed = parsePacket(packet.data);
       if (!parsed) continue;
 
-      const path = buildPath(parsed, packet, myPrefix);
+      const packetActivityAt = normalizePacketTimestampMs(packet.timestamp);
+      const path = buildPath(parsed, packet, myPrefix, packetActivityAt);
       if (path.length < 2) continue;
 
       // Tag each node with why it's considered active
@@ -748,7 +796,7 @@ function useVisualizerData3D({
 
       for (let i = 0; i < path.length - 1; i++) {
         if (path[i] !== path[i + 1]) {
-          addLink(path[i], path[i + 1]);
+          addLink(path[i], path[i + 1], packetActivityAt);
           needsUpdate = true;
         }
       }
