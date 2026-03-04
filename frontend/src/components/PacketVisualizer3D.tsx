@@ -1720,12 +1720,30 @@ export function PacketVisualizer3D({
       )}
 
       {/* Options */}
-      <div className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10">
+      <div
+        className={`absolute top-4 left-4 bg-background/80 backdrop-blur-sm rounded-lg p-3 text-xs border border-border z-10 transition-opacity ${!showControls ? 'opacity-40 hover:opacity-100' : ''}`}
+      >
         <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={showControls}
+                onCheckedChange={(c) => setShowControls(c === true)}
+              />
+              <span title="Toggle legends and controls visibility">Show controls</span>
+            </label>
+            {onFullScreenChange && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={!fullScreen}
+                  onCheckedChange={(c) => onFullScreenChange(c !== true)}
+                />
+                <span title="Show or hide the packet feed sidebar">Show packet feed sidebar</span>
+              </label>
+            )}
+          </div>
           {showControls && (
             <>
-              <div>Nodes: {data.stats.nodes}</div>
-              <div>Links: {data.stats.links}</div>
               <div className="border-t border-border pt-2 mt-1 flex flex-col gap-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox
@@ -1888,32 +1906,12 @@ export function PacketVisualizer3D({
                   Clear &amp; Reset
                 </button>
               </div>
+              <div className="border-t border-border pt-2 mt-1">
+                <div>Nodes: {data.stats.nodes}</div>
+                <div>Links: {data.stats.links}</div>
+              </div>
             </>
           )}
-          <div
-            className={
-              !showControls
-                ? 'flex flex-col gap-2'
-                : 'border-t border-border pt-2 mt-1 flex flex-col gap-2'
-            }
-          >
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={showControls}
-                onCheckedChange={(c) => setShowControls(c === true)}
-              />
-              <span title="Toggle legends and controls visibility">Show controls</span>
-            </label>
-            {onFullScreenChange && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={!fullScreen}
-                  onCheckedChange={(c) => onFullScreenChange(c !== true)}
-                />
-                <span title="Show or hide the packet feed sidebar">Show packet feed sidebar</span>
-              </label>
-            )}
-          </div>
         </div>
       </div>
 

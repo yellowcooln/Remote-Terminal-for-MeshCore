@@ -43,6 +43,7 @@ class TestWebSocketEndpoint:
             mock_health_rm.connection_info = "Serial: /dev/ttyUSB0"
             mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
             mock_settings.database_path = "/tmp/test.db"
+            mock_settings.disable_bots = False
 
             from app.main import app
 
@@ -76,6 +77,7 @@ class TestWebSocketEndpoint:
             mock_health_rm.connection_info = None
             mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
             mock_settings.database_path = "/tmp/test.db"
+            mock_settings.disable_bots = False
 
             from app.main import app
 
@@ -105,6 +107,7 @@ class TestWebSocketEndpoint:
             mock_health_rm.connection_info = "TCP: 192.168.1.1:4000"
             mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
             mock_settings.database_path = "/tmp/test.db"
+            mock_settings.disable_bots = False
 
             from app.main import app
 
@@ -135,6 +138,7 @@ class TestWebSocketEndpoint:
             mock_health_rm.connection_info = "Serial: /dev/ttyUSB0"
             mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
             mock_settings.database_path = "/tmp/test.db"
+            mock_settings.disable_bots = False
 
             from app.main import app
 
@@ -165,6 +169,7 @@ class TestWebSocketEndpoint:
             mock_health_rm.connection_info = "Serial: /dev/ttyUSB0"
             mock_repo.get_oldest_undecrypted = AsyncMock(return_value=None)
             mock_settings.database_path = "/tmp/test.db"
+            mock_settings.disable_bots = False
 
             from app.main import app
 
