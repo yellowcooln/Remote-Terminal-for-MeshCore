@@ -246,6 +246,7 @@ LocalStorage migration helpers for favorites; canonical favorites are server-sid
 - `mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`
 - `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`
 - `community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`
+- `flood_scope`
 
 `HealthStatus` includes `mqtt_status` (`"connected"`, `"disconnected"`, `"disabled"`, or `null`).
 `HealthStatus` also includes `community_mqtt_status` with the same status values.

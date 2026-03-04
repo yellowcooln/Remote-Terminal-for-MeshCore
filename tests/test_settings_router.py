@@ -192,6 +192,76 @@ class TestUpdateSettings:
         assert settings.community_mqtt_iata == ""
         assert settings.community_mqtt_email == ""
 
+    @pytest.mark.asyncio
+    async def test_flood_scope_round_trip(self, test_db):
+        """Flood scope should be saved and retrieved correctly."""
+        result = await update_settings(AppSettingsUpdate(flood_scope="#MyRegion"))
+        assert result.flood_scope == "#MyRegion"
+
+        fresh = await AppSettingsRepository.get()
+        assert fresh.flood_scope == "#MyRegion"
+
+    @pytest.mark.asyncio
+    async def test_flood_scope_default_empty(self, test_db):
+        """Fresh DB should have flood_scope as empty string."""
+        settings = await AppSettingsRepository.get()
+        assert settings.flood_scope == ""
+
+    @pytest.mark.asyncio
+    async def test_flood_scope_whitespace_stripped(self, test_db):
+        """Flood scope should be stripped of whitespace."""
+        result = await update_settings(AppSettingsUpdate(flood_scope="  #MyRegion  "))
+        assert result.flood_scope == "#MyRegion"
+
+    @pytest.mark.asyncio
+    async def test_flood_scope_applies_to_radio(self, test_db):
+        """When radio is connected, setting flood_scope calls set_flood_scope on radio."""
+        mock_mc = AsyncMock()
+        mock_mc.commands.set_flood_scope = AsyncMock()
+
+        mock_rm = AsyncMock()
+        mock_rm.is_connected = True
+        mock_rm.meshcore = mock_mc
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def mock_radio_op(name):
+            yield mock_mc
+
+        mock_rm.radio_operation = mock_radio_op
+
+        with patch("app.radio.radio_manager", mock_rm):
+            await update_settings(AppSettingsUpdate(flood_scope="#TestRegion"))
+
+        mock_mc.commands.set_flood_scope.assert_awaited_once_with("#TestRegion")
+
+    @pytest.mark.asyncio
+    async def test_flood_scope_empty_resets_radio(self, test_db):
+        """Setting flood_scope to empty calls set_flood_scope("") on radio."""
+        # First set a non-empty scope
+        await update_settings(AppSettingsUpdate(flood_scope="#TestRegion"))
+
+        mock_mc = AsyncMock()
+        mock_mc.commands.set_flood_scope = AsyncMock()
+
+        mock_rm = AsyncMock()
+        mock_rm.is_connected = True
+        mock_rm.meshcore = mock_mc
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def mock_radio_op(name):
+            yield mock_mc
+
+        mock_rm.radio_operation = mock_radio_op
+
+        with patch("app.radio.radio_manager", mock_rm):
+            await update_settings(AppSettingsUpdate(flood_scope=""))
+
+        mock_mc.commands.set_flood_scope.assert_awaited_once_with("")
+
 
 class TestToggleFavorite:
     @pytest.mark.asyncio

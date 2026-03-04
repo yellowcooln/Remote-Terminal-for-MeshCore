@@ -518,6 +518,10 @@ class AppSettings(BaseModel):
         default="",
         description="Email address for node claiming on the community aggregator (optional)",
     )
+    flood_scope: str = Field(
+        default="",
+        description="Outbound flood scope / region name (empty = disabled, no tagging)",
+    )
 
 
 class BusyChannel(BaseModel):

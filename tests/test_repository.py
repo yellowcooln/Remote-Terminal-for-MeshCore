@@ -507,6 +507,7 @@ class TestAppSettingsRepository:
                 "community_mqtt_broker_host": "mqtt-us-v1.letsmesh.net",
                 "community_mqtt_broker_port": 443,
                 "community_mqtt_email": "",
+                "flood_scope": "",
             }
         )
         mock_conn.execute = AsyncMock(return_value=mock_cursor)

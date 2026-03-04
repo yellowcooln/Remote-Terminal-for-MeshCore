@@ -40,6 +40,7 @@ export function SettingsIdentitySection({
   const [name, setName] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [advertIntervalHours, setAdvertIntervalHours] = useState('0');
+  const [floodScope, setFloodScope] = useState('');
   const [busy, setBusy] = useState(false);
   const [rebooting, setRebooting] = useState(false);
   const [advertising, setAdvertising] = useState(false);
@@ -51,6 +52,7 @@ export function SettingsIdentitySection({
 
   useEffect(() => {
     setAdvertIntervalHours(String(Math.round(appSettings.advert_interval / 3600)));
+    setFloodScope(appSettings.flood_scope);
   }, [appSettings]);
 
   const handleSaveIdentity = async () => {
@@ -61,10 +63,17 @@ export function SettingsIdentitySection({
       const update: RadioConfigUpdate = { name };
       await onSave(update);
 
+      const appUpdate: AppSettingsUpdate = {};
       const hours = parseInt(advertIntervalHours, 10);
       const newAdvertInterval = isNaN(hours) ? 0 : hours * 3600;
       if (newAdvertInterval !== appSettings.advert_interval) {
-        await onSaveAppSettings({ advert_interval: newAdvertInterval });
+        appUpdate.advert_interval = newAdvertInterval;
+      }
+      if (floodScope !== appSettings.flood_scope) {
+        appUpdate.flood_scope = floodScope;
+      }
+      if (Object.keys(appUpdate).length > 0) {
+        await onSaveAppSettings(appUpdate);
       }
 
       toast.success('Identity settings saved');
@@ -137,6 +146,20 @@ export function SettingsIdentitySection({
         <p className="text-xs text-muted-foreground">
           How often to automatically advertise presence. Set to 0 to disable. Minimum: 1 hour.
           Recommended: 24 hours or higher.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="flood-scope">Flood Scope / Region</Label>
+        <Input
+          id="flood-scope"
+          value={floodScope}
+          onChange={(e) => setFloodScope(e.target.value)}
+          placeholder="#MyRegion"
+        />
+        <p className="text-xs text-muted-foreground">
+          Tag outgoing flood messages with a region name (e.g. #MyRegion). Repeaters with this
+          region configured will prioritize your traffic. Leave empty to disable.
         </p>
       </div>
 

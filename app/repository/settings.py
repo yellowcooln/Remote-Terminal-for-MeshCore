@@ -32,7 +32,7 @@ class AppSettingsRepository:
                    mqtt_publish_messages, mqtt_publish_raw_packets,
                    community_mqtt_enabled, community_mqtt_iata,
                    community_mqtt_broker_host, community_mqtt_broker_port,
-                   community_mqtt_email
+                   community_mqtt_email, flood_scope
             FROM app_settings WHERE id = 1
             """
         )
@@ -112,6 +112,7 @@ class AppSettingsRepository:
             or "mqtt-us-v1.letsmesh.net",
             community_mqtt_broker_port=row["community_mqtt_broker_port"] or 443,
             community_mqtt_email=row["community_mqtt_email"] or "",
+            flood_scope=row["flood_scope"] or "",
         )
 
     @staticmethod
@@ -139,6 +140,7 @@ class AppSettingsRepository:
         community_mqtt_broker_host: str | None = None,
         community_mqtt_broker_port: int | None = None,
         community_mqtt_email: str | None = None,
+        flood_scope: str | None = None,
     ) -> AppSettings:
         """Update app settings. Only provided fields are updated."""
         updates = []
@@ -237,6 +239,10 @@ class AppSettingsRepository:
         if community_mqtt_email is not None:
             updates.append("community_mqtt_email = ?")
             params.append(community_mqtt_email)
+
+        if flood_scope is not None:
+            updates.append("flood_scope = ?")
+            params.append(flood_scope)
 
         if updates:
             query = f"UPDATE app_settings SET {', '.join(updates)} WHERE id = 1"

@@ -121,6 +121,10 @@ class AppSettingsUpdate(BaseModel):
         default=None,
         description="Email address for node claiming on the community aggregator",
     )
+    flood_scope: str | None = Field(
+        default=None,
+        description="Outbound flood scope / region name (empty = disabled)",
+    )
 
 
 class FavoriteRequest(BaseModel):
@@ -237,6 +241,13 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         kwargs["community_mqtt_email"] = update.community_mqtt_email
         community_mqtt_changed = True
 
+    # Flood scope
+    flood_scope_changed = False
+    if update.flood_scope is not None:
+        stripped = update.flood_scope.strip()
+        kwargs["flood_scope"] = stripped
+        flood_scope_changed = True
+
     # Require IATA when enabling community MQTT
     if kwargs.get("community_mqtt_enabled", False):
         # Check the IATA value being set, or fall back to current settings
@@ -264,6 +275,19 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
             from app.community_mqtt import community_publisher
 
             await community_publisher.restart(result)
+
+        # Apply flood scope to radio immediately if changed
+        if flood_scope_changed:
+            from app.radio import radio_manager
+
+            if radio_manager.is_connected:
+                try:
+                    scope = result.flood_scope
+                    async with radio_manager.radio_operation("set_flood_scope") as mc:
+                        await mc.commands.set_flood_scope(scope if scope else "")
+                        logger.info("Applied flood_scope=%r to radio", scope or "(disabled)")
+                except Exception as e:
+                    logger.warning("Failed to apply flood_scope to radio: %s", e)
 
         return result
 

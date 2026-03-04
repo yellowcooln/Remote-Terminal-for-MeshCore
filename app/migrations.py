@@ -268,6 +268,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 33)
         applied += 1
 
+    # Migration 34: Add flood_scope column to app_settings
+    if version < 34:
+        logger.info("Applying migration 34: add flood_scope column to app_settings")
+        await _migrate_034_add_flood_scope(conn)
+        await set_version(conn, 34)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -1951,3 +1958,21 @@ async def _migrate_033_seed_remoteterm_channel(conn: aiosqlite.Connection) -> No
         await conn.commit()
     except Exception:
         logger.debug("Skipping #remoteterm seed (channels table not ready)")
+
+
+async def _migrate_034_add_flood_scope(conn: aiosqlite.Connection) -> None:
+    """Add flood_scope column to app_settings for outbound region tagging.
+
+    Empty string means disabled (no scope set, messages sent unscoped).
+    """
+    try:
+        await conn.execute("ALTER TABLE app_settings ADD COLUMN flood_scope TEXT DEFAULT ''")
+        await conn.commit()
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "duplicate column" in error_msg:
+            logger.debug("flood_scope column already exists, skipping")
+        elif "no such table" in error_msg:
+            logger.debug("app_settings table not ready, skipping flood_scope migration")
+        else:
+            raise

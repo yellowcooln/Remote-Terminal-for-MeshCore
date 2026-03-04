@@ -258,6 +258,14 @@ class RadioManager:
                     # Sync radio clock with system time
                     await sync_radio_time(mc)
 
+                    # Apply flood scope from settings
+                    from app.repository import AppSettingsRepository
+
+                    app_settings = await AppSettingsRepository.get()
+                    scope = app_settings.flood_scope
+                    await mc.commands.set_flood_scope(scope if scope else "")
+                    logger.info("Applied flood_scope=%r", scope or "(disabled)")
+
                     # Sync contacts/channels from radio to DB and clear radio
                     logger.info("Syncing and offloading radio data...")
                     result = await sync_and_offload_all(mc)

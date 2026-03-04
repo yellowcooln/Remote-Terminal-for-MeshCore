@@ -228,6 +228,7 @@ export interface AppSettings {
   community_mqtt_broker_host: string;
   community_mqtt_broker_port: number;
   community_mqtt_email: string;
+  flood_scope: string;
 }
 
 export interface AppSettingsUpdate {
@@ -250,6 +251,7 @@ export interface AppSettingsUpdate {
   community_mqtt_broker_host?: string;
   community_mqtt_broker_port?: number;
   community_mqtt_email?: string;
+  flood_scope?: string;
 }
 
 export interface MigratePreferencesRequest {
