@@ -11,6 +11,7 @@ import {
   getReopenLastConversationEnabled,
   setReopenLastConversationEnabled,
 } from '../../utils/lastViewedConversation';
+import { ThemeSelector } from './ThemeSelector';
 import { getLocalLabel, setLocalLabel, type LocalLabel } from '../../utils/localLabel';
 import type { AppSettings, AppSettingsUpdate, HealthStatus } from '../../types';
 
@@ -223,6 +224,12 @@ export function SettingsDatabaseSection({
 
       <div className="space-y-3">
         <Label>Interface</Label>
+
+        <div className="space-y-1">
+          <span className="text-sm text-muted-foreground">Color Scheme</span>
+          <ThemeSelector />
+        </div>
+
         <label className="flex items-center gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -233,7 +240,7 @@ export function SettingsDatabaseSection({
           <span className="text-sm">Reopen to last viewed channel/conversation</span>
         </label>
         <p className="text-xs text-muted-foreground">
-          This applies only to this device/browser. It does not sync to server settings.
+          These settings apply only to this device/browser. They do not sync to server settings.
         </p>
       </div>
 

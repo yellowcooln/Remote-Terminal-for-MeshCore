@@ -1,0 +1,433 @@
+/* ============================================================
+   Theme overrides
+   Each [data-theme] block overrides the :root custom properties
+   defined in index.css. "Original" is the default (no attribute).
+   ============================================================ */
+
+/* ── Light ("Bleached Linen") ──────────────────────────────── */
+:root[data-theme='light'] {
+  --background: 40 18% 97%;
+  --foreground: 220 20% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 20% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 20% 14%;
+  --primary: 153 65% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 36 12% 92%;
+  --secondary-foreground: 220 15% 28%;
+  --muted: 40 10% 94%;
+  --muted-foreground: 220 8% 46%;
+  --accent: 36 14% 90%;
+  --accent-foreground: 220 20% 14%;
+  --destructive: 0 84% 42%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 36 10% 84%;
+  --input: 36 10% 84%;
+  --ring: 153 65% 30%;
+  --msg-outgoing: 153 18% 92%;
+  --msg-incoming: 40 8% 95%;
+  --status-connected: 145 63% 38%;
+  --status-disconnected: 220 8% 64%;
+  --warning: 38 92% 45%;
+  --warning-foreground: 38 92% 14%;
+  --success: 145 63% 32%;
+  --success-foreground: 0 0% 100%;
+  --info: 217 91% 48%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 43 96% 50%;
+  --console: 153 50% 22%;
+  --console-command: 153 55% 18%;
+  --console-bg: 40 10% 94%;
+  --toast-error: 0 40% 96%;
+  --toast-error-foreground: 0 70% 38%;
+  --toast-error-border: 0 30% 86%;
+  --code-editor-bg: 40 8% 94%;
+  --scrollbar: 36 8% 76%;
+  --scrollbar-hover: 36 8% 64%;
+  --overlay: 220 20% 10%;
+}
+
+/* ── Cyberpunk ("Neon Bleed") ──────────────────────────────── */
+:root[data-theme='cyberpunk'] {
+  --background: 210 18% 3%;
+  --foreground: 120 8% 82%;
+  --card: 180 12% 6%;
+  --card-foreground: 120 8% 82%;
+  --popover: 180 12% 7%;
+  --popover-foreground: 120 8% 82%;
+  --primary: 135 100% 50%;
+  --primary-foreground: 135 100% 6%;
+  --secondary: 150 10% 10%;
+  --secondary-foreground: 120 12% 72%;
+  --muted: 160 6% 9%;
+  --muted-foreground: 120 8% 48%;
+  --accent: 150 14% 12%;
+  --accent-foreground: 120 8% 82%;
+  --destructive: 340 100% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 135 30% 14%;
+  --input: 135 30% 14%;
+  --ring: 135 100% 50%;
+  --radius: 0px;
+  --msg-outgoing: 135 28% 7%;
+  --msg-incoming: 210 10% 6%;
+  --status-connected: 135 100% 45%;
+  --status-disconnected: 135 8% 32%;
+  --warning: 62 100% 49%;
+  --warning-foreground: 62 100% 8%;
+  --success: 135 100% 42%;
+  --success-foreground: 135 100% 6%;
+  --info: 185 100% 42%;
+  --info-foreground: 185 100% 6%;
+  --favorite: 62 100% 52%;
+  --console: 135 100% 50%;
+  --console-command: 135 100% 62%;
+  --console-bg: 0 0% 1%;
+  --toast-error: 340 50% 10%;
+  --toast-error-foreground: 340 80% 72%;
+  --toast-error-border: 340 40% 18%;
+  --code-editor-bg: 150 12% 5%;
+  --font-mono: 'Courier New', 'Lucida Console', monospace;
+  --scrollbar: 135 20% 12%;
+  --scrollbar-hover: 135 30% 18%;
+  --overlay: 0 0% 0%;
+}
+
+/* ── Aurora ("Borealis") ───────────────────────────────────── */
+:root[data-theme='aurora'] {
+  --background: 240 18% 6%;
+  --foreground: 240 8% 88%;
+  --card: 240 16% 10%;
+  --card-foreground: 240 8% 88%;
+  --popover: 240 16% 11%;
+  --popover-foreground: 240 8% 88%;
+  --primary: 328 80% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 245 14% 15%;
+  --secondary-foreground: 245 10% 82%;
+  --muted: 248 14% 13%;
+  --muted-foreground: 258 8% 62%;
+  --accent: 252 12% 18%;
+  --accent-foreground: 240 8% 88%;
+  --destructive: 355 78% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 255 14% 21%;
+  --input: 255 14% 21%;
+  --ring: 328 80% 56%;
+  --msg-outgoing: 328 24% 12%;
+  --msg-incoming: 240 16% 12%;
+  --status-connected: 155 68% 42%;
+  --status-disconnected: 255 8% 44%;
+  --warning: 33 88% 52%;
+  --warning-foreground: 0 0% 100%;
+  --success: 155 68% 42%;
+  --success-foreground: 0 0% 100%;
+  --info: 228 72% 64%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 328 60% 68%;
+  --console: 275 56% 62%;
+  --console-command: 275 56% 72%;
+  --console-bg: 240 18% 4%;
+  --toast-error: 350 28% 13%;
+  --toast-error-foreground: 350 60% 75%;
+  --toast-error-border: 350 24% 22%;
+  --code-editor-bg: 240 16% 8%;
+  --scrollbar: 255 14% 20%;
+  --scrollbar-hover: 255 14% 28%;
+  --overlay: 240 30% 3%;
+}
+
+/* ── Amber Terminal ("Phosphor Burn") ──────────────────────── */
+:root[data-theme='amber-terminal'] {
+  --background: 36 20% 3%;
+  --foreground: 36 28% 78%;
+  --card: 34 16% 6%;
+  --card-foreground: 36 28% 78%;
+  --popover: 34 16% 7%;
+  --popover-foreground: 36 28% 78%;
+  --primary: 40 100% 50%;
+  --primary-foreground: 40 100% 5%;
+  --secondary: 34 10% 10%;
+  --secondary-foreground: 36 18% 68%;
+  --muted: 34 8% 9%;
+  --muted-foreground: 36 12% 46%;
+  --accent: 34 12% 13%;
+  --accent-foreground: 36 28% 78%;
+  --destructive: 14 84% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 34 14% 16%;
+  --input: 34 14% 16%;
+  --ring: 40 100% 50%;
+  --radius: 0px;
+  --msg-outgoing: 40 26% 9%;
+  --msg-incoming: 34 12% 7%;
+  --status-connected: 130 60% 42%;
+  --status-disconnected: 36 10% 34%;
+  --warning: 48 96% 48%;
+  --warning-foreground: 48 96% 8%;
+  --success: 90 60% 40%;
+  --success-foreground: 90 60% 6%;
+  --info: 200 50% 48%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 40 100% 54%;
+  --console: 40 100% 52%;
+  --console-command: 40 100% 64%;
+  --console-bg: 0 0% 1%;
+  --toast-error: 14 40% 10%;
+  --toast-error-foreground: 14 72% 68%;
+  --toast-error-border: 14 32% 18%;
+  --code-editor-bg: 34 14% 5%;
+  --font-mono: 'Courier New', 'Lucida Console', monospace;
+  --scrollbar: 34 14% 14%;
+  --scrollbar-hover: 34 14% 22%;
+  --overlay: 0 0% 0%;
+}
+
+/* ── Midnight Sun ("Solstice") ─────────────────────────────── */
+:root[data-theme='midnight-sun'] {
+  --background: 250 28% 7%;
+  --foreground: 42 16% 86%;
+  --card: 248 24% 13%;
+  --card-foreground: 42 16% 86%;
+  --popover: 248 24% 14%;
+  --popover-foreground: 42 16% 86%;
+  --primary: 44 86% 52%;
+  --primary-foreground: 44 86% 7%;
+  --secondary: 252 18% 17%;
+  --secondary-foreground: 42 12% 78%;
+  --muted: 252 16% 14%;
+  --muted-foreground: 248 10% 56%;
+  --accent: 264 14% 19%;
+  --accent-foreground: 42 16% 86%;
+  --destructive: 0 65% 54%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 256 14% 22%;
+  --input: 256 14% 22%;
+  --ring: 44 86% 52%;
+  --msg-outgoing: 44 22% 11%;
+  --msg-incoming: 250 20% 12%;
+  --status-connected: 152 58% 40%;
+  --status-disconnected: 252 8% 42%;
+  --warning: 32 88% 50%;
+  --warning-foreground: 32 88% 8%;
+  --success: 152 58% 40%;
+  --success-foreground: 0 0% 100%;
+  --info: 212 68% 54%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 44 86% 56%;
+  --console: 44 76% 54%;
+  --console-command: 44 76% 66%;
+  --console-bg: 250 28% 5%;
+  --toast-error: 0 28% 14%;
+  --toast-error-foreground: 0 52% 68%;
+  --toast-error-border: 0 22% 22%;
+  --code-editor-bg: 248 22% 10%;
+  --scrollbar: 256 14% 20%;
+  --scrollbar-hover: 256 14% 28%;
+  --overlay: 250 30% 3%;
+}
+
+/* ── Basecamp ("Red Dust") ─────────────────────────────────── */
+:root[data-theme='basecamp'] {
+  --background: 24 20% 8%;
+  --foreground: 36 14% 82%;
+  --card: 24 18% 11%;
+  --card-foreground: 36 14% 82%;
+  --popover: 24 18% 12%;
+  --popover-foreground: 36 14% 82%;
+  --primary: 16 55% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 24 14% 14%;
+  --secondary-foreground: 30 12% 72%;
+  --muted: 24 12% 12%;
+  --muted-foreground: 30 8% 50%;
+  --accent: 24 14% 16%;
+  --accent-foreground: 36 14% 82%;
+  --destructive: 0 70% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 24 14% 20%;
+  --input: 24 14% 20%;
+  --ring: 16 55% 50%;
+  --msg-outgoing: 16 20% 12%;
+  --msg-incoming: 24 14% 10%;
+  --status-connected: 130 48% 40%;
+  --status-disconnected: 30 8% 38%;
+  --warning: 38 88% 48%;
+  --warning-foreground: 38 88% 8%;
+  --success: 130 48% 38%;
+  --success-foreground: 0 0% 100%;
+  --info: 180 30% 44%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 38 80% 52%;
+  --console: 16 50% 54%;
+  --console-command: 16 50% 66%;
+  --console-bg: 24 20% 5%;
+  --toast-error: 0 30% 12%;
+  --toast-error-foreground: 0 56% 68%;
+  --toast-error-border: 0 24% 20%;
+  --code-editor-bg: 24 16% 7%;
+  --scrollbar: 24 12% 16%;
+  --scrollbar-hover: 24 12% 24%;
+  --overlay: 24 20% 3%;
+}
+
+/* ── High Contrast ("Beacon") ──────────────────────────────── */
+:root[data-theme='high-contrast'] {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 8%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 8%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 212 100% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 92%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 66%;
+  --accent: 0 0% 14%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 355 100% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 22%;
+  --input: 0 0% 22%;
+  --ring: 212 100% 62%;
+  --radius: 1rem;
+  --msg-outgoing: 212 30% 10%;
+  --msg-incoming: 0 0% 8%;
+  --status-connected: 140 72% 48%;
+  --status-disconnected: 0 0% 50%;
+  --warning: 43 100% 50%;
+  --warning-foreground: 43 100% 8%;
+  --success: 140 72% 44%;
+  --success-foreground: 0 0% 100%;
+  --info: 212 100% 58%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 43 100% 54%;
+  --console: 212 100% 62%;
+  --console-command: 212 100% 74%;
+  --console-bg: 0 0% 2%;
+  --toast-error: 355 40% 10%;
+  --toast-error-foreground: 355 80% 72%;
+  --toast-error-border: 355 30% 20%;
+  --code-editor-bg: 0 0% 6%;
+  --font-sans: Verdana, Geneva, 'DejaVu Sans', sans-serif;
+  --font-mono: 'Lucida Console', 'Cascadia Mono', 'Courier New', monospace;
+  --scrollbar: 0 0% 24%;
+  --scrollbar-hover: 0 0% 36%;
+  --overlay: 0 0% 0%;
+}
+
+/* ── Lo-Fi ("Daydream") ────────────────────────────────────── */
+:root[data-theme='lo-fi'] {
+  --background: 270 10% 9%;
+  --foreground: 270 8% 86%;
+  --card: 260 10% 12%;
+  --card-foreground: 270 8% 86%;
+  --popover: 260 10% 13%;
+  --popover-foreground: 270 8% 86%;
+  --primary: 268 30% 73%;
+  --primary-foreground: 268 40% 12%;
+  --secondary: 260 10% 15%;
+  --secondary-foreground: 268 12% 74%;
+  --muted: 260 8% 13%;
+  --muted-foreground: 268 8% 52%;
+  --accent: 250 12% 16%;
+  --accent-foreground: 270 8% 86%;
+  --destructive: 350 56% 56%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 260 10% 20%;
+  --input: 260 10% 20%;
+  --ring: 268 30% 73%;
+  --msg-outgoing: 268 16% 14%;
+  --msg-incoming: 260 8% 11%;
+  --status-connected: 152 40% 52%;
+  --status-disconnected: 268 8% 42%;
+  --warning: 36 60% 60%;
+  --warning-foreground: 36 60% 10%;
+  --success: 152 40% 48%;
+  --success-foreground: 0 0% 100%;
+  --info: 200 40% 62%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 36 50% 64%;
+  --console: 268 30% 68%;
+  --console-command: 268 30% 78%;
+  --console-bg: 270 10% 6%;
+  --toast-error: 350 24% 14%;
+  --toast-error-foreground: 350 44% 72%;
+  --toast-error-border: 350 20% 22%;
+  --code-editor-bg: 260 10% 8%;
+  --scrollbar: 260 10% 18%;
+  --scrollbar-hover: 260 10% 26%;
+  --overlay: 270 14% 4%;
+}
+
+/* ── Obsidian Glass ("Noir Lustre") ────────────────────────── */
+:root[data-theme='obsidian-glass'] {
+  --background: 220 16% 5%;
+  --foreground: 30 10% 85%;
+  --card: 224 14% 10%;
+  --card-foreground: 30 10% 85%;
+  --popover: 224 14% 11%;
+  --popover-foreground: 30 10% 85%;
+  --primary: 30 50% 62%;
+  --primary-foreground: 30 50% 8%;
+  --secondary: 220 12% 13%;
+  --secondary-foreground: 30 8% 72%;
+  --muted: 220 10% 11%;
+  --muted-foreground: 220 6% 50%;
+  --accent: 224 12% 15%;
+  --accent-foreground: 30 10% 85%;
+  --destructive: 0 62% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 224 12% 18%;
+  --input: 224 12% 18%;
+  --ring: 30 50% 62%;
+  --msg-outgoing: 30 14% 11%;
+  --msg-incoming: 220 12% 9%;
+  --status-connected: 148 52% 44%;
+  --status-disconnected: 220 6% 40%;
+  --warning: 38 80% 52%;
+  --warning-foreground: 38 80% 8%;
+  --success: 148 52% 40%;
+  --success-foreground: 0 0% 100%;
+  --info: 210 50% 56%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 38 70% 56%;
+  --console: 30 40% 58%;
+  --console-command: 30 40% 70%;
+  --console-bg: 220 16% 3%;
+  --toast-error: 0 26% 12%;
+  --toast-error-foreground: 0 50% 68%;
+  --toast-error-border: 0 20% 20%;
+  --code-editor-bg: 224 14% 7%;
+  --scrollbar: 224 10% 16%;
+  --scrollbar-hover: 224 10% 24%;
+  --overlay: 220 20% 2%;
+}
+
+/* ── Obsidian Glass: gradient surface overrides ──────────── */
+[data-theme='obsidian-glass'] .bg-card {
+  background: linear-gradient(135deg, hsl(224 14% 9%), hsl(232 12% 12%));
+}
+
+[data-theme='obsidian-glass'] .bg-popover {
+  background: linear-gradient(135deg, hsl(224 14% 10%), hsl(232 12% 13%));
+}
+
+[data-theme='obsidian-glass'] .bg-msg-outgoing {
+  background: linear-gradient(135deg, hsl(30 16% 10%), hsl(350 10% 9%));
+}
+
+[data-theme='obsidian-glass'] .bg-msg-incoming {
+  background: linear-gradient(135deg, hsl(220 14% 8%), hsl(232 10% 10%));
+}
+
+[data-theme='obsidian-glass'] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(30 14% 18%), hsl(224 10% 14%));
+}
+
+[data-theme='obsidian-glass'] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(30 14% 24%), hsl(224 10% 20%));
+}
