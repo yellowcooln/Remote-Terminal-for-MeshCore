@@ -7,13 +7,35 @@ from meshcore import EventType
 
 from app.dependencies import require_connected
 from app.event_handlers import track_pending_ack
-from app.models import Message, SendChannelMessageRequest, SendDirectMessageRequest
+from app.models import (
+    Message,
+    MessagesAroundResponse,
+    SendChannelMessageRequest,
+    SendDirectMessageRequest,
+)
 from app.radio import radio_manager
 from app.repository import AmbiguousPublicKeyPrefixError, MessageRepository
 from app.websocket import broadcast_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/messages", tags=["messages"])
+
+
+@router.get("/around/{message_id}", response_model=MessagesAroundResponse)
+async def get_messages_around(
+    message_id: int,
+    type: str | None = Query(default=None, description="Filter by type: PRIV or CHAN"),
+    conversation_key: str | None = Query(default=None, description="Filter by conversation key"),
+    context: int = Query(default=100, ge=1, le=500, description="Number of messages before/after"),
+) -> MessagesAroundResponse:
+    """Get messages around a specific message for jump-to-message navigation."""
+    messages, has_older, has_newer = await MessageRepository.get_around(
+        message_id=message_id,
+        msg_type=type,
+        conversation_key=conversation_key,
+        context_size=context,
+    )
+    return MessagesAroundResponse(messages=messages, has_older=has_older, has_newer=has_newer)
 
 
 @router.get("", response_model=list[Message])
@@ -28,6 +50,13 @@ async def list_messages(
         default=None, description="Cursor: received_at of last seen message"
     ),
     before_id: int | None = Query(default=None, description="Cursor: id of last seen message"),
+    after: int | None = Query(
+        default=None, description="Forward cursor: received_at of last seen message"
+    ),
+    after_id: int | None = Query(
+        default=None, description="Forward cursor: id of last seen message"
+    ),
+    q: str | None = Query(default=None, description="Full-text search query"),
 ) -> list[Message]:
     """List messages from the database."""
     return await MessageRepository.get_all(
@@ -37,6 +66,9 @@ async def list_messages(
         conversation_key=conversation_key,
         before=before,
         before_id=before_id,
+        after=after,
+        after_id=after_id,
+        q=q,
     )
 
 

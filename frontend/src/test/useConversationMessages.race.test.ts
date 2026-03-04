@@ -6,10 +6,12 @@ import { useConversationMessages } from '../hooks/useConversationMessages';
 import type { Conversation, Message } from '../types';
 
 const mockGetMessages = vi.fn<(...args: unknown[]) => Promise<Message[]>>();
+const mockGetMessagesAround = vi.fn();
 
 vi.mock('../api', () => ({
   api: {
     getMessages: (...args: unknown[]) => mockGetMessages(...args),
+    getMessagesAround: (...args: unknown[]) => mockGetMessagesAround(...args),
   },
   isAbortError: (err: unknown) => err instanceof DOMException && err.name === 'AbortError',
 }));
@@ -35,6 +37,7 @@ function createMessage(overrides: Partial<Message> = {}): Message {
     signature: null,
     outgoing: true,
     acked: 0,
+    sender_name: null,
     ...overrides,
   };
 }
@@ -217,5 +220,175 @@ describe('useConversationMessages conversation switch', () => {
     await waitFor(() => expect(result.current.messagesLoading).toBe(false));
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0].conversation_key).toBe('conv_b');
+  });
+});
+
+describe('useConversationMessages forward pagination', () => {
+  beforeEach(() => {
+    mockGetMessages.mockReset();
+    mockGetMessagesAround.mockReset();
+    messageCache.clear();
+  });
+
+  it('fetchNewerMessages loads newer messages and appends them', async () => {
+    const conv: Conversation = { type: 'channel', id: 'ch1', name: 'Channel' };
+
+    // Initial load returns messages that indicate there are newer ones
+    // (we'll set hasNewerMessages via targetMessageId + getMessagesAround)
+    const initialMessages = Array.from({ length: 3 }, (_, i) =>
+      createMessage({
+        id: i + 1,
+        conversation_key: 'ch1',
+        text: `msg-${i}`,
+        sender_timestamp: 1700000000 + i,
+        received_at: 1700000000 + i,
+      })
+    );
+
+    mockGetMessagesAround.mockResolvedValueOnce({
+      messages: initialMessages,
+      has_older: false,
+      has_newer: true,
+    });
+
+    const { result } = renderHook(
+      ({ conv, target }: { conv: Conversation; target: number | null }) =>
+        useConversationMessages(conv, target),
+      { initialProps: { conv, target: 2 } }
+    );
+
+    await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+    expect(result.current.messages).toHaveLength(3);
+    expect(result.current.hasNewerMessages).toBe(true);
+
+    // Now fetch newer messages
+    const newerMessages = [
+      createMessage({
+        id: 4,
+        conversation_key: 'ch1',
+        text: 'msg-3',
+        sender_timestamp: 1700000003,
+        received_at: 1700000003,
+      }),
+    ];
+    mockGetMessages.mockResolvedValueOnce(newerMessages);
+
+    await act(async () => {
+      await result.current.fetchNewerMessages();
+    });
+
+    expect(result.current.messages).toHaveLength(4);
+    // Less than page size → no more newer messages
+    expect(result.current.hasNewerMessages).toBe(false);
+  });
+
+  it('fetchNewerMessages deduplicates against seen messages', async () => {
+    const conv: Conversation = { type: 'channel', id: 'ch1', name: 'Channel' };
+
+    const initialMessages = [
+      createMessage({
+        id: 1,
+        conversation_key: 'ch1',
+        text: 'msg-0',
+        sender_timestamp: 1700000000,
+        received_at: 1700000000,
+      }),
+    ];
+
+    mockGetMessagesAround.mockResolvedValueOnce({
+      messages: initialMessages,
+      has_older: false,
+      has_newer: true,
+    });
+
+    const { result } = renderHook(
+      ({ conv, target }: { conv: Conversation; target: number | null }) =>
+        useConversationMessages(conv, target),
+      { initialProps: { conv, target: 1 } }
+    );
+
+    await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+
+    // Simulate WS adding a message with the same content key
+    act(() => {
+      result.current.addMessageIfNew(
+        createMessage({
+          id: 2,
+          conversation_key: 'ch1',
+          text: 'duplicate-content',
+          sender_timestamp: 1700000001,
+          received_at: 1700000001,
+        })
+      );
+    });
+
+    // fetchNewerMessages returns the same content (different id but same content key)
+    mockGetMessages.mockResolvedValueOnce([
+      createMessage({
+        id: 3,
+        conversation_key: 'ch1',
+        text: 'duplicate-content',
+        sender_timestamp: 1700000001,
+        received_at: 1700000001,
+      }),
+    ]);
+
+    await act(async () => {
+      await result.current.fetchNewerMessages();
+    });
+
+    // Should not have a duplicate
+    const dupes = result.current.messages.filter((m) => m.text === 'duplicate-content');
+    expect(dupes).toHaveLength(1);
+  });
+
+  it('jumpToBottom clears hasNewerMessages and refetches latest', async () => {
+    const conv: Conversation = { type: 'channel', id: 'ch1', name: 'Channel' };
+
+    const aroundMessages = [
+      createMessage({
+        id: 5,
+        conversation_key: 'ch1',
+        text: 'around-msg',
+        sender_timestamp: 1700000005,
+        received_at: 1700000005,
+      }),
+    ];
+
+    mockGetMessagesAround.mockResolvedValueOnce({
+      messages: aroundMessages,
+      has_older: true,
+      has_newer: true,
+    });
+
+    const { result } = renderHook(
+      ({ conv, target }: { conv: Conversation; target: number | null }) =>
+        useConversationMessages(conv, target),
+      { initialProps: { conv, target: 5 } }
+    );
+
+    await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+    expect(result.current.hasNewerMessages).toBe(true);
+
+    // Jump to bottom
+    const latestMessages = [
+      createMessage({
+        id: 10,
+        conversation_key: 'ch1',
+        text: 'latest-msg',
+        sender_timestamp: 1700000010,
+        received_at: 1700000010,
+      }),
+    ];
+    mockGetMessages.mockResolvedValueOnce(latestMessages);
+
+    act(() => {
+      result.current.jumpToBottom();
+    });
+
+    await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+    expect(result.current.hasNewerMessages).toBe(false);
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].text).toBe('latest-msg');
   });
 });

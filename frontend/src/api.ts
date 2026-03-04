@@ -12,6 +12,7 @@ import type {
   HealthStatus,
   MaintenanceResult,
   Message,
+  MessagesAroundResponse,
   MigratePreferencesRequest,
   MigratePreferencesResponse,
   RadioConfig,
@@ -164,6 +165,9 @@ export const api = {
       conversation_key?: string;
       before?: number;
       before_id?: number;
+      after?: number;
+      after_id?: number;
+      q?: string;
     },
     signal?: AbortSignal
   ) => {
@@ -174,8 +178,26 @@ export const api = {
     if (params?.conversation_key) searchParams.set('conversation_key', params.conversation_key);
     if (params?.before !== undefined) searchParams.set('before', params.before.toString());
     if (params?.before_id !== undefined) searchParams.set('before_id', params.before_id.toString());
+    if (params?.after !== undefined) searchParams.set('after', params.after.toString());
+    if (params?.after_id !== undefined) searchParams.set('after_id', params.after_id.toString());
+    if (params?.q) searchParams.set('q', params.q);
     const query = searchParams.toString();
     return fetchJson<Message[]>(`/messages${query ? `?${query}` : ''}`, { signal });
+  },
+  getMessagesAround: (
+    messageId: number,
+    type?: 'PRIV' | 'CHAN',
+    conversationKey?: string,
+    signal?: AbortSignal
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (type) searchParams.set('type', type);
+    if (conversationKey) searchParams.set('conversation_key', conversationKey);
+    const query = searchParams.toString();
+    return fetchJson<MessagesAroundResponse>(
+      `/messages/around/${messageId}${query ? `?${query}` : ''}`,
+      { signal }
+    );
   },
   sendDirectMessage: (destination: string, text: string) =>
     fetchJson<Message>('/messages/direct', {

@@ -82,6 +82,11 @@ export function useConversationRouter({
       hasSetDefaultConversation.current = true;
       return;
     }
+    if (hashConv?.type === 'search') {
+      setActiveConversationState({ type: 'search', id: 'search', name: 'Message Search' });
+      hasSetDefaultConversation.current = true;
+      return;
+    }
 
     // Handle channel hash (ID-first with legacy-name fallback)
     if (hashConv?.type === 'channel') {
@@ -202,7 +207,7 @@ export function useConversationRouter({
       if (hashSyncEnabledRef.current) {
         updateUrlHash(activeConversation);
       }
-      if (getReopenLastConversationEnabled()) {
+      if (getReopenLastConversationEnabled() && activeConversation.type !== 'search') {
         saveLastViewedConversation(activeConversation);
       }
     }

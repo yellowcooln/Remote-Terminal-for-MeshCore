@@ -195,6 +195,7 @@ describe('Integration: No phantom unreads from mesh echoes (hitlist #8 regressio
         signature: null,
         outgoing: false,
         acked: 0,
+        sender_name: null,
       };
       handleMessageEvent(state, msg, 'other_active_conv');
     }
@@ -215,6 +216,7 @@ describe('Integration: No phantom unreads from mesh echoes (hitlist #8 regressio
       signature: null,
       outgoing: false,
       acked: 0,
+      sender_name: null,
     };
     const result = handleMessageEvent(state, echo, 'other_active_conv');
 
@@ -354,6 +356,7 @@ describe('Integration: ACK + messageCache propagation', () => {
       signature: null,
       outgoing: true,
       acked: 0,
+      sender_name: null,
     };
     messageCache.addMessage('pk_abc', msg, 'key-100');
 
@@ -377,6 +380,7 @@ describe('Integration: ACK + messageCache propagation', () => {
       signature: null,
       outgoing: true,
       acked: 1,
+      sender_name: null,
     };
     messageCache.addMessage('pk_abc', msg, 'key-101');
 
@@ -404,6 +408,7 @@ describe('Integration: ACK + messageCache propagation', () => {
       signature: null,
       outgoing: true,
       acked: 5,
+      sender_name: null,
     };
     messageCache.addMessage('pk_abc', msg, 'key-102');
 
@@ -427,6 +432,7 @@ describe('Integration: ACK + messageCache propagation', () => {
       signature: null,
       outgoing: true,
       acked: 0,
+      sender_name: null,
     };
     messageCache.addMessage('pk_abc', msg, 'key-103');
 

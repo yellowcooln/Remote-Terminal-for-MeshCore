@@ -236,6 +236,7 @@ Key test files:
 - `tests/test_api.py` - API endpoints, read state tracking
 - `tests/test_migrations.py` - Database migration system
 - `tests/test_frontend_static.py` - Frontend static route registration (missing `dist`/`index.html` handling)
+- `tests/test_messages_search.py` - Message search, around endpoint, forward pagination
 - `tests/test_rx_log_data.py` - on_rx_log_data event handler integration
 - `tests/test_ack_tracking_wiring.py` - DM ACK tracking extraction and wiring
 - `tests/test_health_mqtt_status.py` - Health endpoint MQTT status field
@@ -296,7 +297,8 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | DELETE | `/api/channels/{key}` | Delete channel |
 | POST | `/api/channels/sync` | Pull from radio |
 | POST | `/api/channels/{key}/mark-read` | Mark channel as read |
-| GET | `/api/messages` | List with filters |
+| GET | `/api/messages` | List with filters (`q`, `after`/`after_id` for forward pagination) |
+| GET | `/api/messages/around/{id}` | Get messages around a specific message (for jump-to-message) |
 | POST | `/api/messages/direct` | Send direct message |
 | POST | `/api/messages/channel` | Send channel message |
 | POST | `/api/messages/channel/{message_id}/resend` | Resend channel message (default: byte-perfect within 30s; `?new_timestamp=true`: fresh timestamp, no time limit, creates new message row) |

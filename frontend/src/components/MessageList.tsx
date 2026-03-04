@@ -28,6 +28,12 @@ interface MessageListProps {
   radioName?: string;
   config?: RadioConfig | null;
   onOpenContactInfo?: (publicKey: string) => void;
+  targetMessageId?: number | null;
+  onTargetReached?: () => void;
+  hasNewerMessages?: boolean;
+  loadingNewer?: boolean;
+  onLoadNewer?: () => void;
+  onJumpToBottom?: () => void;
 }
 
 // URL regex for linkifying plain text
@@ -154,6 +160,12 @@ export function MessageList({
   radioName,
   config,
   onOpenContactInfo,
+  targetMessageId,
+  onTargetReached,
+  hasNewerMessages = false,
+  loadingNewer = false,
+  onLoadNewer,
+  onJumpToBottom,
 }: MessageListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef<number>(0);
@@ -167,6 +179,8 @@ export function MessageList({
   } | null>(null);
   const [resendableIds, setResendableIds] = useState<Set<number>>(new Set());
   const resendTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
+  const targetScrolledRef = useRef(false);
 
   // Capture scroll state in the scroll handler BEFORE any state updates
   const scrollStateRef = useRef({
@@ -205,14 +219,35 @@ export function MessageList({
       if (scrollStateRef.current.wasNearTop && scrollHeightDiff > 0) {
         // User was near top (loading older) - preserve position by adding the height diff
         list.scrollTop = scrollStateRef.current.scrollTop + scrollHeightDiff;
-      } else if (scrollStateRef.current.wasNearBottom) {
-        // User was near bottom - scroll to bottom for new messages (including sent)
+      } else if (scrollStateRef.current.wasNearBottom && !hasNewerMessagesRef.current) {
+        // User was near bottom - scroll to bottom for new messages (including sent).
+        // Skip when browsing mid-history (hasNewerMessages) so that forward-pagination
+        // appends in place instead of chasing the bottom in an infinite load loop.
         list.scrollTop = list.scrollHeight;
       }
     }
 
     prevMessagesLengthRef.current = messages.length;
   }, [messages]);
+
+  // Scroll to target message and highlight it
+  useLayoutEffect(() => {
+    if (!targetMessageId || targetScrolledRef.current || messages.length === 0) return;
+    const el = listRef.current?.querySelector(`[data-message-id="${targetMessageId}"]`);
+    if (!el) return;
+
+    // Prevent the initial-load layout effect from overriding our scroll
+    isInitialLoadRef.current = false;
+    el.scrollIntoView({ block: 'center' });
+    setHighlightedMessageId(targetMessageId);
+    targetScrolledRef.current = true;
+    onTargetReached?.();
+  }, [messages, targetMessageId, onTargetReached]);
+
+  // Reset target scroll tracking when targetMessageId changes
+  useEffect(() => {
+    targetScrolledRef.current = false;
+  }, [targetMessageId]);
 
   // Reset initial load flag when conversation changes (messages becomes empty then filled)
   useEffect(() => {
@@ -271,9 +306,15 @@ export function MessageList({
   const onLoadOlderRef = useRef(onLoadOlder);
   const loadingOlderRef = useRef(loadingOlder);
   const hasOlderMessagesRef = useRef(hasOlderMessages);
+  const onLoadNewerRef = useRef(onLoadNewer);
+  const loadingNewerRef = useRef(loadingNewer);
+  const hasNewerMessagesRef = useRef(hasNewerMessages);
   onLoadOlderRef.current = onLoadOlder;
   loadingOlderRef.current = loadingOlder;
   hasOlderMessagesRef.current = hasOlderMessages;
+  onLoadNewerRef.current = onLoadNewer;
+  loadingNewerRef.current = loadingNewer;
+  hasNewerMessagesRef.current = hasNewerMessages;
 
   // Handle scroll - capture state and detect when user is near top/bottom
   // Stable callback: reads changing values from refs, never recreated.
@@ -295,20 +336,33 @@ export function MessageList({
     // Show scroll-to-bottom button when not near the bottom (more than 100px away)
     setShowScrollToBottom(distanceFromBottom > 100);
 
-    if (!onLoadOlderRef.current || loadingOlderRef.current || !hasOlderMessagesRef.current) return;
-
-    // Trigger load when within 100px of top
-    if (scrollTop < 100) {
+    if (!onLoadOlderRef.current || loadingOlderRef.current || !hasOlderMessagesRef.current) {
+      // skip older load
+    } else if (scrollTop < 100) {
       onLoadOlderRef.current();
+    }
+
+    // Trigger load newer when within 100px of bottom
+    if (
+      onLoadNewerRef.current &&
+      !loadingNewerRef.current &&
+      hasNewerMessagesRef.current &&
+      distanceFromBottom < 100
+    ) {
+      onLoadNewerRef.current();
     }
   }, []);
 
-  // Scroll to bottom handler
+  // Scroll to bottom handler (or jump to bottom if viewing historical messages)
   const scrollToBottom = useCallback(() => {
+    if (hasNewerMessages && onJumpToBottom) {
+      onJumpToBottom();
+      return;
+    }
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
-  }, []);
+  }, [hasNewerMessages, onJumpToBottom]);
 
   // Sort messages by received_at ascending (oldest first)
   // Note: Deduplication is handled by useConversationMessages.addMessageIfNew()
@@ -465,6 +519,7 @@ export function MessageList({
           return (
             <div
               key={msg.id}
+              data-message-id={msg.id}
               className={cn(
                 'flex items-start max-w-[85%]',
                 msg.outgoing && 'flex-row-reverse self-end',
@@ -503,7 +558,8 @@ export function MessageList({
               <div
                 className={cn(
                   'py-1.5 px-3 rounded-lg min-w-0',
-                  msg.outgoing ? 'bg-msg-outgoing' : 'bg-msg-incoming'
+                  msg.outgoing ? 'bg-msg-outgoing' : 'bg-msg-incoming',
+                  highlightedMessageId === msg.id && 'message-highlight'
                 )}
               >
                 {showAvatar && (
@@ -618,6 +674,16 @@ export function MessageList({
             </div>
           );
         })}
+        {loadingNewer && (
+          <div className="text-center py-2 text-muted-foreground text-sm" role="status">
+            Loading newer messages...
+          </div>
+        )}
+        {!loadingNewer && hasNewerMessages && (
+          <div className="text-center py-2 text-muted-foreground text-xs">
+            Scroll down for newer messages
+          </div>
+        )}
       </div>
 
       {/* Scroll to bottom button */}

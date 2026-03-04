@@ -61,6 +61,7 @@ frontend/src/
 │   ├── MessageList.tsx
 │   ├── MessageInput.tsx
 │   ├── NewMessageModal.tsx
+│   ├── SearchView.tsx          # Full-text message search pane
 │   ├── SettingsModal.tsx       # Layout shell — delegates to settings/ sections
 │   ├── RawPacketList.tsx
 │   ├── MapView.tsx
@@ -186,6 +187,7 @@ Supported routes:
 - `#map`
 - `#map/focus/{pubkey_or_prefix}`
 - `#visualizer`
+- `#search`
 - `#channel/{channelKey}`
 - `#channel/{channelKey}/{label}`
 - `#contact/{publicKey}`
@@ -284,6 +286,16 @@ For repeater contacts (`type=2`), App.tsx renders `RepeaterDashboard` instead of
 **Console pane**: Full CLI access via the same command endpoint. History is ephemeral (not persisted to DB).
 
 All state is managed by `useRepeaterDashboard` hook. State resets on conversation change.
+
+## Message Search Pane
+
+The `SearchView` component (`components/SearchView.tsx`) provides full-text search across all DMs and channel messages. Key behaviors:
+
+- **State**: `targetMessageId` in `App.tsx` drives the jump-to-message flow. When a search result is clicked, `handleNavigateToMessage` sets `targetMessageId` and switches to the target conversation.
+- **Persistence**: `SearchView` stays mounted after first open using the same `hidden` class pattern as `CrackerPanel`, preserving search state when navigating to results.
+- **Jump-to-message**: `useConversationMessages` accepts optional `targetMessageId`. When set, it calls `api.getMessagesAround()` instead of normal fetch, loading context around the target message. `MessageList` scrolls to the target via `data-message-id` attribute and applies a `message-highlight` CSS animation.
+- **Bidirectional pagination**: After jumping mid-history, `hasNewerMessages` enables forward pagination via `fetchNewerMessages`. The scroll-to-bottom button calls `jumpToBottom` (re-fetches latest page) instead of just scrolling.
+- **WS message suppression**: When `hasNewerMessages` is true, incoming WS messages for the active conversation are not added to the message list (the user is viewing historical context, not the latest page).
 
 ## Styling
 

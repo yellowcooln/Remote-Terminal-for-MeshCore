@@ -116,8 +116,10 @@ export function Sidebar({
     onSelectConversation(conversation);
   };
 
-  const isActive = (type: 'contact' | 'channel' | 'raw' | 'map' | 'visualizer', id: string) =>
-    activeConversation?.type === type && activeConversation?.id === id;
+  const isActive = (
+    type: 'contact' | 'channel' | 'raw' | 'map' | 'visualizer' | 'search',
+    id: string
+  ) => activeConversation?.type === type && activeConversation?.id === id;
 
   // Get unread count for a conversation
   const getUnreadCount = (type: 'channel' | 'contact', id: string): number => {
@@ -611,6 +613,32 @@ export function Sidebar({
               ✨
             </span>
             <span className="flex-1 truncate text-muted-foreground">Mesh Visualizer</span>
+          </div>
+        )}
+
+        {/* Message Search */}
+        {!query && (
+          <div
+            className={cn(
+              'px-3 py-2 cursor-pointer flex items-center gap-2 border-l-2 border-transparent hover:bg-accent transition-colors text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              isActive('search', 'search') && 'bg-accent border-l-primary'
+            )}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive('search', 'search') ? 'page' : undefined}
+            onKeyDown={handleKeyboardActivate}
+            onClick={() =>
+              handleSelectConversation({
+                type: 'search',
+                id: 'search',
+                name: 'Message Search',
+              })
+            }
+          >
+            <span className="text-muted-foreground text-xs" aria-hidden="true">
+              🔍
+            </span>
+            <span className="flex-1 truncate text-muted-foreground">Message Search</span>
           </div>
         )}
 

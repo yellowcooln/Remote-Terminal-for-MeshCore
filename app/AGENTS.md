@@ -178,7 +178,8 @@ app/
 - `POST /channels/{key}/mark-read`
 
 ### Messages
-- `GET /messages`
+- `GET /messages` — list with filters; supports `q` (full-text search), `after`/`after_id` (forward cursor)
+- `GET /messages/around/{message_id}` — context messages around a target (for jump-to-message navigation)
 - `POST /messages/direct`
 - `POST /messages/channel`
 - `POST /messages/channel/{message_id}/resend`
@@ -291,6 +292,7 @@ tests/
 ├── test_repeater_routes.py     # Repeater command/telemetry/trace + granular pane endpoints
 ├── test_repository.py          # Data access layer
 ├── test_rx_log_data.py         # on_rx_log_data event handler integration
+├── test_messages_search.py      # Message search, around, forward pagination
 ├── test_send_messages.py       # Outgoing messages, bot triggers, concurrent sends
 ├── test_settings_router.py     # Settings endpoints, advert validation
 ├── test_statistics.py          # Statistics aggregation

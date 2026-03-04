@@ -46,6 +46,7 @@ export function ChatHeader({
             onKeyDown={handleKeyboardActivate}
             onClick={() => onOpenContactInfo(conversation.id)}
             title="View contact info"
+            aria-label={`View info for ${conversation.name}`}
           >
             <ContactAvatar
               name={conversation.name}
@@ -60,6 +61,7 @@ export function ChatHeader({
           className={`flex-shrink-0 font-semibold text-base ${titleClickable ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
           role={titleClickable ? 'button' : undefined}
           tabIndex={titleClickable ? 0 : undefined}
+          aria-label={titleClickable ? `View info for ${conversation.name}` : undefined}
           onKeyDown={titleClickable ? handleKeyboardActivate : undefined}
           onClick={
             titleClickable

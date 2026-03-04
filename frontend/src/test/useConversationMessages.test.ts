@@ -21,6 +21,7 @@ function createMessage(overrides: Partial<Message> = {}): Message {
     signature: null,
     outgoing: false,
     acked: 0,
+    sender_name: null,
     ...overrides,
   };
 }

@@ -51,6 +51,9 @@ const SettingsModal = lazy(() =>
 const CrackerPanel = lazy(() =>
   import('./components/CrackerPanel').then((m) => ({ default: m.CrackerPanel }))
 );
+const SearchView = lazy(() =>
+  import('./components/SearchView').then((m) => ({ default: m.SearchView }))
+);
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './components/ui/sheet';
 import { Toaster, toast } from './components/ui/sonner';
 import { getStateKey } from './utils/conversationState';
@@ -59,6 +62,7 @@ import { messageContainsMention } from './utils/messageParser';
 import { mergeContactIntoList } from './utils/contactMerge';
 import { getLocalLabel, getContrastTextColor } from './utils/localLabel';
 import { cn } from '@/lib/utils';
+import type { SearchNavigateTarget } from './components/SearchView';
 import type { Contact, Conversation, HealthStatus, Message, MessagePath, RawPacket } from './types';
 
 const MAX_RAW_PACKETS = 500;
@@ -75,6 +79,7 @@ export function App() {
   const [localLabel, setLocalLabel] = useState(getLocalLabel);
   const [infoPaneContactKey, setInfoPaneContactKey] = useState<string | null>(null);
   const [infoPaneChannelKey, setInfoPaneChannelKey] = useState<string | null>(null);
+  const [targetMessageId, setTargetMessageId] = useState<number | null>(null);
 
   // Defer CrackerPanel mount until first opened (lazy-loaded, but keep mounted after for state)
   const crackerMounted = useRef(false);
@@ -166,17 +171,26 @@ export function App() {
   // Wire up the ref bridge so useContactsAndChannels handlers reach the real setter
   setActiveConversationRef.current = setActiveConversation;
 
+  // Keep SearchView mounted after first open to preserve search state
+  const searchMounted = useRef(false);
+  if (activeConversation?.type === 'search') searchMounted.current = true;
+
   // Custom hooks for conversation-specific functionality
   const {
     messages,
     messagesLoading,
     loadingOlder,
     hasOlderMessages,
+    hasNewerMessages,
+    loadingNewer,
+    hasNewerMessagesRef,
     fetchOlderMessages,
+    fetchNewerMessages,
+    jumpToBottom,
     addMessageIfNew,
     updateMessageAck,
     triggerReconcile,
-  } = useConversationMessages(activeConversation);
+  } = useConversationMessages(activeConversation, targetMessageId);
 
   const {
     unreadCounts,
@@ -257,7 +271,8 @@ export function App() {
         })();
 
         // Only add to message list if it's for the active conversation
-        if (isForActiveConversation) {
+        // and we're not viewing historical messages (hasNewerMessages means we jumped mid-history)
+        if (isForActiveConversation && !hasNewerMessagesRef.current) {
           addMessageIfNew(msg);
         }
 
@@ -315,6 +330,7 @@ export function App() {
       setHealth,
       setConfig,
       activeConversationRef,
+      hasNewerMessagesRef,
       setContacts,
       setChannels,
       triggerReconcile,
@@ -451,15 +467,45 @@ export function App() {
     setInfoPaneChannelKey(null);
   }, []);
 
+  const handleSelectConversationWithTargetReset = useCallback(
+    (conv: Conversation, options?: { preserveTarget?: boolean }) => {
+      if (conv.type !== 'search' && !options?.preserveTarget) {
+        setTargetMessageId(null);
+      }
+      handleSelectConversation(conv);
+    },
+    [handleSelectConversation]
+  );
+
   const handleNavigateToChannel = useCallback(
     (channelKey: string) => {
       const channel = channels.find((c) => c.key === channelKey);
       if (channel) {
-        handleSelectConversation({ type: 'channel', id: channel.key, name: channel.name });
+        handleSelectConversationWithTargetReset({
+          type: 'channel',
+          id: channel.key,
+          name: channel.name,
+        });
         setInfoPaneContactKey(null);
       }
     },
-    [channels, handleSelectConversation]
+    [channels, handleSelectConversationWithTargetReset]
+  );
+
+  const handleNavigateToMessage = useCallback(
+    (target: SearchNavigateTarget) => {
+      const convType = target.type === 'CHAN' ? 'channel' : 'contact';
+      setTargetMessageId(target.id);
+      handleSelectConversationWithTargetReset(
+        {
+          type: convType,
+          id: target.conversation_key,
+          name: target.conversation_name,
+        },
+        { preserveTarget: true }
+      );
+    },
+    [handleSelectConversationWithTargetReset]
   );
 
   // Sidebar content (shared between desktop and mobile)
@@ -468,7 +514,7 @@ export function App() {
       contacts={contacts}
       channels={channels}
       activeConversation={activeConversation}
-      onSelectConversation={handleSelectConversation}
+      onSelectConversation={handleSelectConversationWithTargetReset}
       onNewMessage={handleNewMessage}
       lastMessageTimes={lastMessageTimes}
       unreadCounts={unreadCounts}
@@ -559,7 +605,12 @@ export function App() {
         </Sheet>
 
         <main className="flex-1 flex flex-col bg-background min-w-0">
-          <div className={cn('flex-1 flex flex-col min-h-0', showSettings && 'hidden')}>
+          <div
+            className={cn(
+              'flex-1 flex flex-col min-h-0',
+              (showSettings || activeConversation?.type === 'search') && 'hidden'
+            )}
+          >
             {activeConversation ? (
               activeConversation.type === 'map' ? (
                 <>
@@ -597,7 +648,7 @@ export function App() {
                     <RawPacketList packets={rawPackets} />
                   </div>
                 </>
-              ) : activeContactIsRepeater ? (
+              ) : activeConversation.type === 'search' ? null : activeContactIsRepeater ? (
                 <Suspense
                   fallback={
                     <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -650,6 +701,12 @@ export function App() {
                     radioName={config?.name}
                     config={config}
                     onOpenContactInfo={handleOpenContactInfo}
+                    targetMessageId={targetMessageId}
+                    onTargetReached={() => setTargetMessageId(null)}
+                    hasNewerMessages={hasNewerMessages}
+                    loadingNewer={loadingNewer}
+                    onLoadNewer={fetchNewerMessages}
+                    onJumpToBottom={jumpToBottom}
                   />
                   <MessageInput
                     ref={messageInputRef}
@@ -671,6 +728,29 @@ export function App() {
               </div>
             )}
           </div>
+
+          {searchMounted.current && (
+            <div
+              className={cn(
+                'flex-1 flex flex-col min-h-0',
+                (activeConversation?.type !== 'search' || showSettings) && 'hidden'
+              )}
+            >
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                    Loading search...
+                  </div>
+                }
+              >
+                <SearchView
+                  contacts={contacts}
+                  channels={channels}
+                  onNavigateToMessage={handleNavigateToMessage}
+                />
+              </Suspense>
+            </div>
+          )}
 
           {showSettings && (
             <div className="flex-1 flex flex-col min-h-0">
@@ -754,7 +834,7 @@ export function App() {
         undecryptedCount={undecryptedCount}
         onClose={() => setShowNewMessage(false)}
         onSelectConversation={(conv) => {
-          setActiveConversation(conv);
+          handleSelectConversationWithTargetReset(conv);
           setShowNewMessage(false);
         }}
         onCreateContact={handleCreateContact}

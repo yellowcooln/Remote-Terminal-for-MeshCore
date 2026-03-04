@@ -71,6 +71,19 @@
   scrollbar-color: hsl(224 11% 22%) transparent;
 }
 
+/* Message highlight animation for jump-to-message */
+@keyframes message-highlight {
+  0% {
+    box-shadow: 0 0 0 2px hsl(var(--primary));
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+.message-highlight {
+  animation: message-highlight 2s ease-out forwards;
+}
+
 /* Constrain CodeMirror editor width */
 .cm-editor {
   max-width: 100% !important;

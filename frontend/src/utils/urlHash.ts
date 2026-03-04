@@ -2,7 +2,7 @@ import type { Channel, Contact, Conversation } from '../types';
 import { getContactDisplayName } from './pubkey';
 
 interface ParsedHashConversation {
-  type: 'channel' | 'contact' | 'raw' | 'map' | 'visualizer';
+  type: 'channel' | 'contact' | 'raw' | 'map' | 'visualizer' | 'search';
   /** Conversation identity token (channel key or contact public key, or legacy name token) */
   name: string;
   /** Optional human-readable label segment (ignored for identity resolution) */
@@ -27,6 +27,10 @@ export function parseHashConversation(): ParsedHashConversation | null {
 
   if (hash === 'visualizer') {
     return { type: 'visualizer', name: 'visualizer' };
+  }
+
+  if (hash === 'search') {
+    return { type: 'search', name: 'search' };
   }
 
   // Check for map with focus: #map/focus/{pubkey_prefix}
@@ -107,6 +111,7 @@ function getConversationHash(conv: Conversation | null): string {
   if (conv.type === 'raw') return '#raw';
   if (conv.type === 'map') return '#map';
   if (conv.type === 'visualizer') return '#visualizer';
+  if (conv.type === 'search') return '#search';
 
   // Use immutable IDs for identity, append readable label for UX.
   if (conv.type === 'channel') {

@@ -322,6 +322,7 @@ class TestContactMessageCLIFiltering:
             "signature",
             "outgoing",
             "acked",
+            "sender_name",
         }
 
         with (

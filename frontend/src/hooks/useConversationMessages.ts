@@ -62,20 +62,28 @@ interface UseConversationMessagesResult {
   messagesLoading: boolean;
   loadingOlder: boolean;
   hasOlderMessages: boolean;
+  hasNewerMessages: boolean;
+  loadingNewer: boolean;
+  hasNewerMessagesRef: React.MutableRefObject<boolean>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   fetchOlderMessages: () => Promise<void>;
+  fetchNewerMessages: () => Promise<void>;
+  jumpToBottom: () => void;
   addMessageIfNew: (msg: Message) => boolean;
   updateMessageAck: (messageId: number, ackCount: number, paths?: MessagePath[]) => void;
   triggerReconcile: () => void;
 }
 
 export function useConversationMessages(
-  activeConversation: Conversation | null
+  activeConversation: Conversation | null,
+  targetMessageId?: number | null
 ): UseConversationMessagesResult {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [hasNewerMessages, setHasNewerMessages] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
 
   // Track seen message content for deduplication
   const seenMessageContent = useRef<Set<string>>(new Set());
@@ -94,6 +102,7 @@ export function useConversationMessages(
   // Keep refs in sync with state so we can read current values in the switch effect
   const messagesRef = useRef<Message[]>([]);
   const hasOlderMessagesRef = useRef(false);
+  const hasNewerMessagesRef = useRef(false);
   const prevConversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -103,6 +112,10 @@ export function useConversationMessages(
   useEffect(() => {
     hasOlderMessagesRef.current = hasOlderMessages;
   }, [hasOlderMessages]);
+
+  useEffect(() => {
+    hasNewerMessagesRef.current = hasNewerMessages;
+  }, [hasNewerMessages]);
 
   const setPendingAck = useCallback(
     (messageId: number, ackCount: number, paths?: MessagePath[]) => {
@@ -146,7 +159,8 @@ export function useConversationMessages(
         !activeConversation ||
         activeConversation.type === 'raw' ||
         activeConversation.type === 'map' ||
-        activeConversation.type === 'visualizer'
+        activeConversation.type === 'visualizer' ||
+        activeConversation.type === 'search'
       ) {
         setMessages([]);
         setHasOlderMessages(false);
@@ -264,11 +278,86 @@ export function useConversationMessages(
     }
   }, [activeConversation, loadingOlder, hasOlderMessages, messages, applyPendingAck]);
 
+  // Fetch newer messages (forward cursor pagination)
+  const fetchNewerMessages = useCallback(async () => {
+    if (
+      !activeConversation ||
+      activeConversation.type === 'raw' ||
+      loadingNewer ||
+      !hasNewerMessages
+    )
+      return;
+
+    const conversationId = activeConversation.id;
+
+    // Get the newest message as forward cursor
+    const newestMessage = messages.reduce(
+      (newest, msg) => {
+        if (!newest) return msg;
+        if (msg.received_at > newest.received_at) return msg;
+        if (msg.received_at === newest.received_at && msg.id > newest.id) return msg;
+        return newest;
+      },
+      null as Message | null
+    );
+    if (!newestMessage) return;
+
+    setLoadingNewer(true);
+    try {
+      const data = await api.getMessages({
+        type: activeConversation.type === 'channel' ? 'CHAN' : 'PRIV',
+        conversation_key: conversationId,
+        limit: MESSAGE_PAGE_SIZE,
+        after: newestMessage.received_at,
+        after_id: newestMessage.id,
+      });
+
+      if (fetchingConversationIdRef.current !== conversationId) return;
+
+      const dataWithPendingAck = data.map((msg) => applyPendingAck(msg));
+
+      // Deduplicate against already-seen messages (WS race)
+      const newMessages = dataWithPendingAck.filter(
+        (msg) => !seenMessageContent.current.has(getMessageContentKey(msg))
+      );
+      if (newMessages.length > 0) {
+        setMessages((prev) => [...prev, ...newMessages]);
+        for (const msg of newMessages) {
+          seenMessageContent.current.add(getMessageContentKey(msg));
+        }
+      }
+      setHasNewerMessages(dataWithPendingAck.length >= MESSAGE_PAGE_SIZE);
+    } catch (err) {
+      console.error('Failed to fetch newer messages:', err);
+      toast.error('Failed to load newer messages', {
+        description: err instanceof Error ? err.message : 'Check your connection',
+      });
+    } finally {
+      setLoadingNewer(false);
+    }
+  }, [activeConversation, loadingNewer, hasNewerMessages, messages, applyPendingAck]);
+
+  // Jump to bottom: re-fetch latest page, clear hasNewerMessages
+  const jumpToBottom = useCallback(() => {
+    if (!activeConversation) return;
+    setHasNewerMessages(false);
+    // Invalidate cache so fetchMessages does a fresh load
+    messageCache.remove(activeConversation.id);
+    fetchMessages(true);
+  }, [activeConversation, fetchMessages]);
+
   // Trigger a background reconciliation for the current conversation.
   // Used after WebSocket reconnects to silently recover any missed messages.
   const triggerReconcile = useCallback(() => {
     const conv = activeConversation;
-    if (!conv || conv.type === 'raw' || conv.type === 'map' || conv.type === 'visualizer') return;
+    if (
+      !conv ||
+      conv.type === 'raw' ||
+      conv.type === 'map' ||
+      conv.type === 'visualizer' ||
+      conv.type === 'search'
+    )
+      return;
     const controller = new AbortController();
     reconcileFromBackend(conv, controller.signal);
   }, [activeConversation]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -318,9 +407,39 @@ export function useConversationMessages(
       abortControllerRef.current.abort();
     }
 
-    // Save outgoing conversation to cache (if it had messages loaded)
     const prevId = prevConversationIdRef.current;
-    if (prevId && messagesRef.current.length > 0) {
+
+    // Track which conversation we're now on
+    const newId = activeConversation?.id ?? null;
+    const conversationChanged = prevId !== newId;
+    fetchingConversationIdRef.current = newId;
+    prevConversationIdRef.current = newId;
+
+    // When targetMessageId goes from a value to null (onTargetReached cleared it)
+    // but the conversation hasn't changed, the around-loaded messages are already
+    // displayed — do nothing. Without this guard the effect would re-enter the
+    // normal fetch path and replace the mid-history view with the latest page.
+    if (!conversationChanged && !targetMessageId) {
+      return;
+    }
+
+    // Reset loadingOlder/loadingNewer — the previous conversation's in-flight
+    // fetch is irrelevant now (its stale-check will discard the response).
+    setLoadingOlder(false);
+    setLoadingNewer(false);
+    if (conversationChanged) {
+      setHasNewerMessages(false);
+    }
+
+    // Save outgoing conversation to cache only when actually leaving it, and
+    // only if we were on the latest page (mid-history views would restore stale
+    // partial data on switch-back).
+    if (
+      conversationChanged &&
+      prevId &&
+      messagesRef.current.length > 0 &&
+      !hasNewerMessagesRef.current
+    ) {
       messageCache.set(prevId, {
         messages: messagesRef.current,
         seenContent: new Set(seenMessageContent.current),
@@ -328,21 +447,13 @@ export function useConversationMessages(
       });
     }
 
-    // Track which conversation we're now on
-    const newId = activeConversation?.id ?? null;
-    fetchingConversationIdRef.current = newId;
-    prevConversationIdRef.current = newId;
-
-    // Reset loadingOlder — the previous conversation's in-flight older-message
-    // fetch is irrelevant now (its stale-check will discard the response).
-    setLoadingOlder(false);
-
     // Clear state for non-message views
     if (
       !activeConversation ||
       activeConversation.type === 'raw' ||
       activeConversation.type === 'map' ||
-      activeConversation.type === 'visualizer'
+      activeConversation.type === 'visualizer' ||
+      activeConversation.type === 'search'
     ) {
       setMessages([]);
       setHasOlderMessages(false);
@@ -353,19 +464,52 @@ export function useConversationMessages(
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Check cache for the new conversation
-    const cached = messageCache.get(activeConversation.id);
-    if (cached) {
-      // Restore from cache instantly — no spinner
-      setMessages(cached.messages);
-      seenMessageContent.current = new Set(cached.seenContent);
-      setHasOlderMessages(cached.hasOlderMessages);
-      setMessagesLoading(false);
-      // Silently reconcile with backend in case we missed a WS message
-      reconcileFromBackend(activeConversation, controller.signal);
+    // Jump-to-message: skip cache and load messages around the target
+    if (targetMessageId) {
+      setMessagesLoading(true);
+      setMessages([]);
+      const msgType = activeConversation.type === 'channel' ? 'CHAN' : 'PRIV';
+      api
+        .getMessagesAround(
+          targetMessageId,
+          msgType as 'PRIV' | 'CHAN',
+          activeConversation.id,
+          controller.signal
+        )
+        .then((response) => {
+          if (fetchingConversationIdRef.current !== activeConversation.id) return;
+          const withAcks = response.messages.map((msg) => applyPendingAck(msg));
+          setMessages(withAcks);
+          seenMessageContent.current.clear();
+          for (const msg of withAcks) {
+            seenMessageContent.current.add(getMessageContentKey(msg));
+          }
+          setHasOlderMessages(response.has_older);
+          setHasNewerMessages(response.has_newer);
+        })
+        .catch((err) => {
+          if (isAbortError(err)) return;
+          console.error('Failed to fetch messages around target:', err);
+          toast.error('Failed to jump to message');
+        })
+        .finally(() => {
+          setMessagesLoading(false);
+        });
     } else {
-      // Not cached — full fetch with spinner
-      fetchMessages(true, controller.signal);
+      // Check cache for the new conversation
+      const cached = messageCache.get(activeConversation.id);
+      if (cached) {
+        // Restore from cache instantly — no spinner
+        setMessages(cached.messages);
+        seenMessageContent.current = new Set(cached.seenContent);
+        setHasOlderMessages(cached.hasOlderMessages);
+        setMessagesLoading(false);
+        // Silently reconcile with backend in case we missed a WS message
+        reconcileFromBackend(activeConversation, controller.signal);
+      } else {
+        // Not cached — full fetch with spinner
+        fetchMessages(true, controller.signal);
+      }
     }
 
     // Cleanup: abort request if conversation changes or component unmounts
@@ -377,7 +521,7 @@ export function useConversationMessages(
     // - activeConversation object identity changes on every render; we only care about id/type
     // - We use fetchingConversationIdRef and AbortController to handle stale responses safely
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversation?.id, activeConversation?.type]);
+  }, [activeConversation?.id, activeConversation?.type, targetMessageId]);
 
   // Add a message if it's new (deduplication)
   // Returns true if the message was added, false if it was a duplicate
@@ -456,8 +600,13 @@ export function useConversationMessages(
     messagesLoading,
     loadingOlder,
     hasOlderMessages,
+    hasNewerMessages,
+    loadingNewer,
+    hasNewerMessagesRef,
     setMessages,
     fetchOlderMessages,
+    fetchNewerMessages,
+    jumpToBottom,
     addMessageIfNew,
     updateMessageAck,
     triggerReconcile,

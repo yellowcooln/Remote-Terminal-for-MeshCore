@@ -15,7 +15,7 @@ class MessageRepository:
         try:
             paths_data = json.loads(paths_json)
             return [MessagePath(**p) for p in paths_data]
-        except (json.JSONDecodeError, TypeError, KeyError):
+        except (json.JSONDecodeError, TypeError, KeyError, ValueError):
             return None
 
     @staticmethod
@@ -129,6 +129,37 @@ class MessageRepository:
         return cursor.rowcount
 
     @staticmethod
+    def _normalize_conversation_key(conversation_key: str) -> tuple[str, str]:
+        """Normalize a conversation key and return (sql_clause, normalized_key).
+
+        Returns the WHERE clause fragment and the normalized key value.
+        """
+        if len(conversation_key) == 64:
+            return "AND conversation_key = ?", conversation_key.lower()
+        elif len(conversation_key) == 32:
+            return "AND conversation_key = ?", conversation_key.upper()
+        else:
+            return "AND conversation_key LIKE ?", f"{conversation_key}%"
+
+    @staticmethod
+    def _row_to_message(row: Any) -> Message:
+        """Convert a database row to a Message model."""
+        return Message(
+            id=row["id"],
+            type=row["type"],
+            conversation_key=row["conversation_key"],
+            text=row["text"],
+            sender_timestamp=row["sender_timestamp"],
+            received_at=row["received_at"],
+            paths=MessageRepository._parse_paths(row["paths"]),
+            txt_type=row["txt_type"],
+            signature=row["signature"],
+            outgoing=bool(row["outgoing"]),
+            acked=row["acked"],
+            sender_name=row["sender_name"],
+        )
+
+    @staticmethod
     async def get_all(
         limit: int = 100,
         offset: int = 0,
@@ -136,6 +167,9 @@ class MessageRepository:
         conversation_key: str | None = None,
         before: int | None = None,
         before_id: int | None = None,
+        after: int | None = None,
+        after_id: int | None = None,
+        q: str | None = None,
     ) -> list[Message]:
         query = "SELECT * FROM messages WHERE 1=1"
         params: list[Any] = []
@@ -144,49 +178,113 @@ class MessageRepository:
             query += " AND type = ?"
             params.append(msg_type)
         if conversation_key:
-            normalized_key = conversation_key
-            # Prefer exact matching for full keys.
-            if len(conversation_key) == 64:
-                normalized_key = conversation_key.lower()
-                query += " AND conversation_key = ?"
-                params.append(normalized_key)
-            elif len(conversation_key) == 32:
-                normalized_key = conversation_key.upper()
-                query += " AND conversation_key = ?"
-                params.append(normalized_key)
-            else:
-                # Prefix match is only for legacy/partial key callers.
-                query += " AND conversation_key LIKE ?"
-                params.append(f"{conversation_key}%")
+            clause, norm_key = MessageRepository._normalize_conversation_key(conversation_key)
+            query += f" {clause}"
+            params.append(norm_key)
 
-        if before is not None and before_id is not None:
-            query += " AND (received_at < ? OR (received_at = ? AND id < ?))"
-            params.extend([before, before, before_id])
+        if q:
+            escaped_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            query += " AND text LIKE ? ESCAPE '\\' COLLATE NOCASE"
+            params.append(f"%{escaped_q}%")
 
-        query += " ORDER BY received_at DESC, id DESC LIMIT ?"
-        params.append(limit)
-        if before is None or before_id is None:
-            query += " OFFSET ?"
-            params.append(offset)
+        # Forward cursor (after/after_id) — mutually exclusive with before/before_id
+        if after is not None and after_id is not None:
+            query += " AND (received_at > ? OR (received_at = ? AND id > ?))"
+            params.extend([after, after, after_id])
+            query += " ORDER BY received_at ASC, id ASC LIMIT ?"
+            params.append(limit)
+        else:
+            if before is not None and before_id is not None:
+                query += " AND (received_at < ? OR (received_at = ? AND id < ?))"
+                params.extend([before, before, before_id])
+
+            query += " ORDER BY received_at DESC, id DESC LIMIT ?"
+            params.append(limit)
+            if before is None or before_id is None:
+                query += " OFFSET ?"
+                params.append(offset)
 
         cursor = await db.conn.execute(query, params)
         rows = await cursor.fetchall()
-        return [
-            Message(
-                id=row["id"],
-                type=row["type"],
-                conversation_key=row["conversation_key"],
-                text=row["text"],
-                sender_timestamp=row["sender_timestamp"],
-                received_at=row["received_at"],
-                paths=MessageRepository._parse_paths(row["paths"]),
-                txt_type=row["txt_type"],
-                signature=row["signature"],
-                outgoing=bool(row["outgoing"]),
-                acked=row["acked"],
-            )
-            for row in rows
+        return [MessageRepository._row_to_message(row) for row in rows]
+
+    @staticmethod
+    async def get_around(
+        message_id: int,
+        msg_type: str | None = None,
+        conversation_key: str | None = None,
+        context_size: int = 100,
+    ) -> tuple[list[Message], bool, bool]:
+        """Get messages around a target message.
+
+        Returns (messages, has_older, has_newer).
+        """
+        # Build common WHERE clause for optional conversation/type filtering.
+        # If the target message doesn't match filters, return an empty result.
+        where_parts: list[str] = []
+        base_params: list[Any] = []
+        if msg_type:
+            where_parts.append("type = ?")
+            base_params.append(msg_type)
+        if conversation_key:
+            clause, norm_key = MessageRepository._normalize_conversation_key(conversation_key)
+            where_parts.append(clause.removeprefix("AND "))
+            base_params.append(norm_key)
+
+        where_sql = " AND ".join(["1=1", *where_parts])
+
+        # 1. Get the target message (must satisfy filters if provided)
+        target_cursor = await db.conn.execute(
+            f"SELECT * FROM messages WHERE id = ? AND {where_sql}",
+            (message_id, *base_params),
+        )
+        target_row = await target_cursor.fetchone()
+        if not target_row:
+            return [], False, False
+
+        target = MessageRepository._row_to_message(target_row)
+
+        # 2. Get context_size+1 messages before target (DESC)
+        before_query = f"""
+            SELECT * FROM messages WHERE {where_sql}
+            AND (received_at < ? OR (received_at = ? AND id < ?))
+            ORDER BY received_at DESC, id DESC LIMIT ?
+        """
+        before_params = [
+            *base_params,
+            target.received_at,
+            target.received_at,
+            target.id,
+            context_size + 1,
         ]
+        before_cursor = await db.conn.execute(before_query, before_params)
+        before_rows = list(await before_cursor.fetchall())
+
+        has_older = len(before_rows) > context_size
+        before_messages = [MessageRepository._row_to_message(r) for r in before_rows[:context_size]]
+
+        # 3. Get context_size+1 messages after target (ASC)
+        after_query = f"""
+            SELECT * FROM messages WHERE {where_sql}
+            AND (received_at > ? OR (received_at = ? AND id > ?))
+            ORDER BY received_at ASC, id ASC LIMIT ?
+        """
+        after_params = [
+            *base_params,
+            target.received_at,
+            target.received_at,
+            target.id,
+            context_size + 1,
+        ]
+        after_cursor = await db.conn.execute(after_query, after_params)
+        after_rows = list(await after_cursor.fetchall())
+
+        has_newer = len(after_rows) > context_size
+        after_messages = [MessageRepository._row_to_message(r) for r in after_rows[:context_size]]
+
+        # Combine: before (reversed to ASC) + target + after
+        all_messages = list(reversed(before_messages)) + [target] + after_messages
+        return all_messages, has_older, has_newer
 
     @staticmethod
     async def increment_ack_count(message_id: int) -> int:
@@ -212,31 +310,14 @@ class MessageRepository:
     async def get_by_id(message_id: int) -> "Message | None":
         """Look up a message by its ID."""
         cursor = await db.conn.execute(
-            """
-            SELECT id, type, conversation_key, text, sender_timestamp, received_at,
-                   paths, txt_type, signature, outgoing, acked
-            FROM messages
-            WHERE id = ?
-            """,
+            "SELECT * FROM messages WHERE id = ?",
             (message_id,),
         )
         row = await cursor.fetchone()
         if not row:
             return None
 
-        return Message(
-            id=row["id"],
-            type=row["type"],
-            conversation_key=row["conversation_key"],
-            text=row["text"],
-            sender_timestamp=row["sender_timestamp"],
-            received_at=row["received_at"],
-            paths=MessageRepository._parse_paths(row["paths"]),
-            txt_type=row["txt_type"],
-            signature=row["signature"],
-            outgoing=bool(row["outgoing"]),
-            acked=row["acked"],
-        )
+        return MessageRepository._row_to_message(row)
 
     @staticmethod
     async def get_by_content(
@@ -248,9 +329,7 @@ class MessageRepository:
         """Look up a message by its unique content fields."""
         cursor = await db.conn.execute(
             """
-            SELECT id, type, conversation_key, text, sender_timestamp, received_at,
-                   paths, txt_type, signature, outgoing, acked
-            FROM messages
+            SELECT * FROM messages
             WHERE type = ? AND conversation_key = ? AND text = ?
               AND (sender_timestamp = ? OR (sender_timestamp IS NULL AND ? IS NULL))
             """,
@@ -260,29 +339,7 @@ class MessageRepository:
         if not row:
             return None
 
-        paths = None
-        if row["paths"]:
-            try:
-                paths_data = json.loads(row["paths"])
-                paths = [
-                    MessagePath(path=p["path"], received_at=p["received_at"]) for p in paths_data
-                ]
-            except (json.JSONDecodeError, KeyError):
-                pass
-
-        return Message(
-            id=row["id"],
-            type=row["type"],
-            conversation_key=row["conversation_key"],
-            text=row["text"],
-            sender_timestamp=row["sender_timestamp"],
-            received_at=row["received_at"],
-            paths=paths,
-            txt_type=row["txt_type"],
-            signature=row["signature"],
-            outgoing=bool(row["outgoing"]),
-            acked=row["acked"],
-        )
+        return MessageRepository._row_to_message(row)
 
     @staticmethod
     async def get_unread_counts(name: str | None = None) -> dict:

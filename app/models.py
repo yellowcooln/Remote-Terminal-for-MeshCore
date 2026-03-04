@@ -194,6 +194,13 @@ class Message(BaseModel):
     signature: str | None = None
     outgoing: bool = False
     acked: int = 0
+    sender_name: str | None = None
+
+
+class MessagesAroundResponse(BaseModel):
+    messages: list[Message]
+    has_older: bool
+    has_newer: bool
 
 
 class RawPacketDecryptedInfo(BaseModel):

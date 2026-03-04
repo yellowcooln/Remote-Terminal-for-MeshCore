@@ -154,9 +154,16 @@ export interface Message {
   outgoing: boolean;
   /** ACK count: 0 = not acked, 1+ = number of acks/flood echoes received */
   acked: number;
+  sender_name: string | null;
 }
 
-type ConversationType = 'contact' | 'channel' | 'raw' | 'map' | 'visualizer';
+export interface MessagesAroundResponse {
+  messages: Message[];
+  has_older: boolean;
+  has_newer: boolean;
+}
+
+type ConversationType = 'contact' | 'channel' | 'raw' | 'map' | 'visualizer' | 'search';
 
 export interface Conversation {
   type: ConversationType;
