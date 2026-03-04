@@ -1,3 +1,4 @@
+import { useState, lazy, Suspense } from 'react';
 import type { Contact, RadioConfig, MessagePath } from '../types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
@@ -13,6 +14,10 @@ import {
 } from '../utils/pathUtils';
 import { formatTime } from '../utils/messageParser';
 import { getMapFocusHash } from '../utils/urlHash';
+
+const PathRouteMap = lazy(() =>
+  import('./PathRouteMap').then((m) => ({ default: m.PathRouteMap }))
+);
 
 interface PathModalProps {
   open: boolean;
@@ -39,6 +44,7 @@ export function PathModal({
   isResendable,
   onResend,
 }: PathModalProps) {
+  const [expandedMaps, setExpandedMaps] = useState<Set<number>>(new Set());
   const hasResendActions = isOutgoingChan && messageId !== undefined && onResend;
   const hasPaths = paths.length > 0;
 
@@ -120,19 +126,54 @@ export function PathModal({
                 </div>
               )}
 
-            {resolvedPaths.map((pathData, index) => (
-              <div key={index}>
-                {!hasSinglePath && (
-                  <div className="text-sm text-foreground/70 font-semibold mb-2 pb-1 border-b border-border">
-                    Path {index + 1}{' '}
-                    <span className="font-normal text-muted-foreground">
-                      — received {formatTime(pathData.received_at)}
-                    </span>
+            {resolvedPaths.map((pathData, index) => {
+              const mapExpanded = expandedMaps.has(index);
+              const toggleMap = () =>
+                setExpandedMaps((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(index)) next.delete(index);
+                  else next.add(index);
+                  return next;
+                });
+
+              return (
+                <div key={index}>
+                  <div className="flex items-center justify-between mb-2 pb-1 border-b border-border">
+                    {!hasSinglePath ? (
+                      <div className="text-sm text-foreground/70 font-semibold">
+                        Path {index + 1}{' '}
+                        <span className="font-normal text-muted-foreground">
+                          — received {formatTime(pathData.received_at)}
+                        </span>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+                    <button
+                      onClick={toggleMap}
+                      className="text-xs text-primary hover:underline cursor-pointer shrink-0 ml-2"
+                    >
+                      {mapExpanded ? 'Hide map' : 'Map route'}
+                    </button>
                   </div>
-                )}
-                <PathVisualization resolved={pathData.resolved} senderInfo={senderInfo} />
-              </div>
-            ))}
+                  {mapExpanded && (
+                    <div className="mb-2">
+                      <Suspense
+                        fallback={
+                          <div
+                            className="rounded border border-border bg-muted/30 animate-pulse"
+                            style={{ height: 220 }}
+                          />
+                        }
+                      >
+                        <PathRouteMap resolved={pathData.resolved} senderInfo={senderInfo} />
+                      </Suspense>
+                    </div>
+                  )}
+                  <PathVisualization resolved={pathData.resolved} senderInfo={senderInfo} />
+                </div>
+              );
+            })}
           </div>
         )}
 
