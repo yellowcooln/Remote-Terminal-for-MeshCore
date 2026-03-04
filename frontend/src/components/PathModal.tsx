@@ -360,7 +360,7 @@ function HopNode({ hop, hopNumber, prevLocation }: HopNodeProps) {
         <div className="text-sm font-semibold">
           <span className="text-foreground/80">Hop {hopNumber}:</span>{' '}
           <span className="text-primary font-mono">{hop.prefix}</span>
-          {isAmbiguous && <span className="text-yellow-500 ml-1 font-normal">(ambiguous)</span>}
+          {isAmbiguous && <span className="text-warning ml-1 font-normal">(ambiguous)</span>}
         </div>
 
         {isUnknown ? (

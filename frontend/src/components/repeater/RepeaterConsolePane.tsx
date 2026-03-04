@@ -39,7 +39,7 @@ export function ConsolePane({
       </div>
       <div
         ref={outputRef}
-        className="h-48 overflow-y-auto p-3 font-mono text-xs bg-black/50 text-green-400 space-y-1"
+        className="h-48 overflow-y-auto p-3 font-mono text-xs bg-console-bg/50 text-console space-y-1"
         aria-live="polite"
         aria-relevant="additions"
       >
@@ -48,11 +48,11 @@ export function ConsolePane({
         )}
         {history.map((entry, i) =>
           entry.outgoing ? (
-            <div key={i} className="text-green-300">
+            <div key={i} className="text-console-command">
               &gt; {entry.command}
             </div>
           ) : (
-            <div key={i} className="text-green-400/80 whitespace-pre-wrap">
+            <div key={i} className="text-console/80 whitespace-pre-wrap">
               {entry.response}
             </div>
           )

@@ -90,21 +90,21 @@ export function SettingsMqttSection({
 
   return (
     <div className={className}>
-      <div className="rounded-md border border-yellow-600/50 bg-yellow-950/30 px-4 py-3 text-sm text-yellow-200">
+      <div className="rounded-md border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-warning">
         MQTT support is an experimental feature in open beta. All publishing uses QoS 0
         (at-most-once delivery). Please report any bugs on the{' '}
         <a
           href="https://github.com/jkingsman/Remote-Terminal-for-MeshCore/issues"
           target="_blank"
           rel="noopener noreferrer"
-          className="underline hover:text-yellow-100"
+          className="underline hover:text-warning-foreground"
         >
           GitHub issues page
         </a>
         .
       </div>
 
-      <div className="rounded-md border border-blue-600/50 bg-blue-950/30 px-4 py-3 text-sm text-blue-200">
+      <div className="rounded-md border border-info/50 bg-info/10 px-4 py-3 text-sm text-info">
         Outgoing messages (DMs and group messages) will be reported to private MQTT brokers in
         decrypted/plaintext form. The raw outgoing packets will NOT be reported to any MQTT broker,
         private or community. This means that{' '}
@@ -138,7 +138,7 @@ export function SettingsMqttSection({
             className={cn(
               'w-2 h-2 rounded-full transition-colors',
               health?.mqtt_status === 'connected'
-                ? 'bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]'
+                ? 'bg-status-connected shadow-[0_0_6px_hsl(var(--status-connected)/0.5)]'
                 : 'bg-muted-foreground'
             )}
           />
@@ -323,7 +323,7 @@ export function SettingsMqttSection({
             className={cn(
               'w-2 h-2 rounded-full transition-colors',
               health?.community_mqtt_status === 'connected'
-                ? 'bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]'
+                ? 'bg-status-connected shadow-[0_0_6px_hsl(var(--status-connected)/0.5)]'
                 : 'bg-muted-foreground'
             )}
           />

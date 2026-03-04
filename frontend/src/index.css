@@ -28,6 +28,52 @@
     /* Semantic colors for specific contexts */
     --msg-outgoing: 152 30% 14%;
     --msg-incoming: 224 12% 15%;
+
+    /* Status indicator pips */
+    --status-connected: 142 71% 45%;
+    --status-disconnected: 220 9% 46%;
+
+    /* Semantic feedback colors */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Favorites */
+    --favorite: 43 96% 56%;
+
+    /* Console / terminal */
+    --console: 142 69% 58%;
+    --console-command: 142 76% 73%;
+    --console-bg: 0 0% 0%;
+
+    /* Unread badges */
+    --badge-unread: var(--primary);
+    --badge-unread-foreground: var(--primary-foreground);
+    --badge-mention: var(--destructive);
+    --badge-mention-foreground: var(--destructive-foreground);
+
+    /* Error toast */
+    --toast-error: 0 30% 14%;
+    --toast-error-foreground: 0 56% 77%;
+    --toast-error-border: 0 27% 23%;
+
+    /* Code editor */
+    --code-editor-bg: 220 13% 18%;
+
+    /* Overlay / backdrop */
+    --overlay: 0 0% 0%;
+
+    /* Typography */
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono:
+      ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+    /* Scrollbar */
+    --scrollbar: 224 11% 22%;
+    --scrollbar-hover: 224 11% 28%;
   }
 }
 
@@ -37,12 +83,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family:
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      sans-serif;
+    font-family: var(--font-sans);
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -58,17 +99,17 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(224 11% 22%);
+  background: hsl(var(--scrollbar));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(224 11% 28%);
+  background: hsl(var(--scrollbar-hover));
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(224 11% 22%) transparent;
+  scrollbar-color: hsl(var(--scrollbar)) transparent;
 }
 
 /* Message highlight animation for jump-to-message */

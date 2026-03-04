@@ -82,14 +82,14 @@ export function SettingsConnectivitySection({
         <Label>Connection</Label>
         {health?.connection_info ? (
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <div className="w-2 h-2 rounded-full bg-status-connected" />
             <code className="px-2 py-1 bg-muted rounded text-foreground text-sm">
               {health.connection_info}
             </code>
           </div>
         ) : (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-gray-500" />
+            <div className="w-2 h-2 rounded-full bg-status-disconnected" />
             <span>Not connected</span>
           </div>
         )}
@@ -123,7 +123,7 @@ export function SettingsConnectivitySection({
         variant="outline"
         onClick={handleReboot}
         disabled={rebooting || busy}
-        className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+        className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
       >
         {rebooting ? 'Rebooting...' : 'Reboot Radio'}
       </Button>

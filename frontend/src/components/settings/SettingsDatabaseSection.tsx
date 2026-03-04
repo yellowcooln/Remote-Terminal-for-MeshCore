@@ -171,7 +171,7 @@ export function SettingsDatabaseSection({
             variant="outline"
             onClick={handleCleanup}
             disabled={cleaning}
-            className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+            className="border-destructive/50 text-destructive hover:bg-destructive/10"
           >
             {cleaning ? 'Deleting...' : 'Permanently Delete'}
           </Button>
@@ -194,7 +194,7 @@ export function SettingsDatabaseSection({
           variant="outline"
           onClick={handlePurgeDecryptedRawPackets}
           disabled={purgingDecryptedRaw}
-          className="w-full border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+          className="w-full border-warning/50 text-warning hover:bg-warning/10"
         >
           {purgingDecryptedRaw ? 'Purging Archival Raw Packets...' : 'Purge Archival Raw Packets'}
         </Button>

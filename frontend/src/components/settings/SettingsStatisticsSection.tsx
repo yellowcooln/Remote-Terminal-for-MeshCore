@@ -88,12 +88,12 @@ export function SettingsStatisticsSection({ className }: { className?: string })
                 <span className="font-medium">{stats.total_packets}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-green-400">Decrypted</span>
-                <span className="font-medium text-green-400">{stats.decrypted_packets}</span>
+                <span className="text-sm text-success">Decrypted</span>
+                <span className="font-medium text-success">{stats.decrypted_packets}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-yellow-500">Undecrypted</span>
-                <span className="font-medium text-yellow-500">{stats.undecrypted_packets}</span>
+                <span className="text-sm text-warning">Undecrypted</span>
+                <span className="font-medium text-warning">{stats.undecrypted_packets}</span>
               </div>
             </div>
           </div>

@@ -76,8 +76,8 @@ export function StatusBar({
           className={cn(
             'w-2 h-2 rounded-full transition-colors',
             connected
-              ? 'bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]'
-              : 'bg-muted-foreground'
+              ? 'bg-status-connected shadow-[0_0_6px_hsl(var(--status-connected)/0.5)]'
+              : 'bg-status-disconnected'
           )}
           aria-hidden="true"
         />
@@ -109,7 +109,7 @@ export function StatusBar({
         <button
           onClick={handleReconnect}
           disabled={reconnecting}
-          className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-md text-xs cursor-pointer hover:bg-amber-500/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="px-3 py-1 bg-warning/10 border border-warning/20 text-warning rounded-md text-xs cursor-pointer hover:bg-warning/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {reconnecting ? 'Reconnecting...' : 'Reconnect'}
         </button>

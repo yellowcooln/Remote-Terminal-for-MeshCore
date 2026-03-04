@@ -43,6 +43,43 @@ export default {
         },
         "msg-outgoing": "hsl(var(--msg-outgoing))",
         "msg-incoming": "hsl(var(--msg-incoming))",
+        "status-connected": "hsl(var(--status-connected))",
+        "status-disconnected": "hsl(var(--status-disconnected))",
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        favorite: "hsl(var(--favorite))",
+        console: "hsl(var(--console))",
+        "console-command": "hsl(var(--console-command))",
+        "console-bg": "hsl(var(--console-bg))",
+        "code-editor-bg": "hsl(var(--code-editor-bg))",
+        overlay: "hsl(var(--overlay))",
+        "badge-unread": {
+          DEFAULT: "hsl(var(--badge-unread))",
+          foreground: "hsl(var(--badge-unread-foreground))",
+        },
+        "badge-mention": {
+          DEFAULT: "hsl(var(--badge-mention))",
+          foreground: "hsl(var(--badge-mention-foreground))",
+        },
+        "toast-error": {
+          DEFAULT: "hsl(var(--toast-error))",
+          foreground: "hsl(var(--toast-error-foreground))",
+          border: "hsl(var(--toast-error-border))",
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"],
       },
       borderRadius: {
         lg: "var(--radius)",

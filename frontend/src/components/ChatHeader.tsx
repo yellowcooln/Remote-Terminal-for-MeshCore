@@ -142,7 +142,7 @@ export function ChatHeader({
             }
           >
             {isFavorite(favorites, conversation.type as 'channel' | 'contact', conversation.id) ? (
-              <span className="text-amber-400">&#9733;</span>
+              <span className="text-favorite">&#9733;</span>
             ) : (
               <span className="text-muted-foreground">&#9734;</span>
             )}

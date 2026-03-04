@@ -112,7 +112,7 @@ export function RepeaterPane({
               'p-1 rounded transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               disabled || state.loading
                 ? 'text-muted-foreground'
-                : 'text-green-500 hover:bg-accent hover:text-green-400'
+                : 'text-success hover:bg-accent hover:text-success'
             )}
             title="Refresh"
             aria-label={`Refresh ${title}`}

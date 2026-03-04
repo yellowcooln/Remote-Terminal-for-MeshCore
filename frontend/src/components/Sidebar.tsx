@@ -411,8 +411,8 @@ export function Sidebar({
           className={cn(
             'text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center',
             row.isMention
-              ? 'bg-destructive text-destructive-foreground'
-              : 'bg-primary/90 text-primary-foreground'
+              ? 'bg-badge-mention text-badge-mention-foreground'
+              : 'bg-badge-unread/90 text-badge-unread-foreground'
           )}
           aria-label={`${row.unreadCount} unread message${row.unreadCount !== 1 ? 's' : ''}`}
         >

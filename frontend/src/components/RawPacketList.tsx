@@ -149,9 +149,9 @@ function decodePacketSummary(
 function getRouteTypeColor(routeType: string): string {
   switch (routeType) {
     case 'Flood':
-      return 'bg-blue-500/20 text-blue-400';
+      return 'bg-info/20 text-info';
     case 'Direct':
-      return 'bg-green-500/20 text-green-400';
+      return 'bg-success/20 text-success';
     case 'Transport Flood':
       return 'bg-purple-500/20 text-purple-400';
     case 'Transport Direct':

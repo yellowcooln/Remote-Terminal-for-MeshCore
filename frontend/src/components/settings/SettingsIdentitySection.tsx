@@ -175,7 +175,7 @@ export function SettingsIdentitySection({
         <Button
           onClick={handleAdvertise}
           disabled={advertising || !health?.radio_connected}
-          className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+          className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
         >
           {advertising ? 'Sending...' : 'Send Advertisement'}
         </Button>

@@ -151,23 +151,23 @@ export function SettingsBotSection({
 
   return (
     <div className={className}>
-      <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md">
-        <p className="text-sm text-red-400">
+      <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+        <p className="text-sm text-destructive">
           <strong>Experimental:</strong> This is an alpha feature and introduces automated message
           sending to your radio; unexpected behavior may occur. Use with caution, and please report
           any bugs!
         </p>
       </div>
 
-      <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-        <p className="text-sm text-yellow-500">
+      <div className="p-3 bg-warning/10 border border-warning/30 rounded-md">
+        <p className="text-sm text-warning">
           <strong>Security Warning:</strong> This feature executes arbitrary Python code on the
           server. Only run trusted code, and be cautious of arbitrary usage of message parameters.
         </p>
       </div>
 
-      <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-        <p className="text-sm text-yellow-500">
+      <div className="p-3 bg-warning/10 border border-warning/30 rounded-md">
+        <p className="text-sm text-warning">
           <strong>Don&apos;t wreck the mesh!</strong> Bots process ALL messages, including their
           own. Be careful of creating infinite loops!
         </p>
@@ -286,7 +286,7 @@ export function SettingsBotSection({
                   </div>
                   <Suspense
                     fallback={
-                      <div className="h-64 md:h-96 rounded-md border border-input bg-[#282c34] flex items-center justify-center text-muted-foreground">
+                      <div className="h-64 md:h-96 rounded-md border border-input bg-code-editor-bg flex items-center justify-center text-muted-foreground">
                         Loading editor...
                       </div>
                     }

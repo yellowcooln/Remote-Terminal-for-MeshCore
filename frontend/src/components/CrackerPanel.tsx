@@ -548,7 +548,7 @@ export function CrackerPanel({
           Pending: <span className="text-foreground font-medium">{pendingCount}</span>
         </span>
         <span className="text-muted-foreground">
-          Cracked: <span className="text-green-400 font-medium">{crackedCount}</span>
+          Cracked: <span className="text-success font-medium">{crackedCount}</span>
         </span>
         <span className="text-muted-foreground">
           Failed: <span className="text-destructive font-medium">{failedCount}</span>
@@ -613,9 +613,9 @@ export function CrackerPanel({
             {crackedRooms.map((room, i) => (
               <div
                 key={i}
-                className="text-sm bg-green-950/30 border border-green-900/50 rounded px-2 py-1"
+                className="text-sm bg-success/10 border border-success/20 rounded px-2 py-1"
               >
-                <span className="text-green-400 font-medium">#{room.roomName}</span>
+                <span className="text-success font-medium">#{room.roomName}</span>
                 <span className="text-muted-foreground ml-2 text-xs">
                   "{room.message.slice(0, 50)}
                   {room.message.length > 50 ? '...' : ''}"

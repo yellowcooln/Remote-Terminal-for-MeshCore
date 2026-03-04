@@ -112,7 +112,7 @@ export function ChannelInfoPane({
               >
                 {isFavorite(favorites, 'channel', channel.key) ? (
                   <>
-                    <span className="text-amber-400 text-lg">&#9733;</span>
+                    <span className="text-favorite text-lg">&#9733;</span>
                     <span>Remove from favorites</span>
                   </>
                 ) : (

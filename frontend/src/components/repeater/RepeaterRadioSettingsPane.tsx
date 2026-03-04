@@ -66,7 +66,7 @@ export function RadioSettingsPane({
                 <span
                   className={cn(
                     'ml-2 text-xs',
-                    clockDrift.isLarge ? 'text-red-400' : 'text-muted-foreground'
+                    clockDrift.isLarge ? 'text-destructive' : 'text-muted-foreground'
                   )}
                 >
                   (drift: {clockDrift.text})
@@ -88,7 +88,7 @@ export function RadioSettingsPane({
             'p-1 rounded transition-colors disabled:opacity-50',
             disabled || advertState.loading
               ? 'text-muted-foreground'
-              : 'text-green-500 hover:bg-accent hover:text-green-400'
+              : 'text-success hover:bg-accent hover:text-success'
           )}
           title="Refresh Advert Intervals"
         >

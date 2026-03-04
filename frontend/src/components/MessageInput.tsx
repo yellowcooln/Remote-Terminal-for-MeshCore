@@ -186,9 +186,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               className={cn(
                 'tabular-nums',
                 limitState === 'error' || limitState === 'danger'
-                  ? 'text-red-400 font-medium'
+                  ? 'text-destructive font-medium'
                   : limitState === 'warning'
-                    ? 'text-yellow-500'
+                    ? 'text-warning'
                     : 'text-muted-foreground'
               )}
             >
@@ -196,7 +196,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               {remaining < 0 && ` (${remaining})`}
             </span>
             {warningMessage && (
-              <span className={cn(limitState === 'error' ? 'text-red-400' : 'text-yellow-500')}>
+              <span className={cn(limitState === 'error' ? 'text-destructive' : 'text-warning')}>
                 — {warningMessage}
               </span>
             )}
@@ -209,9 +209,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                   className={cn(
                     'tabular-nums',
                     limitState === 'error' || limitState === 'danger'
-                      ? 'text-red-400 font-medium'
+                      ? 'text-destructive font-medium'
                       : limitState === 'warning'
-                        ? 'text-yellow-500'
+                        ? 'text-warning'
                         : 'text-muted-foreground'
                   )}
                 >
@@ -220,7 +220,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 </span>
               )}
               {warningMessage && (
-                <span className={cn(limitState === 'error' ? 'text-red-400' : 'text-yellow-500')}>
+                <span className={cn(limitState === 'error' ? 'text-destructive' : 'text-warning')}>
                   — {warningMessage}
                 </span>
               )}

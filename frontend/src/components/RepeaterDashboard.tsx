@@ -95,7 +95,7 @@ export function RepeaterDashboard({
               size="sm"
               onClick={loadAll}
               disabled={anyLoading}
-              className="text-xs border-green-400 text-green-400 hover:bg-green-400/10 hover:text-green-400"
+              className="text-xs border-success text-success hover:bg-success/10 hover:text-success"
             >
               {anyLoading ? 'Loading...' : 'Load All'}
             </Button>
@@ -115,7 +115,7 @@ export function RepeaterDashboard({
             aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}
           >
             {isFav ? (
-              <span className="text-amber-400">&#9733;</span>
+              <span className="text-favorite">&#9733;</span>
             ) : (
               <span className="text-muted-foreground">&#9734;</span>
             )}
