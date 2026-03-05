@@ -19,14 +19,12 @@ test.describe('Radio settings', () => {
 
       // --- Step 1: Change the name via settings UI ---
       await page.getByText('Settings').click();
-      await page.getByRole('button', { name: /Identity/i }).click();
-
       const nameInput = page.locator('#name');
       await nameInput.clear();
       await nameInput.fill(testName);
 
-      await page.getByRole('button', { name: 'Save Identity Settings' }).click();
-      await expect(page.getByText('Identity settings saved')).toBeVisible({ timeout: 10_000 });
+      await page.getByRole('button', { name: 'Save Radio Config & Reboot' }).click();
+      await expect(page.getByText('Radio config saved, rebooting...')).toBeVisible({ timeout: 10_000 });
 
       // Exit settings page mode
       await page.getByRole('button', { name: /Back to Chat/i }).click();
@@ -40,7 +38,6 @@ test.describe('Radio settings', () => {
       await expect(page.getByText('Connected')).toBeVisible({ timeout: 15_000 });
 
       await page.getByText('Settings').click();
-      await page.getByRole('button', { name: /Identity/i }).click();
       await expect(page.locator('#name')).toHaveValue(testName, { timeout: 10_000 });
     } finally {
       // Always restore original name, even when assertions fail.

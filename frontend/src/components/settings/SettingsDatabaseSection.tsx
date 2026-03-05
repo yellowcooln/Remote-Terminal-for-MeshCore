@@ -6,13 +6,6 @@ import { Separator } from '../ui/separator';
 import { toast } from '../ui/sonner';
 import { api } from '../../api';
 import { formatTime } from '../../utils/messageParser';
-import {
-  captureLastViewedConversationFromHash,
-  getReopenLastConversationEnabled,
-  setReopenLastConversationEnabled,
-} from '../../utils/lastViewedConversation';
-import { ThemeSelector } from './ThemeSelector';
-import { getLocalLabel, setLocalLabel, type LocalLabel } from '../../utils/localLabel';
 import type { AppSettings, AppSettingsUpdate, HealthStatus } from '../../types';
 
 export function SettingsDatabaseSection({
@@ -20,7 +13,6 @@ export function SettingsDatabaseSection({
   health,
   onSaveAppSettings,
   onHealthRefresh,
-  onLocalLabelChange,
   blockedKeys = [],
   blockedNames = [],
   onToggleBlockedKey,
@@ -31,7 +23,6 @@ export function SettingsDatabaseSection({
   health: HealthStatus | null;
   onSaveAppSettings: (update: AppSettingsUpdate) => Promise<void>;
   onHealthRefresh: () => Promise<void>;
-  onLocalLabelChange?: (label: LocalLabel) => void;
   blockedKeys?: string[];
   blockedNames?: string[];
   onToggleBlockedKey?: (key: string) => void;
@@ -42,11 +33,6 @@ export function SettingsDatabaseSection({
   const [cleaning, setCleaning] = useState(false);
   const [purgingDecryptedRaw, setPurgingDecryptedRaw] = useState(false);
   const [autoDecryptOnAdvert, setAutoDecryptOnAdvert] = useState(false);
-  const [reopenLastConversation, setReopenLastConversation] = useState(
-    getReopenLastConversationEnabled
-  );
-  const [localLabelText, setLocalLabelText] = useState(() => getLocalLabel().text);
-  const [localLabelColor, setLocalLabelColor] = useState(() => getLocalLabel().color);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,14 +100,6 @@ export function SettingsDatabaseSection({
       toast.error('Failed to save settings');
     } finally {
       setBusy(false);
-    }
-  };
-
-  const handleToggleReopenLastConversation = (enabled: boolean) => {
-    setReopenLastConversation(enabled);
-    setReopenLastConversationEnabled(enabled);
-    if (enabled) {
-      captureLastViewedConversationFromHash();
     }
   };
 
@@ -225,66 +203,6 @@ export function SettingsDatabaseSection({
         <p className="text-xs text-muted-foreground">
           When enabled, the server will automatically try to decrypt stored DM packets when a new
           contact sends an advertisement. This may cause brief delays on large packet backlogs.
-        </p>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <Label>Interface</Label>
-
-        <div className="space-y-1">
-          <span className="text-sm text-muted-foreground">Color Scheme</span>
-          <ThemeSelector />
-        </div>
-
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={reopenLastConversation}
-            onChange={(e) => handleToggleReopenLastConversation(e.target.checked)}
-            className="w-4 h-4 rounded border-input accent-primary"
-          />
-          <span className="text-sm">Reopen to last viewed channel/conversation</span>
-        </label>
-        <p className="text-xs text-muted-foreground">
-          These settings apply only to this device/browser. They do not sync to server settings.
-        </p>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <Label>Local Label</Label>
-        <div className="flex items-center gap-2">
-          <Input
-            value={localLabelText}
-            onChange={(e) => {
-              const text = e.target.value;
-              setLocalLabelText(text);
-              setLocalLabel(text, localLabelColor);
-              onLocalLabelChange?.({ text, color: localLabelColor });
-            }}
-            placeholder="e.g. Home Base, Field Radio 2"
-            aria-label="Local label text"
-            className="flex-1"
-          />
-          <input
-            type="color"
-            value={localLabelColor}
-            onChange={(e) => {
-              const color = e.target.value;
-              setLocalLabelColor(color);
-              setLocalLabel(localLabelText, color);
-              onLocalLabelChange?.({ text: localLabelText, color });
-            }}
-            aria-label="Local label color"
-            className="w-10 h-9 rounded border border-input cursor-pointer bg-transparent p-0.5"
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Display a colored banner at the top of the page to identify this instance. This applies
-          only to this device/browser.
         </p>
       </div>
 

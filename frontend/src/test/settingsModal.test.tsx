@@ -149,9 +149,14 @@ function setMatchMedia(matches: boolean) {
   });
 }
 
-function openConnectivitySection() {
-  const connectivityToggle = screen.getByRole('button', { name: /Connectivity/i });
-  fireEvent.click(connectivityToggle);
+function openRadioSection() {
+  const radioToggle = screen.getByRole('button', { name: /Radio/i });
+  fireEvent.click(radioToggle);
+}
+
+function openLocalSection() {
+  const localToggle = screen.getByRole('button', { name: /Local Configuration/i });
+  fireEvent.click(localToggle);
 }
 
 function openMqttSection() {
@@ -200,10 +205,9 @@ describe('SettingsModal', () => {
     expect(screen.queryByLabelText('Preset')).not.toBeInTheDocument();
   });
 
-  it('shows favorite-first contact sync helper text in connectivity tab', async () => {
+  it('shows favorite-first contact sync helper text in radio tab', async () => {
     renderModal();
-
-    openConnectivitySection();
+    openRadioSection();
 
     expect(
       screen.getByText(
@@ -214,13 +218,14 @@ describe('SettingsModal', () => {
 
   it('saves changed max contacts value through onSaveAppSettings', async () => {
     const { onSaveAppSettings } = renderModal();
-
-    openConnectivitySection();
+    openRadioSection();
 
     const maxContactsInput = screen.getByLabelText('Max Contacts on Radio');
     fireEvent.change(maxContactsInput, { target: { value: '250' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
+    // Click the "Save Settings" button in the Flood & Advert Control section
+    const saveButtons = screen.getAllByRole('button', { name: 'Save Settings' });
+    fireEvent.click(saveButtons[0]);
 
     await waitFor(() => {
       expect(onSaveAppSettings).toHaveBeenCalledWith({ max_radio_contacts: 250 });
@@ -231,9 +236,11 @@ describe('SettingsModal', () => {
     const { onSaveAppSettings } = renderModal({
       appSettings: { ...baseSettings, max_radio_contacts: 200 },
     });
+    openRadioSection();
 
-    openConnectivitySection();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
+    // Click the "Save Settings" button in the Flood & Advert Control section
+    const saveButtons = screen.getAllByRole('button', { name: 'Save Settings' });
+    fireEvent.click(saveButtons[0]);
 
     await waitFor(() => {
       expect(onSaveAppSettings).not.toHaveBeenCalled();
@@ -247,22 +254,22 @@ describe('SettingsModal', () => {
     });
 
     expect(screen.getByText('No bots configured')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Connectivity/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Local Configuration/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Preset')).not.toBeInTheDocument();
   });
 
   it('toggles sections in mobile accordion mode', () => {
     renderModal({ mobile: true });
-    const identityToggle = screen.getAllByRole('button', { name: /Identity/i })[0];
+    const localToggle = screen.getAllByRole('button', { name: /Local Configuration/i })[0];
 
     expect(screen.queryByLabelText('Preset')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Public Key')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Local label text')).not.toBeInTheDocument();
 
-    fireEvent.click(identityToggle);
-    expect(screen.getByLabelText('Public Key')).toBeInTheDocument();
+    fireEvent.click(localToggle);
+    expect(screen.getByLabelText('Local label text')).toBeInTheDocument();
 
-    fireEvent.click(identityToggle);
-    expect(screen.queryByLabelText('Public Key')).not.toBeInTheDocument();
+    fireEvent.click(localToggle);
+    expect(screen.queryByLabelText('Local label text')).not.toBeInTheDocument();
   });
 
   it('clears stale errors when switching external desktop sections', async () => {
@@ -316,6 +323,7 @@ describe('SettingsModal', () => {
       onSetPrivateKey,
       onReboot,
     });
+    openRadioSection();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save Radio Config & Reboot' }));
     await waitFor(() => {
@@ -324,7 +332,6 @@ describe('SettingsModal', () => {
     });
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /Identity/i }));
     fireEvent.change(screen.getByLabelText('Set Private Key (write-only)'), {
       target: { value: 'a'.repeat(64) },
     });
@@ -340,7 +347,7 @@ describe('SettingsModal', () => {
   it('stores and clears reopen-last-conversation preference locally', () => {
     window.location.hash = '#raw';
     renderModal();
-    openDatabaseSection();
+    openLocalSection();
 
     const checkbox = screen.getByLabelText('Reopen to last viewed channel/conversation');
     expect(checkbox).not.toBeChecked();

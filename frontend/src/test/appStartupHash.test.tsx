@@ -89,12 +89,11 @@ vi.mock('../components/NewMessageModal', () => ({
 
 vi.mock('../components/SettingsModal', () => ({
   SettingsModal: () => null,
-  SETTINGS_SECTION_ORDER: ['radio', 'identity', 'connectivity', 'database', 'bot'],
+  SETTINGS_SECTION_ORDER: ['radio', 'local', 'database', 'bot'],
   SETTINGS_SECTION_LABELS: {
     radio: 'Radio',
-    identity: 'Identity',
-    connectivity: 'Connectivity',
-    database: 'Database',
+    local: 'Local Configuration',
+    database: 'Database & Messaging',
     bot: 'Bot',
   },
 }));

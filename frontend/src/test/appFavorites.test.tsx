@@ -120,12 +120,11 @@ vi.mock('../components/SettingsModal', () => ({
   SettingsModal: ({ desktopSection }: { desktopSection?: string }) => (
     <div data-testid="settings-modal-section">{desktopSection ?? 'none'}</div>
   ),
-  SETTINGS_SECTION_ORDER: ['radio', 'identity', 'connectivity', 'database', 'bot'],
+  SETTINGS_SECTION_ORDER: ['radio', 'local', 'database', 'bot'],
   SETTINGS_SECTION_LABELS: {
     radio: '📻 Radio',
-    identity: '🪪 Identity',
-    connectivity: '📡 Connectivity',
-    database: '🗄️ Database',
+    local: '🖥️ Local Configuration',
+    database: '🗄️ Database & Messaging',
     bot: '🤖 Bot',
   },
 }));
@@ -274,10 +273,10 @@ describe('App favorite toggle flow', () => {
       expect(screen.getByTestId('settings-modal-section')).toHaveTextContent('radio');
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Identity/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Local Configuration/i })[0]);
 
     await waitFor(() => {
-      expect(screen.getByTestId('settings-modal-section')).toHaveTextContent('identity');
+      expect(screen.getByTestId('settings-modal-section')).toHaveTextContent('local');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Chat' }));
