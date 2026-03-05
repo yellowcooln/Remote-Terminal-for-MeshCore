@@ -384,11 +384,17 @@ class MessageRepository:
         return MessageRepository._row_to_message(row)
 
     @staticmethod
-    async def get_unread_counts(name: str | None = None) -> dict:
+    async def get_unread_counts(
+        name: str | None = None,
+        blocked_keys: list[str] | None = None,
+        blocked_names: list[str] | None = None,
+    ) -> dict:
         """Get unread message counts, mention flags, and last message times for all conversations.
 
         Args:
             name: User's display name for @[name] mention detection. If None, mentions are skipped.
+            blocked_keys: Public keys whose messages should be excluded from counts.
+            blocked_names: Display names whose messages should be excluded from counts.
 
         Returns:
             Dict with 'counts', 'mentions', and 'last_message_times' keys.
@@ -399,9 +405,25 @@ class MessageRepository:
 
         mention_token = f"@[{name}]" if name else None
 
+        # Build optional block-list WHERE fragments for channel messages
+        chan_block_sql = ""
+        chan_block_params: list[Any] = []
+        if blocked_keys:
+            placeholders = ",".join("?" for _ in blocked_keys)
+            chan_block_sql += (
+                f" AND NOT (m.sender_key IS NOT NULL AND LOWER(m.sender_key) IN ({placeholders}))"
+            )
+            chan_block_params.extend(blocked_keys)
+        if blocked_names:
+            placeholders = ",".join("?" for _ in blocked_names)
+            chan_block_sql += (
+                f" AND NOT (m.sender_name IS NOT NULL AND m.sender_name IN ({placeholders}))"
+            )
+            chan_block_params.extend(blocked_names)
+
         # Channel unreads
         cursor = await db.conn.execute(
-            """
+            f"""
             SELECT m.conversation_key,
                    COUNT(*) as unread_count,
                    SUM(CASE
@@ -412,9 +434,10 @@ class MessageRepository:
             JOIN channels c ON m.conversation_key = c.key
             WHERE m.type = 'CHAN' AND m.outgoing = 0
               AND m.received_at > COALESCE(c.last_read_at, 0)
+              {chan_block_sql}
             GROUP BY m.conversation_key
             """,
-            (mention_token or "", mention_token or ""),
+            (mention_token or "", mention_token or "", *chan_block_params),
         )
         rows = await cursor.fetchall()
         for row in rows:
@@ -423,9 +446,17 @@ class MessageRepository:
             if mention_token and row["has_mention"]:
                 mention_flags[state_key] = True
 
+        # Build block-list exclusion for contact (DM) unreads
+        contact_block_sql = ""
+        contact_block_params: list[Any] = []
+        if blocked_keys:
+            placeholders = ",".join("?" for _ in blocked_keys)
+            contact_block_sql += f" AND LOWER(m.conversation_key) NOT IN ({placeholders})"
+            contact_block_params.extend(blocked_keys)
+
         # Contact unreads
         cursor = await db.conn.execute(
-            """
+            f"""
             SELECT m.conversation_key,
                    COUNT(*) as unread_count,
                    SUM(CASE
@@ -436,9 +467,10 @@ class MessageRepository:
             JOIN contacts ct ON m.conversation_key = ct.public_key
             WHERE m.type = 'PRIV' AND m.outgoing = 0
               AND m.received_at > COALESCE(ct.last_read_at, 0)
+              {contact_block_sql}
             GROUP BY m.conversation_key
             """,
-            (mention_token or "", mention_token or ""),
+            (mention_token or "", mention_token or "", *contact_block_params),
         )
         rows = await cursor.fetchall()
         for row in rows:

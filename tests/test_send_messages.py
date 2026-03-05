@@ -259,6 +259,44 @@ class TestOutgoingChannelBotTrigger:
         assert message.id is not None
         assert message.acked == 0
 
+    @pytest.mark.asyncio
+    async def test_send_channel_msg_includes_sender_key(self, test_db):
+        """Outgoing channel message includes our public key as sender_key."""
+        our_pubkey = "ab" * 32
+        mc = _make_mc(name="MyNode")
+        mc.self_info["public_key"] = our_pubkey
+        chan_key = "ee" * 16
+        await ChannelRepository.upsert(key=chan_key, name="#test")
+
+        broadcasts = []
+
+        def capture_broadcast(event_type, data):
+            broadcasts.append({"type": event_type, "data": data})
+
+        with (
+            patch("app.routers.messages.require_connected", return_value=mc),
+            patch.object(radio_manager, "_meshcore", mc),
+            patch("app.decoder.calculate_channel_hash", return_value="abcd"),
+            patch("app.bot.run_bot_for_message", new=AsyncMock()),
+            patch("app.routers.messages.broadcast_event", side_effect=capture_broadcast),
+        ):
+            request = SendChannelMessageRequest(channel_key=chan_key, text="hello")
+            message = await send_channel_message(request)
+
+        # Response message includes sender_key
+        assert message.sender_key == our_pubkey
+        assert message.sender_name == "MyNode"
+
+        # Broadcast also includes sender_key
+        msg_broadcasts = [b for b in broadcasts if b["type"] == "message"]
+        assert len(msg_broadcasts) == 1
+        assert msg_broadcasts[0]["data"]["sender_key"] == our_pubkey
+
+        # DB row also has sender_key
+        db_msg = await MessageRepository.get_by_id(message.id)
+        assert db_msg is not None
+        assert db_msg.sender_key == our_pubkey
+
 
 class TestResendChannelMessage:
     """Test the user-triggered resend endpoint."""

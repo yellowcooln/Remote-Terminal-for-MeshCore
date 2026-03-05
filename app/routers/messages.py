@@ -239,8 +239,11 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
     radio_name: str = ""
     text_with_sender: str = request.text
 
+    our_public_key: str | None = None
+
     async with radio_manager.radio_operation("send_channel_message") as mc:
         radio_name = mc.self_info.get("name", "") if mc.self_info else ""
+        our_public_key = (mc.self_info.get("public_key") or None) if mc.self_info else None
         text_with_sender = f"{radio_name}: {request.text}" if radio_name else request.text
         # Load the channel to a temporary radio slot before sending
         set_result = await mc.commands.set_channel(
@@ -286,6 +289,7 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
             received_at=now,
             outgoing=True,
             sender_name=radio_name or None,
+            sender_key=our_public_key,
         )
         if message_id is None:
             raise HTTPException(
@@ -307,6 +311,8 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
                 received_at=now,
                 outgoing=True,
                 acked=0,
+                sender_name=radio_name or None,
+                sender_key=our_public_key,
             ).model_dump(),
         )
 
@@ -325,6 +331,8 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
         outgoing=True,
         acked=acked_count,
         paths=paths,
+        sender_name=radio_name or None,
+        sender_key=our_public_key,
     )
 
     # Trigger bots for outgoing channel messages (runs in background, doesn't block response)
@@ -404,9 +412,12 @@ async def resend_channel_message(
             status_code=400, detail=f"Invalid channel key format: {msg.conversation_key}"
         ) from None
 
+    resend_public_key: str | None = None
+
     async with radio_manager.radio_operation("resend_channel_message") as mc:
         # Strip sender prefix: DB stores "RadioName: message" but radio needs "message"
         radio_name = mc.self_info.get("name", "") if mc.self_info else ""
+        resend_public_key = (mc.self_info.get("public_key") or None) if mc.self_info else None
         text_to_send = msg.text
         if radio_name and text_to_send.startswith(f"{radio_name}: "):
             text_to_send = text_to_send[len(f"{radio_name}: ") :]
@@ -442,6 +453,7 @@ async def resend_channel_message(
             received_at=now,
             outgoing=True,
             sender_name=radio_name or None,
+            sender_key=resend_public_key,
         )
         if new_msg_id is None:
             # Timestamp-second collision (same text+channel within the same second).
@@ -464,6 +476,8 @@ async def resend_channel_message(
                 received_at=now,
                 outgoing=True,
                 acked=0,
+                sender_name=radio_name or None,
+                sender_key=resend_public_key,
             ).model_dump(),
         )
 
