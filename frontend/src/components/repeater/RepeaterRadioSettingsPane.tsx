@@ -91,6 +91,7 @@ export function RadioSettingsPane({
               : 'text-success hover:bg-accent hover:text-success'
           )}
           title="Refresh Advert Intervals"
+          aria-label="Refresh Advert Intervals"
         >
           <RefreshIcon
             className={cn(

@@ -151,6 +151,7 @@ export function PathModal({
                     )}
                     <button
                       onClick={toggleMap}
+                      aria-expanded={mapExpanded}
                       className="text-xs text-primary hover:underline cursor-pointer shrink-0 ml-2"
                     >
                       {mapExpanded ? 'Hide map' : 'Map route'}

@@ -40,8 +40,6 @@ export function ConsolePane({
       <div
         ref={outputRef}
         className="h-48 overflow-y-auto p-3 font-mono text-xs bg-console-bg/50 text-console space-y-1"
-        aria-live="polite"
-        aria-relevant="additions"
       >
         {history.length === 0 && (
           <p className="text-muted-foreground italic">Type a CLI command below...</p>

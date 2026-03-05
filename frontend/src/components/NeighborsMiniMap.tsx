@@ -29,7 +29,11 @@ export function NeighborsMiniMap({ neighbors, radioLat, radioLon, radioName }: P
   const center: [number, number] = hasRadio ? [radioLat!, radioLon!] : [valid[0].lat, valid[0].lon];
 
   return (
-    <div className="min-h-48 flex-1 rounded border border-border overflow-hidden">
+    <div
+      className="min-h-48 flex-1 rounded border border-border overflow-hidden"
+      role="img"
+      aria-label="Map showing repeater neighbor locations"
+    >
       <MapContainer
         center={center}
         zoom={10}

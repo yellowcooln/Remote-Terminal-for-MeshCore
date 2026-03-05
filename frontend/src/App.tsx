@@ -54,7 +54,13 @@ const CrackerPanel = lazy(() =>
 const SearchView = lazy(() =>
   import('./components/SearchView').then((m) => ({ default: m.SearchView }))
 );
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from './components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from './components/ui/sheet';
 import { Toaster, toast } from './components/ui/sonner';
 import { getStateKey } from './utils/conversationState';
 import { appendRawPacketUnique } from './utils/rawPacketIdentity';
@@ -637,6 +643,12 @@ export function App() {
 
   return (
     <div className="flex flex-col h-full">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-2 focus:bg-primary focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       {localLabel.text && (
         <div
           style={{
@@ -665,12 +677,13 @@ export function App() {
           <SheetContent side="left" className="w-[280px] p-0 flex flex-col" hideCloseButton>
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation</SheetTitle>
+              <SheetDescription>Sidebar navigation</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-hidden">{activeSidebarContent}</div>
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 flex flex-col bg-background min-w-0">
+        <main id="main-content" className="flex-1 flex flex-col bg-background min-w-0">
           <div
             className={cn(
               'flex-1 flex flex-col min-h-0',
@@ -680,9 +693,9 @@ export function App() {
             {activeConversation ? (
               activeConversation.type === 'map' ? (
                 <>
-                  <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
+                  <h2 className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
                     Node Map
-                  </div>
+                  </h2>
                   <div className="flex-1 overflow-hidden">
                     <Suspense
                       fallback={
@@ -707,9 +720,9 @@ export function App() {
                 </Suspense>
               ) : activeConversation.type === 'raw' ? (
                 <>
-                  <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
+                  <h2 className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
                     Raw Packet Feed
-                  </div>
+                  </h2>
                   <div className="flex-1 overflow-hidden">
                     <RawPacketList packets={rawPackets} />
                   </div>
@@ -820,12 +833,12 @@ export function App() {
 
           {showSettings && (
             <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
+              <h2 className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
                 <span>Radio & Settings</span>
                 <span className="text-sm text-muted-foreground hidden md:inline">
                   {SETTINGS_SECTION_LABELS[settingsSection]}
                 </span>
-              </div>
+              </h2>
               <div className="flex-1 min-h-0 overflow-hidden">
                 <Suspense
                   fallback={
@@ -865,6 +878,13 @@ export function App() {
 
       {/* Global Cracker Panel - deferred until first opened, then kept mounted for state */}
       <div
+        ref={(el) => {
+          // Focus the panel when it becomes visible
+          if (showCracker && el) {
+            const focusable = el.querySelector<HTMLElement>('input, button:not([disabled])');
+            if (focusable) setTimeout(() => focusable.focus(), 210);
+          }
+        }}
         className={cn(
           'border-t border-border bg-background transition-all duration-200 overflow-hidden',
           showCracker ? 'h-[275px]' : 'h-0'

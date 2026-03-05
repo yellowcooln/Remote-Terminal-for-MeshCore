@@ -6,7 +6,7 @@ import { getMapFocusHash } from '../utils/urlHash';
 import { isFavorite } from '../utils/favorites';
 import { handleKeyboardActivate } from '../utils/a11y';
 import { ContactAvatar } from './ContactAvatar';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { toast } from './ui/sonner';
 import type { Contact, ContactDetail, Favorite, RadioConfig } from '../types';
 
@@ -98,6 +98,7 @@ export function ContactInfoPane({
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0 flex flex-col">
         <SheetHeader className="sr-only">
           <SheetTitle>Contact Info</SheetTitle>
+          <SheetDescription>Contact details and actions</SheetDescription>
         </SheetHeader>
 
         {isNameOnly && nameOnlyValue ? (

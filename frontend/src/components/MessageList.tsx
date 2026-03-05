@@ -140,6 +140,7 @@ function HopCountBadge({ paths, onClick, variant }: HopCountBadgeProps) {
         onClick();
       }}
       title="View message path"
+      aria-label={`${hopInfo.display}, view path`}
     >
       {label}
     </span>
@@ -462,8 +463,6 @@ export function MessageList({
         className="h-full overflow-y-auto p-4 flex flex-col gap-0.5"
         ref={listRef}
         onScroll={handleScroll}
-        aria-live="polite"
-        aria-relevant="additions"
       >
         {loadingOlder && (
           <div className="text-center py-2 text-muted-foreground text-sm" role="status">
@@ -629,6 +628,7 @@ export function MessageList({
                             });
                           }}
                           title="View echo paths"
+                          aria-label={`Acknowledged, ${msg.acked} echo${msg.acked !== 1 ? 's' : ''} — view paths`}
                         >{` ✓${msg.acked > 1 ? msg.acked : ''}`}</span>
                       ) : (
                         <span className="text-muted-foreground">{` ✓${msg.acked > 1 ? msg.acked : ''}`}</span>
@@ -649,6 +649,7 @@ export function MessageList({
                           });
                         }}
                         title="Message status"
+                        aria-label="No echoes yet — view message status"
                       >
                         {' '}
                         ?

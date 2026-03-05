@@ -172,9 +172,9 @@ export function SearchView({ contacts, channels, onNavigateToMessage }: SearchVi
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
+      <h2 className="flex justify-between items-center px-4 py-2.5 border-b border-border font-semibold text-base">
         Message Search
-      </div>
+      </h2>
 
       {/* Search input */}
       <div className="px-4 py-3 border-b border-border">
@@ -254,7 +254,9 @@ export function SearchView({ contacts, channels, onNavigateToMessage }: SearchVi
         })}
 
         {loading && (
-          <div className="p-4 text-center text-muted-foreground text-sm">Searching...</div>
+          <div className="p-4 text-center text-muted-foreground text-sm" role="status">
+            Searching...
+          </div>
         )}
 
         {hasMore && !loading && (

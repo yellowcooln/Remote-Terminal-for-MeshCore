@@ -1872,8 +1872,14 @@ export function PacketVisualizer3D({
                   </label>
                   {pruneStaleNodes && (
                     <div className="flex items-center gap-2 pl-6">
-                      <span className="text-muted-foreground whitespace-nowrap">Window:</span>
+                      <label
+                        htmlFor="prune-window"
+                        className="text-muted-foreground whitespace-nowrap"
+                      >
+                        Window:
+                      </label>
                       <input
+                        id="prune-window"
                         type="number"
                         min={1}
                         max={60}
@@ -1884,7 +1890,9 @@ export function PacketVisualizer3D({
                         }}
                         className="w-14 rounded border border-border bg-background px-2 py-0.5 text-sm"
                       />
-                      <span className="text-muted-foreground">min</span>
+                      <span className="text-muted-foreground" aria-hidden="true">
+                        min
+                      </span>
                     </div>
                   )}
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1907,12 +1915,14 @@ export function PacketVisualizer3D({
                   </label>
                   <div className="flex flex-col gap-1 mt-1">
                     <label
+                      htmlFor="viz-repulsion"
                       className="text-muted-foreground"
                       title="How strongly nodes repel each other. Higher values spread nodes out more."
                     >
                       Repulsion: {Math.abs(chargeStrength)}
                     </label>
                     <input
+                      id="viz-repulsion"
                       type="range"
                       min="50"
                       max="2500"
@@ -1923,12 +1933,14 @@ export function PacketVisualizer3D({
                   </div>
                   <div className="flex flex-col gap-1 mt-1">
                     <label
+                      htmlFor="viz-packet-speed"
                       className="text-muted-foreground"
                       title="How fast particles travel along links. Higher values make packets move faster."
                     >
                       Packet speed: {particleSpeedMultiplier}x
                     </label>
                     <input
+                      id="viz-packet-speed"
                       type="range"
                       min="1"
                       max="5"

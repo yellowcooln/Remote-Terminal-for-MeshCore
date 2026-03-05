@@ -586,7 +586,14 @@ export function CrackerPanel({
                 : `${Math.round(progress.etaSeconds / 60)}m`}
             </span>
           </div>
-          <div className="h-2 bg-muted rounded overflow-hidden">
+          <div
+            className="h-2 bg-muted rounded overflow-hidden"
+            role="progressbar"
+            aria-valuenow={Math.round(progress.percent)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Cracking progress"
+          >
             <div
               className="h-full bg-primary transition-all duration-200"
               style={{ width: `${progress.percent}%` }}
@@ -597,12 +604,14 @@ export function CrackerPanel({
 
       {/* GPU status */}
       {gpuAvailable === false && (
-        <div className="text-sm text-destructive">
+        <div className="text-sm text-destructive" role="alert">
           WebGPU not available. Cracking requires Chrome 113+ or Edge 113+.
         </div>
       )}
       {!wordlistLoaded && gpuAvailable !== false && (
-        <div className="text-sm text-muted-foreground">Loading wordlist...</div>
+        <div className="text-sm text-muted-foreground" role="status">
+          Loading wordlist...
+        </div>
       )}
 
       {/* Cracked rooms list */}

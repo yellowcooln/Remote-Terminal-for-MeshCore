@@ -113,7 +113,12 @@ export function PathRouteMap({ resolved, senderInfo }: PathRouteMapProps) {
 
   return (
     <div>
-      <div className="rounded border border-border overflow-hidden" style={{ height: 220 }}>
+      <div
+        className="rounded border border-border overflow-hidden"
+        role="img"
+        aria-label="Map showing message route between nodes"
+        style={{ height: 220 }}
+      >
         <MapContainer
           center={center}
           zoom={10}

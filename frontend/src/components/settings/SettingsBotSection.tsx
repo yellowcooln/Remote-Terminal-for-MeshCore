@@ -3,7 +3,6 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import { toast } from '../ui/sonner';
-import { handleKeyboardActivate } from '../../utils/a11y';
 import type { AppSettings, AppSettingsUpdate, BotConfig, HealthStatus } from '../../types';
 
 const BotCodeEditor = lazy(() =>
@@ -191,14 +190,12 @@ export function SettingsBotSection({
         <div className="space-y-2">
           {bots.map((bot) => (
             <div key={bot.id} className="border border-input rounded-md overflow-hidden">
-              <div
-                className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted/80"
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
+                className="flex items-center gap-2 px-3 py-2 bg-muted/50 cursor-pointer hover:bg-muted/80 w-full text-left"
                 aria-expanded={expandedBotId === bot.id}
-                onKeyDown={handleKeyboardActivate}
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest('input, button')) return;
+                  if ((e.target as HTMLElement).closest('input, [data-bot-control]')) return;
                   setExpandedBotId(expandedBotId === bot.id ? null : bot.id);
                 }}
               >
@@ -220,15 +217,14 @@ export function SettingsBotSection({
                       }
                     }}
                     autoFocus
+                    aria-label="Bot name"
                     className="px-2 py-0.5 text-sm bg-background border border-input rounded flex-1 max-w-[200px]"
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
                   <span
-                    className="text-sm font-medium flex-1 hover:text-primary cursor-text"
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={handleKeyboardActivate}
+                    className="text-sm font-medium flex-1 hover:text-primary cursor-text text-left"
+                    data-bot-control
                     onClick={(e) => {
                       e.stopPropagation();
                       handleStartEditingName(bot);
@@ -241,6 +237,7 @@ export function SettingsBotSection({
 
                 <label
                   className="flex items-center gap-1.5 cursor-pointer"
+                  data-bot-control
                   onClick={(e) => e.stopPropagation()}
                 >
                   <input
@@ -248,6 +245,7 @@ export function SettingsBotSection({
                     checked={bot.enabled}
                     onChange={() => handleToggleBotEnabled(bot.id)}
                     className="w-4 h-4 rounded border-input accent-primary"
+                    aria-label={`Enable ${bot.name}`}
                   />
                   <span className="text-xs text-muted-foreground">Enabled</span>
                 </label>
@@ -256,17 +254,18 @@ export function SettingsBotSection({
                   type="button"
                   variant="ghost"
                   size="sm"
+                  data-bot-control
                   className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteBot(bot.id);
                   }}
                   title="Delete bot"
-                  aria-label="Delete bot"
+                  aria-label={`Delete ${bot.name}`}
                 >
                   <span aria-hidden="true">🗑</span>
                 </Button>
-              </div>
+              </button>
 
               {expandedBotId === bot.id && (
                 <div className="p-3 space-y-3 border-t border-input">

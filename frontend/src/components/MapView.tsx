@@ -140,22 +140,27 @@ export function MapView({ contacts, focusedKey }: MapViewProps) {
         </span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-[#22c55e]" /> &lt;1h
+            <span className="w-3 h-3 rounded-full bg-[#22c55e]" aria-hidden="true" /> &lt;1h
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-[#4ade80]" /> &lt;1d
+            <span className="w-3 h-3 rounded-full bg-[#4ade80]" aria-hidden="true" /> &lt;1d
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-[#a3e635]" /> &lt;3d
+            <span className="w-3 h-3 rounded-full bg-[#a3e635]" aria-hidden="true" /> &lt;3d
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-[#9ca3af]" /> older
+            <span className="w-3 h-3 rounded-full bg-[#9ca3af]" aria-hidden="true" /> older
           </span>
         </div>
       </div>
 
       {/* Map - z-index constrained to stay below modals/sheets */}
-      <div className="flex-1 relative" style={{ zIndex: 0 }}>
+      <div
+        className="flex-1 relative"
+        style={{ zIndex: 0 }}
+        role="img"
+        aria-label="Map showing mesh node locations"
+      >
         <MapContainer
           center={[20, 0]}
           zoom={2}

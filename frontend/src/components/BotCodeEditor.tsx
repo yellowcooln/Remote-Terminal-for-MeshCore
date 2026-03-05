@@ -25,6 +25,7 @@ export function BotCodeEditor({ value, onChange, id, height = '256px' }: BotCode
         }}
         className="text-sm"
         id={id}
+        aria-label="Bot code editor"
       />
     </div>
   );

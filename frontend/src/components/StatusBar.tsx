@@ -99,6 +99,7 @@ export function StatusBar({
               toast.success('Public key copied!');
             }}
             title="Click to copy public key"
+            aria-label="Copy public key"
           >
             {config.public_key.toLowerCase()}
           </span>

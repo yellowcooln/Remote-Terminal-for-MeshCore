@@ -117,6 +117,7 @@ export function ChatHeader({
               );
             }}
             title="Click to copy"
+            aria-label={conversation.type === 'channel' ? 'Copy channel key' : 'Copy contact key'}
           >
             {conversation.type === 'channel' ? conversation.id.toLowerCase() : conversation.id}
           </span>

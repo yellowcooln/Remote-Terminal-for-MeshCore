@@ -3,7 +3,7 @@ import { api } from '../api';
 import { formatTime } from '../utils/messageParser';
 import { isFavorite } from '../utils/favorites';
 import { handleKeyboardActivate } from '../utils/a11y';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { toast } from './ui/sonner';
 import type { Channel, ChannelDetail, Favorite } from '../types';
 
@@ -65,6 +65,7 @@ export function ChannelInfoPane({
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0 flex flex-col">
         <SheetHeader className="sr-only">
           <SheetTitle>Channel Info</SheetTitle>
+          <SheetDescription>Channel details and statistics</SheetDescription>
         </SheetHeader>
 
         {loading && !detail ? (
