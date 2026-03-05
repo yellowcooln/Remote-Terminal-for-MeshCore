@@ -174,6 +174,7 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 │   ├── collect_licenses.sh # Gather third-party license attributions
 │   ├── e2e.sh              # End-to-end test runner
 │   └── publish.sh          # Version bump, changelog, docker build & push
+├── remoteterm.service      # Systemd unit file for production deployment
 ├── tests/                  # Backend tests (pytest)
 ├── data/                   # SQLite database (runtime)
 └── pyproject.toml          # Python dependencies
@@ -311,6 +312,8 @@ All endpoints are prefixed with `/api` (e.g., `/api/health`).
 | GET | `/api/settings` | Get app settings |
 | PATCH | `/api/settings` | Update app settings |
 | POST | `/api/settings/favorites/toggle` | Toggle favorite status |
+| POST | `/api/settings/blocked-keys/toggle` | Toggle blocked key |
+| POST | `/api/settings/blocked-names/toggle` | Toggle blocked name |
 | POST | `/api/settings/migrate` | One-time migration from frontend localStorage |
 | GET | `/api/statistics` | Aggregated mesh network statistics |
 | WS | `/api/ws` | Real-time updates |
@@ -427,7 +430,7 @@ mc.subscribe(EventType.ACK, handler)
 | `MESHCORE_DATABASE_PATH` | `data/meshcore.db` | SQLite database location |
 | `MESHCORE_DISABLE_BOTS` | `false` | Disable bot system entirely (blocks execution and config) |
 
-**Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, `bots`, all MQTT configuration (`mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`), community MQTT configuration (`community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`), and `flood_scope`. They are configured via `GET/PATCH /api/settings` (and related settings endpoints).
+**Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, `bots`, all MQTT configuration (`mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`), community MQTT configuration (`community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`), `flood_scope`, `blocked_keys`, and `blocked_names`. They are configured via `GET/PATCH /api/settings` (and related settings endpoints).
 
 Byte-perfect channel retries are user-triggered via `POST /api/messages/channel/{message_id}/resend` and are allowed for 30 seconds after the original send.
 

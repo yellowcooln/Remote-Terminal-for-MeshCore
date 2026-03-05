@@ -197,6 +197,8 @@ app/
 - `GET /settings`
 - `PATCH /settings`
 - `POST /settings/favorites/toggle`
+- `POST /settings/blocked-keys/toggle`
+- `POST /settings/blocked-names/toggle`
 - `POST /settings/migrate`
 
 ### Statistics
@@ -245,6 +247,7 @@ Main tables:
 - `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`
 - `community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`
 - `flood_scope`
+- `blocked_keys`, `blocked_names`
 
 ## Security Posture (intentional)
 
@@ -297,6 +300,7 @@ tests/
 ├── test_repository.py          # Data access layer
 ├── test_rx_log_data.py         # on_rx_log_data event handler integration
 ├── test_messages_search.py      # Message search, around, forward pagination
+├── test_block_lists.py          # Blocked keys/names filtering
 ├── test_send_messages.py       # Outgoing messages, bot triggers, concurrent sends
 ├── test_settings_router.py     # Settings endpoints, advert validation
 ├── test_statistics.py          # Statistics aggregation

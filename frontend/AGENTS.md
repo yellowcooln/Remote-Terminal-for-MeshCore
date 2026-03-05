@@ -70,6 +70,7 @@ frontend/src/
 │   ├── VisualizerView.tsx
 │   ├── PacketVisualizer3D.tsx
 │   ├── PathModal.tsx
+│   ├── PathRouteMap.tsx
 │   ├── CrackerPanel.tsx
 │   ├── BotCodeEditor.tsx
 │   ├── ContactAvatar.tsx
@@ -82,8 +83,7 @@ frontend/src/
 │   ├── settings/
 │   │   ├── settingsConstants.ts          # Settings section type, ordering, labels
 │   │   ├── SettingsRadioSection.tsx      # Preset, freq/bw/sf/cr, txPower, lat/lon
-│   │   ├── SettingsIdentitySection.tsx   # Name, keys, advert interval
-│   │   ├── SettingsConnectivitySection.tsx # Connection status, max contacts, reboot
+│   │   ├── SettingsLocalSection.tsx      # Name, keys, advert interval, max contacts, reboot
 │   │   ├── SettingsMqttSection.tsx       # MQTT broker config, TLS, publish toggles
 │   │   ├── SettingsDatabaseSection.tsx   # DB size, cleanup, auto-decrypt, local label
 │   │   ├── SettingsBotSection.tsx        # Bot list, code editor, add/delete/reset
@@ -247,6 +247,7 @@ LocalStorage migration helpers for favorites; canonical favorites are server-sid
 - `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`
 - `community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`
 - `flood_scope`
+- `blocked_keys`, `blocked_names`
 
 `HealthStatus` includes `mqtt_status` (`"connected"`, `"disconnected"`, `"disabled"`, or `null`).
 `HealthStatus` also includes `community_mqtt_status` with the same status values.
