@@ -151,6 +151,7 @@ export interface Message {
   paths: MessagePath[] | null;
   txt_type: number;
   signature: string | null;
+  sender_key: string | null;
   outgoing: boolean;
   /** ACK count: 0 = not acked, 1+ = number of acks/flood echoes received */
   acked: number;

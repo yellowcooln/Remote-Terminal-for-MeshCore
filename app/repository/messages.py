@@ -154,6 +154,7 @@ class MessageRepository:
             paths=MessageRepository._parse_paths(row["paths"]),
             txt_type=row["txt_type"],
             signature=row["signature"],
+            sender_key=row["sender_key"],
             outgoing=bool(row["outgoing"]),
             acked=row["acked"],
             sender_name=row["sender_name"],

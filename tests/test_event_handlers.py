@@ -320,6 +320,7 @@ class TestContactMessageCLIFiltering:
             "paths",
             "txt_type",
             "signature",
+            "sender_key",
             "outgoing",
             "acked",
             "sender_name",

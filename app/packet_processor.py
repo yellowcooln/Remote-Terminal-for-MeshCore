@@ -206,6 +206,8 @@ async def create_message_from_decrypted(
             sender_timestamp=timestamp,
             received_at=received,
             paths=paths,
+            sender_name=sender,
+            sender_key=resolved_sender_key,
         ).model_dump(),
     )
 

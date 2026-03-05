@@ -192,6 +192,7 @@ class Message(BaseModel):
     )
     txt_type: int = 0
     signature: str | None = None
+    sender_key: str | None = None
     outgoing: bool = False
     acked: int = 0
     sender_name: str | None = None

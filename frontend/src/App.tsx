@@ -270,14 +270,22 @@ export function App() {
         if (!msg.outgoing) {
           const bKeys = blockedKeysRef.current;
           const bNames = blockedNamesRef.current;
-          // Block DMs by key
+          // Block DMs by sender key
           if (
             bKeys.length > 0 &&
             msg.type === 'PRIV' &&
             bKeys.includes(msg.conversation_key.toLowerCase())
           )
             return;
-          // Block by sender name (works for channel messages)
+          // Block channel messages by sender key
+          if (
+            bKeys.length > 0 &&
+            msg.type === 'CHAN' &&
+            msg.sender_key &&
+            bKeys.includes(msg.sender_key.toLowerCase())
+          )
+            return;
+          // Block by sender name (works for both DMs and channel messages)
           if (bNames.length > 0 && msg.sender_name && bNames.includes(msg.sender_name)) return;
         }
 

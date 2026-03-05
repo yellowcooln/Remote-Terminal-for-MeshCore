@@ -35,6 +35,7 @@ function createMessage(overrides: Partial<Message> = {}): Message {
     paths: null,
     txt_type: 0,
     signature: null,
+    sender_key: null,
     outgoing: true,
     acked: 0,
     sender_name: null,
