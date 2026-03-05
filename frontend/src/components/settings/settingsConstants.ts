@@ -1,17 +1,15 @@
 export type SettingsSection =
   | 'radio'
-  | 'identity'
-  | 'connectivity'
-  | 'mqtt'
+  | 'local'
   | 'database'
   | 'bot'
+  | 'mqtt'
   | 'statistics'
   | 'about';
 
 export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
   'radio',
-  'identity',
-  'connectivity',
+  'local',
   'database',
   'bot',
   'mqtt',
@@ -21,9 +19,8 @@ export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
 
 export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   radio: '📻 Radio',
-  identity: '🪪 Identity',
-  connectivity: '📡 Connectivity',
-  database: '🗄️ Database & Interface',
+  local: '🖥️ Local Configuration',
+  database: '🗄️ Database & Messaging',
   bot: '🤖 Bots',
   mqtt: '📤 MQTT',
   statistics: '📊 Statistics',

@@ -5,23 +5,41 @@ import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import { toast } from '../ui/sonner';
 import { RADIO_PRESETS } from '../../utils/radioPresets';
-import type { RadioConfig, RadioConfigUpdate } from '../../types';
+import type {
+  AppSettings,
+  AppSettingsUpdate,
+  HealthStatus,
+  RadioConfig,
+  RadioConfigUpdate,
+} from '../../types';
 
 export function SettingsRadioSection({
   config,
+  health,
+  appSettings,
   pageMode,
   onSave,
+  onSaveAppSettings,
+  onSetPrivateKey,
   onReboot,
+  onAdvertise,
   onClose,
   className,
 }: {
   config: RadioConfig;
+  health: HealthStatus | null;
+  appSettings: AppSettings;
   pageMode: boolean;
   onSave: (update: RadioConfigUpdate) => Promise<void>;
+  onSaveAppSettings: (update: AppSettingsUpdate) => Promise<void>;
+  onSetPrivateKey: (key: string) => Promise<void>;
   onReboot: () => Promise<void>;
+  onAdvertise: () => Promise<void>;
   onClose: () => void;
   className?: string;
 }) {
+  // Radio config state
+  const [name, setName] = useState('');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
   const [txPower, setTxPower] = useState('');
@@ -30,12 +48,28 @@ export function SettingsRadioSection({
   const [sf, setSf] = useState('');
   const [cr, setCr] = useState('');
   const [gettingLocation, setGettingLocation] = useState(false);
-
   const [busy, setBusy] = useState(false);
   const [rebooting, setRebooting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Identity state
+  const [privateKey, setPrivateKey] = useState('');
+  const [identityBusy, setIdentityBusy] = useState(false);
+  const [identityRebooting, setIdentityRebooting] = useState(false);
+  const [identityError, setIdentityError] = useState<string | null>(null);
+
+  // Flood & advert control state
+  const [advertIntervalHours, setAdvertIntervalHours] = useState('0');
+  const [floodScope, setFloodScope] = useState('');
+  const [maxRadioContacts, setMaxRadioContacts] = useState('');
+  const [floodBusy, setFloodBusy] = useState(false);
+  const [floodError, setFloodError] = useState<string | null>(null);
+
+  // Advertise state
+  const [advertising, setAdvertising] = useState(false);
+
   useEffect(() => {
+    setName(config.name);
     setLat(String(config.lat));
     setLon(String(config.lon));
     setTxPower(String(config.tx_power));
@@ -44,6 +78,12 @@ export function SettingsRadioSection({
     setSf(String(config.radio.sf));
     setCr(String(config.radio.cr));
   }, [config]);
+
+  useEffect(() => {
+    setAdvertIntervalHours(String(Math.round(appSettings.advert_interval / 3600)));
+    setFloodScope(appSettings.flood_scope);
+    setMaxRadioContacts(String(appSettings.max_radio_contacts));
+  }, [appSettings]);
 
   const currentPreset = useMemo(() => {
     const freqNum = parseFloat(freq);
@@ -125,6 +165,7 @@ export function SettingsRadioSection({
 
     try {
       const update: RadioConfigUpdate = {
+        name,
         lat: parsedLat,
         lon: parsedLon,
         tx_power: parsedTxPower,
@@ -150,8 +191,98 @@ export function SettingsRadioSection({
     }
   };
 
+  const handleSetPrivateKey = async () => {
+    if (!privateKey.trim()) {
+      setIdentityError('Private key is required');
+      return;
+    }
+    setIdentityError(null);
+    setIdentityBusy(true);
+
+    try {
+      await onSetPrivateKey(privateKey.trim());
+      setPrivateKey('');
+      toast.success('Private key set, rebooting...');
+      setIdentityRebooting(true);
+      await onReboot();
+      if (!pageMode) {
+        onClose();
+      }
+    } catch (err) {
+      setIdentityError(err instanceof Error ? err.message : 'Failed to set private key');
+    } finally {
+      setIdentityRebooting(false);
+      setIdentityBusy(false);
+    }
+  };
+
+  const handleSaveFloodSettings = async () => {
+    setFloodError(null);
+    setFloodBusy(true);
+
+    try {
+      const update: AppSettingsUpdate = {};
+      const hours = parseInt(advertIntervalHours, 10);
+      const newAdvertInterval = isNaN(hours) ? 0 : hours * 3600;
+      if (newAdvertInterval !== appSettings.advert_interval) {
+        update.advert_interval = newAdvertInterval;
+      }
+      if (floodScope !== appSettings.flood_scope) {
+        update.flood_scope = floodScope;
+      }
+      const newMaxRadioContacts = parseInt(maxRadioContacts, 10);
+      if (!isNaN(newMaxRadioContacts) && newMaxRadioContacts !== appSettings.max_radio_contacts) {
+        update.max_radio_contacts = newMaxRadioContacts;
+      }
+      if (Object.keys(update).length > 0) {
+        await onSaveAppSettings(update);
+      }
+      toast.success('Settings saved');
+    } catch (err) {
+      setFloodError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setFloodBusy(false);
+    }
+  };
+
+  const handleAdvertise = async () => {
+    setAdvertising(true);
+    try {
+      await onAdvertise();
+    } finally {
+      setAdvertising(false);
+    }
+  };
+
   return (
     <div className={className}>
+      {/* Connection display */}
+      <div className="space-y-2">
+        <Label>Connection</Label>
+        {health?.connection_info ? (
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-status-connected" />
+            <code className="px-2 py-1 bg-muted rounded text-foreground text-sm">
+              {health.connection_info}
+            </code>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="w-2 h-2 rounded-full bg-status-disconnected" />
+            <span>Not connected</span>
+          </div>
+        )}
+      </div>
+
+      {/* Radio Name */}
+      <div className="space-y-2">
+        <Label htmlFor="name">Radio Name</Label>
+        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+
+      <Separator />
+
+      {/* Radio Config */}
       <div className="space-y-2">
         <Label htmlFor="preset">Preset</Label>
         <select
@@ -285,6 +416,128 @@ export function SettingsRadioSection({
       <Button onClick={handleSave} disabled={busy || rebooting} className="w-full">
         {busy || rebooting ? 'Saving & Rebooting...' : 'Save Radio Config & Reboot'}
       </Button>
+
+      <Separator />
+
+      {/* Keys */}
+      <div className="space-y-2">
+        <Label htmlFor="public-key">Public Key</Label>
+        <Input id="public-key" value={config.public_key} disabled className="font-mono text-xs" />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="private-key">Set Private Key (write-only)</Label>
+        <Input
+          id="private-key"
+          type="password"
+          autoComplete="off"
+          value={privateKey}
+          onChange={(e) => setPrivateKey(e.target.value)}
+          placeholder="64-character hex private key"
+        />
+        <Button
+          onClick={handleSetPrivateKey}
+          disabled={identityBusy || identityRebooting || !privateKey.trim()}
+          className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
+          variant="outline"
+        >
+          {identityBusy || identityRebooting
+            ? 'Setting & Rebooting...'
+            : 'Set Private Key & Reboot'}
+        </Button>
+      </div>
+
+      {identityError && (
+        <div className="text-sm text-destructive" role="alert">
+          {identityError}
+        </div>
+      )}
+
+      <Separator />
+
+      {/* Flood & Advert Control */}
+      <div className="space-y-2">
+        <Label className="text-base">Flood & Advert Control</Label>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="advert-interval">Periodic Advertising Interval</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            id="advert-interval"
+            type="number"
+            min="0"
+            value={advertIntervalHours}
+            onChange={(e) => setAdvertIntervalHours(e.target.value)}
+            className="w-28"
+          />
+          <span className="text-sm text-muted-foreground">hours (0 = off)</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          How often to automatically advertise presence. Set to 0 to disable. Minimum: 1 hour.
+          Recommended: 24 hours or higher.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="flood-scope">Flood Scope / Region</Label>
+        <Input
+          id="flood-scope"
+          value={floodScope}
+          onChange={(e) => setFloodScope(e.target.value)}
+          placeholder="#MyRegion"
+        />
+        <p className="text-xs text-muted-foreground">
+          Tag outgoing flood messages with a region name (e.g. #MyRegion). Repeaters with this
+          region configured will prioritize your traffic. Leave empty to disable.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="max-contacts">Max Contacts on Radio</Label>
+        <Input
+          id="max-contacts"
+          type="number"
+          min="1"
+          max="1000"
+          value={maxRadioContacts}
+          onChange={(e) => setMaxRadioContacts(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Favorite contacts load first, then recent non-repeater contacts until this limit is
+          reached (1-1000)
+        </p>
+      </div>
+
+      {floodError && (
+        <div className="text-sm text-destructive" role="alert">
+          {floodError}
+        </div>
+      )}
+
+      <Button onClick={handleSaveFloodSettings} disabled={floodBusy} className="w-full">
+        {floodBusy ? 'Saving...' : 'Save Settings'}
+      </Button>
+
+      <Separator />
+
+      {/* Send Advertisement */}
+      <div className="space-y-2">
+        <Label>Send Advertisement</Label>
+        <p className="text-xs text-muted-foreground">
+          Send a flood advertisement to announce your presence on the mesh network.
+        </p>
+        <Button
+          onClick={handleAdvertise}
+          disabled={advertising || !health?.radio_connected}
+          className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
+        >
+          {advertising ? 'Sending...' : 'Send Advertisement'}
+        </Button>
+        {!health?.radio_connected && (
+          <p className="text-sm text-destructive">Radio not connected</p>
+        )}
+      </div>
     </div>
   );
 }

@@ -10,8 +10,7 @@ import type { LocalLabel } from '../utils/localLabel';
 import { SETTINGS_SECTION_LABELS, type SettingsSection } from './settings/settingsConstants';
 
 import { SettingsRadioSection } from './settings/SettingsRadioSection';
-import { SettingsIdentitySection } from './settings/SettingsIdentitySection';
-import { SettingsConnectivitySection } from './settings/SettingsConnectivitySection';
+import { SettingsLocalSection } from './settings/SettingsLocalSection';
 import { SettingsMqttSection } from './settings/SettingsMqttSection';
 import { SettingsDatabaseSection } from './settings/SettingsDatabaseSection';
 import { SettingsBotSection } from './settings/SettingsBotSection';
@@ -76,18 +75,14 @@ export function SettingsModal(props: SettingsModalProps) {
 
   const [isMobileLayout, setIsMobileLayout] = useState(getIsMobileLayout);
   const externalDesktopSidebarMode = externalSidebarNav && !isMobileLayout;
-  const [expandedSections, setExpandedSections] = useState<Record<SettingsSection, boolean>>(() => {
-    const isMobile = getIsMobileLayout();
-    return {
-      radio: !isMobile,
-      identity: false,
-      connectivity: false,
-      mqtt: false,
-      database: false,
-      bot: false,
-      statistics: false,
-      about: false,
-    };
+  const [expandedSections, setExpandedSections] = useState<Record<SettingsSection, boolean>>({
+    radio: false,
+    local: false,
+    mqtt: false,
+    database: false,
+    bot: false,
+    statistics: false,
+    about: false,
   });
 
   // Refresh settings from server when modal opens
@@ -115,14 +110,6 @@ export function SettingsModal(props: SettingsModalProps) {
     query.addListener(onChange);
     return () => query.removeListener(onChange);
   }, []);
-
-  // On mobile with external sidebar nav, auto-expand the selected section
-  useEffect(() => {
-    if (!externalSidebarNav || !isMobileLayout || !desktopSection) return;
-    setExpandedSections((prev) =>
-      prev[desktopSection] ? prev : { ...prev, [desktopSection]: true }
-    );
-  }, [externalSidebarNav, isMobileLayout, desktopSection]);
 
   const toggleSection = (section: SettingsSection) => {
     setExpandedSections((prev) => ({
@@ -181,24 +168,8 @@ export function SettingsModal(props: SettingsModalProps) {
       {shouldRenderSection('radio') && (
         <section className={sectionWrapperClass}>
           {renderSectionHeader('radio')}
-          {isSectionVisible('radio') && (
+          {isSectionVisible('radio') && appSettings && (
             <SettingsRadioSection
-              config={config}
-              pageMode={pageMode}
-              onSave={onSave}
-              onReboot={onReboot}
-              onClose={onClose}
-              className={sectionContentClass}
-            />
-          )}
-        </section>
-      )}
-
-      {shouldRenderSection('identity') && (
-        <section className={sectionWrapperClass}>
-          {renderSectionHeader('identity')}
-          {isSectionVisible('identity') && appSettings && (
-            <SettingsIdentitySection
               config={config}
               health={health}
               appSettings={appSettings}
@@ -215,17 +186,12 @@ export function SettingsModal(props: SettingsModalProps) {
         </section>
       )}
 
-      {shouldRenderSection('connectivity') && (
+      {shouldRenderSection('local') && (
         <section className={sectionWrapperClass}>
-          {renderSectionHeader('connectivity')}
-          {isSectionVisible('connectivity') && appSettings && (
-            <SettingsConnectivitySection
-              appSettings={appSettings}
-              health={health}
-              pageMode={pageMode}
-              onSaveAppSettings={onSaveAppSettings}
-              onReboot={onReboot}
-              onClose={onClose}
+          {renderSectionHeader('local')}
+          {isSectionVisible('local') && (
+            <SettingsLocalSection
+              onLocalLabelChange={onLocalLabelChange}
               className={sectionContentClass}
             />
           )}
@@ -241,7 +207,6 @@ export function SettingsModal(props: SettingsModalProps) {
               health={health}
               onSaveAppSettings={onSaveAppSettings}
               onHealthRefresh={onHealthRefresh}
-              onLocalLabelChange={onLocalLabelChange}
               blockedKeys={blockedKeys}
               blockedNames={blockedNames}
               onToggleBlockedKey={onToggleBlockedKey}
