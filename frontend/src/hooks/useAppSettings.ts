@@ -62,6 +62,57 @@ export function useAppSettings() {
     [appSettings?.sidebar_sort_order]
   );
 
+  const handleToggleBlockedKey = useCallback(async (key: string) => {
+    const normalizedKey = key.toLowerCase();
+    setAppSettings((prev) => {
+      if (!prev) return prev;
+      const current = prev.blocked_keys ?? [];
+      const wasBlocked = current.includes(normalizedKey);
+      const optimistic = wasBlocked
+        ? current.filter((k) => k !== normalizedKey)
+        : [...current, normalizedKey];
+      return { ...prev, blocked_keys: optimistic };
+    });
+
+    try {
+      const updatedSettings = await api.toggleBlockedKey(key);
+      setAppSettings(updatedSettings);
+    } catch (err) {
+      console.error('Failed to toggle blocked key:', err);
+      try {
+        const settings = await api.getSettings();
+        setAppSettings(settings);
+      } catch {
+        // If refetch also fails, leave optimistic state
+      }
+      toast.error('Failed to update blocked key');
+    }
+  }, []);
+
+  const handleToggleBlockedName = useCallback(async (name: string) => {
+    setAppSettings((prev) => {
+      if (!prev) return prev;
+      const current = prev.blocked_names ?? [];
+      const wasBlocked = current.includes(name);
+      const optimistic = wasBlocked ? current.filter((n) => n !== name) : [...current, name];
+      return { ...prev, blocked_names: optimistic };
+    });
+
+    try {
+      const updatedSettings = await api.toggleBlockedName(name);
+      setAppSettings(updatedSettings);
+    } catch (err) {
+      console.error('Failed to toggle blocked name:', err);
+      try {
+        const settings = await api.getSettings();
+        setAppSettings(settings);
+      } catch {
+        // If refetch also fails, leave optimistic state
+      }
+      toast.error('Failed to update blocked name');
+    }
+  }, []);
+
   const handleToggleFavorite = useCallback(async (type: 'channel' | 'contact', id: string) => {
     setAppSettings((prev) => {
       if (!prev) return prev;
@@ -149,5 +200,7 @@ export function useAppSettings() {
     handleSaveAppSettings,
     handleSortOrderChange,
     handleToggleFavorite,
+    handleToggleBlockedKey,
+    handleToggleBlockedName,
   };
 }

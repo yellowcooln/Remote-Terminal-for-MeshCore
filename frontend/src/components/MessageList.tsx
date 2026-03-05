@@ -530,26 +530,16 @@ export function MessageList({
                 <div className="w-10 flex-shrink-0 flex items-start pt-0.5">
                   {showAvatar && avatarKey && (
                     <span
-                      role={
-                        onOpenContactInfo && !avatarKey.startsWith('name:') ? 'button' : undefined
-                      }
-                      tabIndex={onOpenContactInfo && !avatarKey.startsWith('name:') ? 0 : undefined}
-                      onKeyDown={
-                        onOpenContactInfo && !avatarKey.startsWith('name:')
-                          ? handleKeyboardActivate
-                          : undefined
-                      }
-                      onClick={
-                        onOpenContactInfo && !avatarKey.startsWith('name:')
-                          ? () => onOpenContactInfo(avatarKey)
-                          : undefined
-                      }
+                      role={onOpenContactInfo ? 'button' : undefined}
+                      tabIndex={onOpenContactInfo ? 0 : undefined}
+                      onKeyDown={onOpenContactInfo ? handleKeyboardActivate : undefined}
+                      onClick={onOpenContactInfo ? () => onOpenContactInfo(avatarKey) : undefined}
                     >
                       <ContactAvatar
                         name={avatarName}
                         publicKey={avatarKey}
                         size={32}
-                        clickable={!!onOpenContactInfo && !avatarKey.startsWith('name:')}
+                        clickable={!!onOpenContactInfo}
                       />
                     </span>
                   )}

@@ -117,6 +117,8 @@ export function App() {
     handleSaveAppSettings,
     handleSortOrderChange,
     handleToggleFavorite,
+    handleToggleBlockedKey,
+    handleToggleBlockedName,
   } = useAppSettings();
 
   // Keep user's name in ref for mention detection in WebSocket callback
@@ -124,6 +126,14 @@ export function App() {
   useEffect(() => {
     myNameRef.current = config?.name ?? null;
   }, [config?.name]);
+
+  // Keep block lists in refs for WS callback filtering
+  const blockedKeysRef = useRef<string[]>([]);
+  const blockedNamesRef = useRef<string[]>([]);
+  useEffect(() => {
+    blockedKeysRef.current = appSettings?.blocked_keys ?? [];
+    blockedNamesRef.current = appSettings?.blocked_names ?? [];
+  }, [appSettings?.blocked_keys, appSettings?.blocked_names]);
 
   // Check if a message mentions the user
   const checkMention = useCallback(
@@ -256,6 +266,21 @@ export function App() {
           .catch(console.error);
       },
       onMessage: (msg: Message) => {
+        // Filter blocked contacts on incoming (non-outgoing) messages
+        if (!msg.outgoing) {
+          const bKeys = blockedKeysRef.current;
+          const bNames = blockedNamesRef.current;
+          // Block DMs by key
+          if (
+            bKeys.length > 0 &&
+            msg.type === 'PRIV' &&
+            bKeys.includes(msg.conversation_key.toLowerCase())
+          )
+            return;
+          // Block by sender name (works for channel messages)
+          if (bNames.length > 0 && msg.sender_name && bNames.includes(msg.sender_name)) return;
+        }
+
         const activeConv = activeConversationRef.current;
 
         // Check if message belongs to the active conversation
@@ -440,6 +465,28 @@ export function App() {
       });
     }
   }, [activeConversation]);
+
+  // Wrappers that clear cache and hard-refetch messages after block changes.
+  // jumpToBottom does cache.remove + fetchMessages(true) which fully replaces
+  // the message state; triggerReconcile only merges diffs and would keep
+  // blocked messages already in state.
+  const handleBlockKey = useCallback(
+    async (key: string) => {
+      await handleToggleBlockedKey(key);
+      messageCache.clear();
+      jumpToBottom();
+    },
+    [handleToggleBlockedKey, jumpToBottom]
+  );
+
+  const handleBlockName = useCallback(
+    async (name: string) => {
+      await handleToggleBlockedName(name);
+      messageCache.clear();
+      jumpToBottom();
+    },
+    [handleToggleBlockedName, jumpToBottom]
+  );
 
   const handleCloseSettingsView = useCallback(() => {
     startTransition(() => setShowSettings(false));
@@ -796,6 +843,10 @@ export function App() {
                     onHealthRefresh={handleHealthRefresh}
                     onRefreshAppSettings={fetchAppSettings}
                     onLocalLabelChange={setLocalLabel}
+                    blockedKeys={appSettings?.blocked_keys}
+                    blockedNames={appSettings?.blocked_names}
+                    onToggleBlockedKey={handleBlockKey}
+                    onToggleBlockedName={handleBlockName}
                   />
                 </Suspense>
               </div>
@@ -861,6 +912,10 @@ export function App() {
         favorites={favorites}
         onToggleFavorite={handleToggleFavorite}
         onNavigateToChannel={handleNavigateToChannel}
+        blockedKeys={appSettings?.blocked_keys}
+        blockedNames={appSettings?.blocked_names}
+        onToggleBlockedKey={handleBlockKey}
+        onToggleBlockedName={handleBlockName}
       />
 
       <ChannelInfoPane

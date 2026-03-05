@@ -32,7 +32,8 @@ class AppSettingsRepository:
                    mqtt_publish_messages, mqtt_publish_raw_packets,
                    community_mqtt_enabled, community_mqtt_iata,
                    community_mqtt_broker_host, community_mqtt_broker_port,
-                   community_mqtt_email, flood_scope
+                   community_mqtt_email, flood_scope,
+                   blocked_keys, blocked_names
             FROM app_settings WHERE id = 1
             """
         )
@@ -82,6 +83,22 @@ class AppSettingsRepository:
                 )
                 bots = []
 
+        # Parse blocked_keys JSON
+        blocked_keys: list[str] = []
+        if row["blocked_keys"]:
+            try:
+                blocked_keys = json.loads(row["blocked_keys"])
+            except (json.JSONDecodeError, TypeError):
+                blocked_keys = []
+
+        # Parse blocked_names JSON
+        blocked_names: list[str] = []
+        if row["blocked_names"]:
+            try:
+                blocked_names = json.loads(row["blocked_names"])
+            except (json.JSONDecodeError, TypeError):
+                blocked_names = []
+
         # Validate sidebar_sort_order (fallback to "recent" if invalid)
         sort_order = row["sidebar_sort_order"]
         if sort_order not in ("recent", "alpha"):
@@ -113,6 +130,8 @@ class AppSettingsRepository:
             community_mqtt_broker_port=row["community_mqtt_broker_port"] or 443,
             community_mqtt_email=row["community_mqtt_email"] or "",
             flood_scope=row["flood_scope"] or "",
+            blocked_keys=blocked_keys,
+            blocked_names=blocked_names,
         )
 
     @staticmethod
@@ -141,6 +160,8 @@ class AppSettingsRepository:
         community_mqtt_broker_port: int | None = None,
         community_mqtt_email: str | None = None,
         flood_scope: str | None = None,
+        blocked_keys: list[str] | None = None,
+        blocked_names: list[str] | None = None,
     ) -> AppSettings:
         """Update app settings. Only provided fields are updated."""
         updates = []
@@ -244,6 +265,14 @@ class AppSettingsRepository:
             updates.append("flood_scope = ?")
             params.append(flood_scope)
 
+        if blocked_keys is not None:
+            updates.append("blocked_keys = ?")
+            params.append(json.dumps(blocked_keys))
+
+        if blocked_names is not None:
+            updates.append("blocked_names = ?")
+            params.append(json.dumps(blocked_names))
+
         if updates:
             query = f"UPDATE app_settings SET {', '.join(updates)} WHERE id = 1"
             await db.conn.execute(query, params)
@@ -271,6 +300,27 @@ class AppSettingsRepository:
             f for f in settings.favorites if not (f.type == fav_type and f.id == fav_id)
         ]
         return await AppSettingsRepository.update(favorites=new_favorites)
+
+    @staticmethod
+    async def toggle_blocked_key(key: str) -> AppSettings:
+        """Toggle a public key in the blocked list. Keys are normalized to lowercase."""
+        normalized = key.lower()
+        settings = await AppSettingsRepository.get()
+        if normalized in settings.blocked_keys:
+            new_keys = [k for k in settings.blocked_keys if k != normalized]
+        else:
+            new_keys = settings.blocked_keys + [normalized]
+        return await AppSettingsRepository.update(blocked_keys=new_keys)
+
+    @staticmethod
+    async def toggle_blocked_name(name: str) -> AppSettings:
+        """Toggle a display name in the blocked list."""
+        settings = await AppSettingsRepository.get()
+        if name in settings.blocked_names:
+            new_names = [n for n in settings.blocked_names if n != name]
+        else:
+            new_names = settings.blocked_names + [name]
+        return await AppSettingsRepository.update(blocked_names=new_names)
 
     @staticmethod
     async def migrate_preferences_from_frontend(

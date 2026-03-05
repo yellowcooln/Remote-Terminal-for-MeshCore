@@ -275,6 +275,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 34)
         applied += 1
 
+    # Migration 35: Add blocked_keys and blocked_names columns to app_settings
+    if version < 35:
+        logger.info("Applying migration 35: add blocked_keys and blocked_names to app_settings")
+        await _migrate_035_add_block_lists(conn)
+        await set_version(conn, 35)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -1976,3 +1983,34 @@ async def _migrate_034_add_flood_scope(conn: aiosqlite.Connection) -> None:
             logger.debug("app_settings table not ready, skipping flood_scope migration")
         else:
             raise
+
+
+async def _migrate_035_add_block_lists(conn: aiosqlite.Connection) -> None:
+    """Add blocked_keys and blocked_names columns to app_settings.
+
+    These store JSON arrays of blocked public keys and display names.
+    Blocking hides messages from the UI but does not affect MQTT or bots.
+    """
+    try:
+        await conn.execute("ALTER TABLE app_settings ADD COLUMN blocked_keys TEXT DEFAULT '[]'")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "duplicate column" in error_msg:
+            logger.debug("blocked_keys column already exists, skipping")
+        elif "no such table" in error_msg:
+            logger.debug("app_settings table not ready, skipping blocked_keys migration")
+        else:
+            raise
+
+    try:
+        await conn.execute("ALTER TABLE app_settings ADD COLUMN blocked_names TEXT DEFAULT '[]'")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "duplicate column" in error_msg:
+            logger.debug("blocked_names column already exists, skipping")
+        elif "no such table" in error_msg:
+            logger.debug("app_settings table not ready, skipping blocked_names migration")
+        else:
+            raise
+
+    await conn.commit()

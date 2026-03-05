@@ -26,6 +26,10 @@ interface ContactInfoPaneProps {
   favorites: Favorite[];
   onToggleFavorite: (type: 'channel' | 'contact', id: string) => void;
   onNavigateToChannel?: (channelKey: string) => void;
+  blockedKeys?: string[];
+  blockedNames?: string[];
+  onToggleBlockedKey?: (key: string) => void;
+  onToggleBlockedName?: (name: string) => void;
 }
 
 export function ContactInfoPane({
@@ -36,17 +40,23 @@ export function ContactInfoPane({
   favorites,
   onToggleFavorite,
   onNavigateToChannel,
+  blockedKeys = [],
+  blockedNames = [],
+  onToggleBlockedKey,
+  onToggleBlockedName,
 }: ContactInfoPaneProps) {
+  const isNameOnly = contactKey?.startsWith('name:') ?? false;
+  const nameOnlyValue = isNameOnly && contactKey ? contactKey.slice(5) : null;
+
   const [detail, setDetail] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Get live contact data from contacts array (real-time via WS)
-  const liveContact = contactKey
-    ? (contacts.find((c) => c.public_key === contactKey) ?? null)
-    : null;
+  const liveContact =
+    contactKey && !isNameOnly ? (contacts.find((c) => c.public_key === contactKey) ?? null) : null;
 
   useEffect(() => {
-    if (!contactKey) {
+    if (!contactKey || isNameOnly) {
       setDetail(null);
       return;
     }
@@ -70,7 +80,7 @@ export function ContactInfoPane({
     return () => {
       cancelled = true;
     };
-  }, [contactKey]);
+  }, [contactKey, isNameOnly]);
 
   // Use live contact data where available, fall back to detail snapshot
   const contact = liveContact ?? detail?.contact ?? null;
@@ -90,7 +100,46 @@ export function ContactInfoPane({
           <SheetTitle>Contact Info</SheetTitle>
         </SheetHeader>
 
-        {loading && !detail ? (
+        {isNameOnly && nameOnlyValue ? (
+          <div className="flex-1 overflow-y-auto">
+            {/* Name-only header */}
+            <div className="px-5 pt-5 pb-4 border-b border-border">
+              <div className="flex items-start gap-4">
+                <ContactAvatar name={nameOnlyValue} publicKey={`name:${nameOnlyValue}`} size={56} />
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-semibold truncate">{nameOnlyValue}</h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    We have not heard an advertisement associated with this name, so we cannot
+                    identify their key.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Block by name toggle */}
+            {onToggleBlockedName && (
+              <div className="px-5 py-3 border-b border-border">
+                <button
+                  type="button"
+                  className="text-sm flex items-center gap-2 hover:text-primary transition-colors"
+                  onClick={() => onToggleBlockedName(nameOnlyValue)}
+                >
+                  {blockedNames.includes(nameOnlyValue) ? (
+                    <>
+                      <span className="text-destructive text-lg">&#x2718;</span>
+                      <span>Unblock this name</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-muted-foreground text-lg">&#x2718;</span>
+                      <span>Block this name</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : loading && !detail ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             Loading...
           </div>
@@ -208,6 +257,50 @@ export function ContactInfoPane({
                 )}
               </button>
             </div>
+
+            {/* Block toggles */}
+            {(onToggleBlockedKey || onToggleBlockedName) && (
+              <div className="px-5 py-3 border-b border-border space-y-2">
+                {onToggleBlockedKey && (
+                  <button
+                    type="button"
+                    className="text-sm flex items-center gap-2 hover:text-primary transition-colors"
+                    onClick={() => onToggleBlockedKey(contact.public_key)}
+                  >
+                    {blockedKeys.includes(contact.public_key.toLowerCase()) ? (
+                      <>
+                        <span className="text-destructive text-lg">&#x2718;</span>
+                        <span>Unblock this key</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground text-lg">&#x2718;</span>
+                        <span>Block this key</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {onToggleBlockedName && contact.name && (
+                  <button
+                    type="button"
+                    className="text-sm flex items-center gap-2 hover:text-primary transition-colors"
+                    onClick={() => onToggleBlockedName(contact.name!)}
+                  >
+                    {blockedNames.includes(contact.name) ? (
+                      <>
+                        <span className="text-destructive text-lg">&#x2718;</span>
+                        <span>Unblock name &ldquo;{contact.name}&rdquo;</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground text-lg">&#x2718;</span>
+                        <span>Block name &ldquo;{contact.name}&rdquo;</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* AKA (Name History) - only show if more than one name */}
             {detail && detail.name_history.length > 1 && (

@@ -68,6 +68,8 @@ const baseSettings: AppSettings = {
   community_mqtt_broker_port: 443,
   community_mqtt_email: '',
   flood_scope: '',
+  blocked_keys: [],
+  blocked_names: [],
 };
 
 function renderModal(overrides?: {

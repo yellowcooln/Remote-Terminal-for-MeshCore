@@ -14,7 +14,7 @@ from app.models import (
     SendDirectMessageRequest,
 )
 from app.radio import radio_manager
-from app.repository import AmbiguousPublicKeyPrefixError, MessageRepository
+from app.repository import AmbiguousPublicKeyPrefixError, AppSettingsRepository, MessageRepository
 from app.websocket import broadcast_event
 
 logger = logging.getLogger(__name__)
@@ -29,11 +29,16 @@ async def get_messages_around(
     context: int = Query(default=100, ge=1, le=500, description="Number of messages before/after"),
 ) -> MessagesAroundResponse:
     """Get messages around a specific message for jump-to-message navigation."""
+    settings = await AppSettingsRepository.get()
+    blocked_keys = settings.blocked_keys or None
+    blocked_names = settings.blocked_names or None
     messages, has_older, has_newer = await MessageRepository.get_around(
         message_id=message_id,
         msg_type=type,
         conversation_key=conversation_key,
         context_size=context,
+        blocked_keys=blocked_keys,
+        blocked_names=blocked_names,
     )
     return MessagesAroundResponse(messages=messages, has_older=has_older, has_newer=has_newer)
 
@@ -59,6 +64,9 @@ async def list_messages(
     q: str | None = Query(default=None, description="Full-text search query"),
 ) -> list[Message]:
     """List messages from the database."""
+    settings = await AppSettingsRepository.get()
+    blocked_keys = settings.blocked_keys or None
+    blocked_names = settings.blocked_names or None
     return await MessageRepository.get_all(
         limit=limit,
         offset=offset,
@@ -69,6 +77,8 @@ async def list_messages(
         after=after,
         after_id=after_id,
         q=q,
+        blocked_keys=blocked_keys,
+        blocked_names=blocked_names,
     )
 
 

@@ -21,6 +21,10 @@ export function SettingsDatabaseSection({
   onSaveAppSettings,
   onHealthRefresh,
   onLocalLabelChange,
+  blockedKeys = [],
+  blockedNames = [],
+  onToggleBlockedKey,
+  onToggleBlockedName,
   className,
 }: {
   appSettings: AppSettings;
@@ -28,6 +32,10 @@ export function SettingsDatabaseSection({
   onSaveAppSettings: (update: AppSettingsUpdate) => Promise<void>;
   onHealthRefresh: () => Promise<void>;
   onLocalLabelChange?: (label: LocalLabel) => void;
+  blockedKeys?: string[];
+  blockedNames?: string[];
+  onToggleBlockedKey?: (key: string) => void;
+  onToggleBlockedName?: (name: string) => void;
   className?: string;
 }) {
   const [retentionDays, setRetentionDays] = useState('14');
@@ -278,6 +286,67 @@ export function SettingsDatabaseSection({
           Display a colored banner at the top of the page to identify this instance. This applies
           only to this device/browser.
         </p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <Label>Blocked Contacts</Label>
+        <p className="text-xs text-muted-foreground">
+          Blocking only hides messages from the UI. MQTT forwarding and bot responses are not
+          affected. Messages are still stored and will reappear if unblocked.
+        </p>
+
+        {blockedKeys.length === 0 && blockedNames.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">No blocked contacts</p>
+        ) : (
+          <div className="space-y-2">
+            {blockedKeys.length > 0 && (
+              <div>
+                <span className="text-xs text-muted-foreground font-medium">Blocked Keys</span>
+                <div className="mt-1 space-y-1">
+                  {blockedKeys.map((key) => (
+                    <div key={key} className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-mono truncate flex-1">{key}</span>
+                      {onToggleBlockedKey && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onToggleBlockedKey(key)}
+                          className="h-7 text-xs flex-shrink-0"
+                        >
+                          Unblock
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {blockedNames.length > 0 && (
+              <div>
+                <span className="text-xs text-muted-foreground font-medium">Blocked Names</span>
+                <div className="mt-1 space-y-1">
+                  {blockedNames.map((name) => (
+                    <div key={name} className="flex items-center justify-between gap-2">
+                      <span className="text-sm truncate flex-1">{name}</span>
+                      {onToggleBlockedName && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onToggleBlockedName(name)}
+                          className="h-7 text-xs flex-shrink-0"
+                        >
+                          Unblock
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (

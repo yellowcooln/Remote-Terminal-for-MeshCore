@@ -33,6 +33,10 @@ interface SettingsModalBaseProps {
   onHealthRefresh: () => Promise<void>;
   onRefreshAppSettings: () => Promise<void>;
   onLocalLabelChange?: (label: LocalLabel) => void;
+  blockedKeys?: string[];
+  blockedNames?: string[];
+  onToggleBlockedKey?: (key: string) => void;
+  onToggleBlockedName?: (name: string) => void;
 }
 
 type SettingsModalProps = SettingsModalBaseProps &
@@ -57,6 +61,10 @@ export function SettingsModal(props: SettingsModalProps) {
     onHealthRefresh,
     onRefreshAppSettings,
     onLocalLabelChange,
+    blockedKeys,
+    blockedNames,
+    onToggleBlockedKey,
+    onToggleBlockedName,
   } = props;
   const externalSidebarNav = props.externalSidebarNav === true;
   const desktopSection = props.externalSidebarNav ? props.desktopSection : undefined;
@@ -234,6 +242,10 @@ export function SettingsModal(props: SettingsModalProps) {
               onSaveAppSettings={onSaveAppSettings}
               onHealthRefresh={onHealthRefresh}
               onLocalLabelChange={onLocalLabelChange}
+              blockedKeys={blockedKeys}
+              blockedNames={blockedNames}
+              onToggleBlockedKey={onToggleBlockedKey}
+              onToggleBlockedName={onToggleBlockedName}
               className={sectionContentClass}
             />
           )}

@@ -125,6 +125,22 @@ class AppSettingsUpdate(BaseModel):
         default=None,
         description="Outbound flood scope / region name (empty = disabled)",
     )
+    blocked_keys: list[str] | None = Field(
+        default=None,
+        description="Public keys whose messages are hidden from the UI",
+    )
+    blocked_names: list[str] | None = Field(
+        default=None,
+        description="Display names whose messages are hidden from the UI",
+    )
+
+
+class BlockKeyRequest(BaseModel):
+    key: str = Field(description="Public key to toggle block status")
+
+
+class BlockNameRequest(BaseModel):
+    name: str = Field(description="Display name to toggle block status")
 
 
 class FavoriteRequest(BaseModel):
@@ -241,6 +257,12 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         kwargs["community_mqtt_email"] = update.community_mqtt_email
         community_mqtt_changed = True
 
+    # Block lists
+    if update.blocked_keys is not None:
+        kwargs["blocked_keys"] = [k.lower() for k in update.blocked_keys]
+    if update.blocked_names is not None:
+        kwargs["blocked_names"] = update.blocked_names
+
     # Flood scope
     flood_scope_changed = False
     if update.flood_scope is not None:
@@ -315,6 +337,20 @@ async def toggle_favorite(request: FavoriteRequest) -> AppSettings:
         asyncio.create_task(sync_recent_contacts_to_radio(force=True))
 
     return result
+
+
+@router.post("/blocked-keys/toggle", response_model=AppSettings)
+async def toggle_blocked_key(request: BlockKeyRequest) -> AppSettings:
+    """Toggle a public key's blocked status."""
+    logger.info("Toggling blocked key: %s", request.key[:12])
+    return await AppSettingsRepository.toggle_blocked_key(request.key)
+
+
+@router.post("/blocked-names/toggle", response_model=AppSettings)
+async def toggle_blocked_name(request: BlockNameRequest) -> AppSettings:
+    """Toggle a display name's blocked status."""
+    logger.info("Toggling blocked name: %s", request.name)
+    return await AppSettingsRepository.toggle_blocked_name(request.name)
 
 
 @router.post("/migrate", response_model=MigratePreferencesResponse)

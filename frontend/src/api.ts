@@ -254,6 +254,18 @@ export const api = {
       body: JSON.stringify(settings),
     }),
 
+  // Block lists
+  toggleBlockedKey: (key: string) =>
+    fetchJson<AppSettings>('/settings/blocked-keys/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ key }),
+    }),
+  toggleBlockedName: (name: string) =>
+    fetchJson<AppSettings>('/settings/blocked-names/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
   // Favorites
   toggleFavorite: (type: Favorite['type'], id: string) =>
     fetchJson<AppSettings>('/settings/favorites/toggle', {

@@ -170,9 +170,30 @@ class MessageRepository:
         after: int | None = None,
         after_id: int | None = None,
         q: str | None = None,
+        blocked_keys: list[str] | None = None,
+        blocked_names: list[str] | None = None,
     ) -> list[Message]:
         query = "SELECT * FROM messages WHERE 1=1"
         params: list[Any] = []
+
+        if blocked_keys:
+            placeholders = ",".join("?" for _ in blocked_keys)
+            query += (
+                f" AND NOT (outgoing=0 AND ("
+                f"(type='PRIV' AND LOWER(conversation_key) IN ({placeholders}))"
+                f" OR (type='CHAN' AND sender_key IS NOT NULL AND LOWER(sender_key) IN ({placeholders}))"
+                f"))"
+            )
+            params.extend(blocked_keys)
+            params.extend(blocked_keys)
+
+        if blocked_names:
+            placeholders = ",".join("?" for _ in blocked_names)
+            query += (
+                f" AND NOT (outgoing=0 AND sender_name IS NOT NULL"
+                f" AND sender_name IN ({placeholders}))"
+            )
+            params.extend(blocked_names)
 
         if msg_type:
             query += " AND type = ?"
@@ -214,6 +235,8 @@ class MessageRepository:
         msg_type: str | None = None,
         conversation_key: str | None = None,
         context_size: int = 100,
+        blocked_keys: list[str] | None = None,
+        blocked_names: list[str] | None = None,
     ) -> tuple[list[Message], bool, bool]:
         """Get messages around a target message.
 
@@ -230,6 +253,24 @@ class MessageRepository:
             clause, norm_key = MessageRepository._normalize_conversation_key(conversation_key)
             where_parts.append(clause.removeprefix("AND "))
             base_params.append(norm_key)
+
+        if blocked_keys:
+            placeholders = ",".join("?" for _ in blocked_keys)
+            where_parts.append(
+                f"NOT (outgoing=0 AND ("
+                f"(type='PRIV' AND LOWER(conversation_key) IN ({placeholders}))"
+                f" OR (type='CHAN' AND sender_key IS NOT NULL AND LOWER(sender_key) IN ({placeholders}))"
+                f"))"
+            )
+            base_params.extend(blocked_keys)
+            base_params.extend(blocked_keys)
+
+        if blocked_names:
+            placeholders = ",".join("?" for _ in blocked_names)
+            where_parts.append(
+                f"NOT (outgoing=0 AND sender_name IS NOT NULL AND sender_name IN ({placeholders}))"
+            )
+            base_params.extend(blocked_names)
 
         where_sql = " AND ".join(["1=1", *where_parts])
 

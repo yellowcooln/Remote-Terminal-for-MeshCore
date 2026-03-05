@@ -508,6 +508,8 @@ class TestAppSettingsRepository:
                 "community_mqtt_broker_port": 443,
                 "community_mqtt_email": "",
                 "flood_scope": "",
+                "blocked_keys": "[]",
+                "blocked_names": "[]",
             }
         )
         mock_conn.execute = AsyncMock(return_value=mock_cursor)

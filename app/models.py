@@ -522,6 +522,14 @@ class AppSettings(BaseModel):
         default="",
         description="Outbound flood scope / region name (empty = disabled, no tagging)",
     )
+    blocked_keys: list[str] = Field(
+        default_factory=list,
+        description="Public keys whose messages are hidden from the UI",
+    )
+    blocked_names: list[str] = Field(
+        default_factory=list,
+        description="Display names whose messages are hidden from the UI",
+    )
 
 
 class BusyChannel(BaseModel):
