@@ -1,3 +1,32 @@
+## [2.5.0] - 2026-03-05
+
+Feature: Far better accessibility across the app (with far to go)
+Feature: Add community MQTT stats reporting, and improve over a few commits
+Feature: Color schemes and misc. settings reorg
+Feature: Add why-active to filtered nodes
+Feature: Add channel and contact info box
+Feature: Add contact blocking
+Feature: Add potential repeater path map display
+Feature: Add flood scoping/regions
+Feature: Global message search
+Feature: Fully safe bot disable
+Feature: Add default #remoteterm channel (lol sorry I had to)
+Feature: Custom recency pruning in visualizer
+Bugfix: Be more cautious around null byte stripping
+Bugfix: Clear channel-add interface on not-add-another
+Bugfix: Add status/name/MQTT LWT
+Bugfix: Channel deletion propagates over WS
+Bugfix: Show map location for all nodes on link, not 7-day-limited
+Bugfix: Hide private key channel keys by default
+Misc: Logline to show if cleanup loop on non-sync'd meshcore radio links fixes anything
+Misc: Doc, changelog, and test improvements
+Misc: Add, and remove, package lock (sorry Windows users)
+Misc: Don't show mark all as read if not necessary
+Misc: Fix stale closures and misc. frontend perf/correctness improvements
+Misc: Add Windows startup notes
+Misc: E2E expansion + improvement
+Misc: Move around visualizer settings
+
 ## [2.4.0] - 2026-03-02
 
 Feature: Add community MQTT reporting (e.g. LetsMesh.net)
