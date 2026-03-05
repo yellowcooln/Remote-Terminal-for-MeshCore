@@ -4,7 +4,12 @@ import time
 
 import pytest
 
-from app.repository import AppSettingsRepository, MessageRepository
+from app.repository import (
+    AppSettingsRepository,
+    ChannelRepository,
+    ContactRepository,
+    MessageRepository,
+)
 from app.routers.settings import (
     BlockKeyRequest,
     BlockNameRequest,
@@ -168,3 +173,140 @@ class TestMessageBlockFiltering:
         assert "blocked dm" not in texts
         assert "normal dm" in texts
         assert "outgoing to blocked" in texts
+
+
+class TestUnreadCountsBlockFiltering:
+    """Unread counts should exclude messages from blocked keys/names."""
+
+    @pytest.mark.asyncio
+    async def test_unread_counts_exclude_blocked_key_dms(self, test_db):
+        """Blocked key DMs should not contribute to unread counts."""
+        blocked_key = "aa" * 32
+        normal_key = "bb" * 32
+        now = int(time.time())
+
+        # Set up contacts with last_read_at in the past
+        await ContactRepository.upsert({"public_key": blocked_key, "name": "Blocked"})
+        await ContactRepository.upsert({"public_key": normal_key, "name": "Normal"})
+
+        # Incoming DMs
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="blocked msg",
+            received_at=now,
+            conversation_key=blocked_key,
+            sender_timestamp=now,
+        )
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="normal msg",
+            received_at=now + 1,
+            conversation_key=normal_key,
+            sender_timestamp=now + 1,
+        )
+
+        result = await MessageRepository.get_unread_counts(
+            blocked_keys=[blocked_key],
+        )
+        assert f"contact-{blocked_key}" not in result["counts"]
+        assert result["counts"][f"contact-{normal_key}"] == 1
+
+    @pytest.mark.asyncio
+    async def test_unread_counts_exclude_blocked_key_channel_msgs(self, test_db):
+        """Blocked key channel messages should not contribute to unread counts."""
+        blocked_key = "aa" * 32
+        normal_key = "bb" * 32
+        chan_key = "CC" * 16
+        now = int(time.time())
+
+        await ChannelRepository.upsert(key=chan_key, name="#test")
+        await ChannelRepository.update_last_read_at(chan_key, 0)
+
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Blocked: spam",
+            received_at=now,
+            conversation_key=chan_key,
+            sender_timestamp=now,
+            sender_name="Blocked",
+            sender_key=blocked_key,
+        )
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Normal: hi",
+            received_at=now + 1,
+            conversation_key=chan_key,
+            sender_timestamp=now + 1,
+            sender_name="Normal",
+            sender_key=normal_key,
+        )
+
+        result = await MessageRepository.get_unread_counts(
+            blocked_keys=[blocked_key],
+        )
+        assert result["counts"][f"channel-{chan_key}"] == 1
+
+    @pytest.mark.asyncio
+    async def test_unread_counts_exclude_blocked_name_channel_msgs(self, test_db):
+        """Blocked name channel messages should not contribute to unread counts."""
+        chan_key = "DD" * 16
+        now = int(time.time())
+
+        await ChannelRepository.upsert(key=chan_key, name="#test2")
+        await ChannelRepository.update_last_read_at(chan_key, 0)
+
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Spammer: buy stuff",
+            received_at=now,
+            conversation_key=chan_key,
+            sender_timestamp=now,
+            sender_name="Spammer",
+            sender_key="ee" * 32,
+        )
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Friend: hello",
+            received_at=now + 1,
+            conversation_key=chan_key,
+            sender_timestamp=now + 1,
+            sender_name="Friend",
+            sender_key="ff" * 32,
+        )
+
+        result = await MessageRepository.get_unread_counts(
+            blocked_names=["Spammer"],
+        )
+        assert result["counts"][f"channel-{chan_key}"] == 1
+
+    @pytest.mark.asyncio
+    async def test_unread_counts_no_block_lists_returns_all(self, test_db):
+        """Without block lists, all messages count toward unreads."""
+        blocked_key = "aa" * 32
+        chan_key = "CC" * 16
+        now = int(time.time())
+
+        await ContactRepository.upsert({"public_key": blocked_key, "name": "Someone"})
+        await ChannelRepository.upsert(key=chan_key, name="#all")
+        await ChannelRepository.update_last_read_at(chan_key, 0)
+
+        await MessageRepository.create(
+            msg_type="PRIV",
+            text="dm",
+            received_at=now,
+            conversation_key=blocked_key,
+            sender_timestamp=now,
+        )
+        await MessageRepository.create(
+            msg_type="CHAN",
+            text="Someone: hi",
+            received_at=now + 1,
+            conversation_key=chan_key,
+            sender_timestamp=now + 1,
+            sender_name="Someone",
+            sender_key=blocked_key,
+        )
+
+        result = await MessageRepository.get_unread_counts()
+        assert result["counts"][f"contact-{blocked_key}"] == 1
+        assert result["counts"][f"channel-{chan_key}"] == 1

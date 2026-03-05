@@ -7,7 +7,12 @@ from fastapi import APIRouter
 
 from app.models import UnreadCounts
 from app.radio import radio_manager
-from app.repository import ChannelRepository, ContactRepository, MessageRepository
+from app.repository import (
+    AppSettingsRepository,
+    ChannelRepository,
+    ContactRepository,
+    MessageRepository,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/read-state", tags=["read-state"])
@@ -26,7 +31,12 @@ async def get_unreads() -> UnreadCounts:
     mc = radio_manager.meshcore
     if mc and mc.self_info:
         name = mc.self_info.get("name") or None
-    data = await MessageRepository.get_unread_counts(name)
+    settings = await AppSettingsRepository.get()
+    blocked_keys = settings.blocked_keys or None
+    blocked_names = settings.blocked_names or None
+    data = await MessageRepository.get_unread_counts(
+        name, blocked_keys=blocked_keys, blocked_names=blocked_names
+    )
     return UnreadCounts(**data)
 
 
