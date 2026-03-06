@@ -20,8 +20,7 @@ class BotModule(FanoutModule):
     """
 
     def __init__(self, config_id: str, config: dict, *, name: str = "Bot") -> None:
-        super().__init__(config_id, config)
-        self._name = name
+        super().__init__(config_id, config, name=name)
 
     async def on_message(self, data: dict) -> None:
         """Kick off bot execution in a background task so we don't block dispatch."""
@@ -110,10 +109,10 @@ class BotModule(FanoutModule):
                     timeout=BOT_EXECUTION_TIMEOUT,
                 )
             except asyncio.TimeoutError:
-                logger.warning("Bot '%s' execution timed out", self._name)
+                logger.warning("Bot '%s' execution timed out", self.name)
                 return
             except Exception as e:
-                logger.warning("Bot '%s' execution error: %s", self._name, e)
+                logger.warning("Bot '%s' execution error: %s", self.name, e)
                 return
 
         if response:

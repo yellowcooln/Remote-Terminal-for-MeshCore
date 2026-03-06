@@ -44,10 +44,10 @@ def _validate_mqtt_private_config(config: dict) -> None:
 def _validate_mqtt_community_config(config: dict) -> None:
     """Validate mqtt_community config blob."""
     iata = config.get("iata", "")
-    if iata and not _IATA_RE.fullmatch(iata.upper().strip()):
+    if not iata or not _IATA_RE.fullmatch(iata.upper().strip()):
         raise HTTPException(
             status_code=400,
-            detail="IATA code must be exactly 3 uppercase alphabetic characters",
+            detail="IATA code is required and must be exactly 3 uppercase alphabetic characters",
         )
 
 

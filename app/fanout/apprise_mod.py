@@ -88,8 +88,8 @@ def _send_sync(urls_raw: str, body: str, *, preserve_identity: bool) -> bool:
 class AppriseModule(FanoutModule):
     """Sends push notifications via Apprise for incoming messages."""
 
-    def __init__(self, config_id: str, config: dict) -> None:
-        super().__init__(config_id, config)
+    def __init__(self, config_id: str, config: dict, *, name: str = "") -> None:
+        super().__init__(config_id, config, name=name)
         self._last_error: str | None = None
 
     async def on_message(self, data: dict) -> None:

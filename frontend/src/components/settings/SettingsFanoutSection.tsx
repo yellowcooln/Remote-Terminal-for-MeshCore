@@ -777,18 +777,42 @@ function WebhookConfigEditor({
             <option value="PATCH">PATCH</option>
           </select>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="fanout-webhook-secret">Secret (optional)</Label>
-          <Input
-            id="fanout-webhook-secret"
-            type="password"
-            placeholder="Sent as X-Webhook-Secret header"
-            value={(config.secret as string) || ''}
-            onChange={(e) => onChange({ ...config, secret: e.target.value })}
-          />
+      <Separator />
+
+      <div className="space-y-3">
+        <Label>HMAC Signing</Label>
+        <p className="text-xs text-muted-foreground">
+          When a secret is set, each request includes an HMAC-SHA256 signature of the JSON body in
+          the specified header (e.g. <code className="bg-muted px-1 rounded">sha256=ab12cd...</code>
+          ).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="fanout-webhook-hmac-secret">HMAC Secret</Label>
+            <Input
+              id="fanout-webhook-hmac-secret"
+              type="password"
+              placeholder="Leave empty to disable signing"
+              value={(config.hmac_secret as string) || ''}
+              onChange={(e) => onChange({ ...config, hmac_secret: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fanout-webhook-hmac-header">Signature Header Name</Label>
+            <Input
+              id="fanout-webhook-hmac-header"
+              type="text"
+              placeholder="X-Webhook-Signature"
+              value={(config.hmac_header as string) || ''}
+              onChange={(e) => onChange({ ...config, hmac_header: e.target.value })}
+            />
+          </div>
         </div>
       </div>
+
+      <Separator />
 
       <div className="space-y-2">
         <Label htmlFor="fanout-webhook-headers">Extra Headers (JSON)</Label>
@@ -915,7 +939,8 @@ export function SettingsFanoutSection({
         url: '',
         method: 'POST',
         headers: {},
-        secret: '',
+        hmac_secret: '',
+        hmac_header: '',
       },
       apprise: {
         urls: '',

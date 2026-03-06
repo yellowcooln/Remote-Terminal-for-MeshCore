@@ -40,10 +40,6 @@ test.describe('Webhook integration settings', () => {
     // Verify method defaults to POST
     await expect(page.locator('#fanout-webhook-method')).toHaveValue('POST');
 
-    // Fill in a secret
-    const secretInput = page.locator('#fanout-webhook-secret');
-    await secretInput.fill('e2e-secret');
-
     // Rename it
     const nameInput = page.locator('#fanout-edit-name');
     await nameInput.clear();
@@ -69,7 +65,7 @@ test.describe('Webhook integration settings', () => {
     const webhook = await createFanoutConfig({
       type: 'webhook',
       name: 'API Webhook',
-      config: { url: 'https://example.com/hook', method: 'POST', headers: {}, secret: '' },
+      config: { url: 'https://example.com/hook', method: 'POST', headers: {} },
       enabled: true,
     });
     createdWebhookId = webhook.id;
@@ -105,7 +101,7 @@ test.describe('Webhook integration settings', () => {
     const webhook = await createFanoutConfig({
       type: 'webhook',
       name: 'Scope Webhook',
-      config: { url: 'https://example.com/hook', method: 'POST', headers: {}, secret: '' },
+      config: { url: 'https://example.com/hook', method: 'POST', headers: {} },
     });
     createdWebhookId = webhook.id;
 
@@ -140,7 +136,7 @@ test.describe('Webhook integration settings', () => {
     const webhook = await createFanoutConfig({
       type: 'webhook',
       name: 'Delete Me Webhook',
-      config: { url: 'https://example.com/hook', method: 'POST', headers: {}, secret: '' },
+      config: { url: 'https://example.com/hook', method: 'POST', headers: {} },
     });
     createdWebhookId = webhook.id;
 

@@ -493,12 +493,11 @@ async def webhook_server():
     await server.stop()
 
 
-def _webhook_config(port: int, secret: str = "") -> dict:
+def _webhook_config(port: int, extra_headers: dict | None = None) -> dict:
     return {
         "url": f"http://127.0.0.1:{port}/hook",
         "method": "POST",
-        "headers": {},
-        "secret": secret,
+        "headers": extra_headers or {},
     }
 
 
@@ -540,12 +539,12 @@ class TestFanoutWebhookIntegration:
         assert results[0]["headers"].get("x-webhook-event") == "message"
 
     @pytest.mark.asyncio
-    async def test_webhook_sends_secret_header(self, webhook_server, integration_db):
-        """Webhook sends X-Webhook-Secret when configured."""
+    async def test_webhook_sends_custom_headers(self, webhook_server, integration_db):
+        """Webhook forwards custom headers from config."""
         cfg = await FanoutConfigRepository.create(
             config_type="webhook",
-            name="Secret Hook",
-            config=_webhook_config(webhook_server.port, secret="my-secret-123"),
+            name="Custom Header Hook",
+            config=_webhook_config(webhook_server.port, extra_headers={"X-Custom": "my-value"}),
             scope={"messages": "all", "raw_packets": "none"},
             enabled=True,
         )
@@ -556,7 +555,7 @@ class TestFanoutWebhookIntegration:
             await _wait_connected(manager, cfg["id"])
 
             await manager.broadcast_message(
-                {"type": "CHAN", "conversation_key": "ch1", "text": "secret test"}
+                {"type": "CHAN", "conversation_key": "ch1", "text": "header test"}
             )
 
             results = await webhook_server.wait_for(1)
@@ -564,7 +563,48 @@ class TestFanoutWebhookIntegration:
             await manager.stop_all()
 
         assert len(results) == 1
-        assert results[0]["headers"].get("x-webhook-secret") == "my-secret-123"
+        assert results[0]["headers"].get("x-custom") == "my-value"
+
+    @pytest.mark.asyncio
+    async def test_webhook_hmac_signature(self, webhook_server, integration_db):
+        """Webhook sends HMAC-SHA256 signature when hmac_secret is configured."""
+        import hashlib
+        import hmac
+        import json
+
+        secret = "test-secret-key"
+        cfg = await FanoutConfigRepository.create(
+            config_type="webhook",
+            name="HMAC Hook",
+            config={
+                **_webhook_config(webhook_server.port),
+                "hmac_secret": secret,
+                "hmac_header": "X-My-Sig",
+            },
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            await _wait_connected(manager, cfg["id"])
+
+            msg = {"type": "CHAN", "conversation_key": "ch1", "text": "hmac test"}
+            await manager.broadcast_message(msg)
+
+            results = await webhook_server.wait_for(1)
+        finally:
+            await manager.stop_all()
+
+        assert len(results) == 1
+        sig_header = results[0]["headers"].get("x-my-sig", "")
+        assert sig_header.startswith("sha256=")
+
+        # Verify the signature matches
+        body_bytes = json.dumps(results[0]["body"], separators=(",", ":"), sort_keys=True).encode()
+        expected = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+        assert sig_header == f"sha256={expected}"
 
     @pytest.mark.asyncio
     async def test_webhook_disabled_no_delivery(self, webhook_server, integration_db):
@@ -725,14 +765,14 @@ class TestFanoutWebhookIntegration:
         cfg_a = await FanoutConfigRepository.create(
             config_type="webhook",
             name="Hook A",
-            config=_webhook_config(webhook_server.port, secret="a"),
+            config=_webhook_config(webhook_server.port, extra_headers={"X-Hook-Id": "a"}),
             scope={"messages": "all", "raw_packets": "none"},
             enabled=True,
         )
         cfg_b = await FanoutConfigRepository.create(
             config_type="webhook",
             name="Hook B",
-            config=_webhook_config(webhook_server.port, secret="b"),
+            config=_webhook_config(webhook_server.port, extra_headers={"X-Hook-Id": "b"}),
             scope={"messages": "all", "raw_packets": "none"},
             enabled=True,
         )
@@ -752,9 +792,9 @@ class TestFanoutWebhookIntegration:
             await manager.stop_all()
 
         assert len(results) == 2
-        secrets = {r["headers"].get("x-webhook-secret") for r in results}
-        assert "a" in secrets
-        assert "b" in secrets
+        hook_ids = {r["headers"].get("x-hook-id") for r in results}
+        assert "a" in hook_ids
+        assert "b" in hook_ids
 
     @pytest.mark.asyncio
     async def test_webhook_disable_stops_delivery(self, webhook_server, integration_db):

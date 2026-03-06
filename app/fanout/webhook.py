@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 
 import httpx
@@ -14,8 +16,8 @@ logger = logging.getLogger(__name__)
 class WebhookModule(FanoutModule):
     """Delivers message data to an HTTP endpoint via POST (or configurable method)."""
 
-    def __init__(self, config_id: str, config: dict) -> None:
-        super().__init__(config_id, config)
+    def __init__(self, config_id: str, config: dict, *, name: str = "") -> None:
+        super().__init__(config_id, config, name=name)
         self._client: httpx.AsyncClient | None = None
         self._last_error: str | None = None
 
@@ -44,18 +46,25 @@ class WebhookModule(FanoutModule):
 
         method = self.config.get("method", "POST").upper()
         extra_headers = self.config.get("headers", {})
-        secret = self.config.get("secret", "")
+        hmac_secret = self.config.get("hmac_secret", "")
+        hmac_header = self.config.get("hmac_header", "X-Webhook-Signature")
 
         headers = {
             "Content-Type": "application/json",
             "X-Webhook-Event": event_type,
             **extra_headers,
         }
-        if secret:
-            headers["X-Webhook-Secret"] = secret
+
+        import json as _json
+
+        body_bytes = _json.dumps(data, separators=(",", ":"), sort_keys=True).encode()
+
+        if hmac_secret:
+            sig = hmac.new(hmac_secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+            headers[hmac_header or "X-Webhook-Signature"] = f"sha256={sig}"
 
         try:
-            resp = await self._client.request(method, url, json=data, headers=headers)
+            resp = await self._client.request(method, url, content=body_bytes, headers=headers)
             resp.raise_for_status()
             self._last_error = None
         except httpx.HTTPStatusError as exc:

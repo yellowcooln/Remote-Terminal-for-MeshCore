@@ -12,9 +12,10 @@ class FanoutModule:
     Subclasses must override the ``status`` property.
     """
 
-    def __init__(self, config_id: str, config: dict) -> None:
+    def __init__(self, config_id: str, config: dict, *, name: str = "") -> None:
         self.config_id = config_id
         self.config = config
+        self.name = name
 
     async def start(self) -> None:
         """Start the module (e.g. connect to broker). Override for persistent connections."""

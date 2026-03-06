@@ -108,10 +108,7 @@ class FanoutManager:
             return
 
         try:
-            if config_type == "bot":
-                module = cls(config_id, config_blob, name=cfg.get("name", "Bot"))
-            else:
-                module = cls(config_id, config_blob)
+            module = cls(config_id, config_blob, name=cfg.get("name", ""))
             await module.start()
             self._modules[config_id] = (module, scope)
             logger.info(

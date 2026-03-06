@@ -29,8 +29,8 @@ def _config_to_settings(config: dict) -> SimpleNamespace:
 class MqttPrivateModule(FanoutModule):
     """Wraps an MqttPublisher instance for private MQTT forwarding."""
 
-    def __init__(self, config_id: str, config: dict) -> None:
-        super().__init__(config_id, config)
+    def __init__(self, config_id: str, config: dict, *, name: str = "") -> None:
+        super().__init__(config_id, config, name=name)
         self._publisher = MqttPublisher()
 
     async def start(self) -> None:
