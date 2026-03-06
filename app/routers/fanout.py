@@ -26,7 +26,7 @@ class FanoutConfigCreate(BaseModel):
 
 
 class FanoutConfigUpdate(BaseModel):
-    name: str | None = Field(default=None, description="Updated label")
+    name: str | None = Field(default=None, min_length=1, description="Updated label")
     config: dict | None = Field(default=None, description="Updated config blob")
     scope: dict | None = Field(default=None, description="Updated scope controls")
     enabled: bool | None = Field(default=None, description="Enable/disable toggle")
@@ -42,13 +42,14 @@ def _validate_mqtt_private_config(config: dict) -> None:
 
 
 def _validate_mqtt_community_config(config: dict) -> None:
-    """Validate mqtt_community config blob."""
-    iata = config.get("iata", "")
-    if not iata or not _IATA_RE.fullmatch(iata.upper().strip()):
+    """Validate mqtt_community config blob. Normalizes IATA to uppercase."""
+    iata = config.get("iata", "").upper().strip()
+    if not iata or not _IATA_RE.fullmatch(iata):
         raise HTTPException(
             status_code=400,
             detail="IATA code is required and must be exactly 3 uppercase alphabetic characters",
         )
+    config["iata"] = iata
 
 
 def _validate_bot_config(config: dict) -> None:
@@ -96,15 +97,24 @@ def _enforce_scope(config_type: str, scope: dict) -> dict:
     if config_type in ("webhook", "apprise"):
         messages = scope.get("messages", "all")
         if messages not in ("all", "none") and not isinstance(messages, dict):
-            messages = "all"
+            raise HTTPException(
+                status_code=400,
+                detail="scope.messages must be 'all', 'none', or a filter object",
+            )
         return {"messages": messages, "raw_packets": "none"}
     # For mqtt_private, validate scope values
     messages = scope.get("messages", "all")
     if messages not in ("all", "none") and not isinstance(messages, dict):
-        messages = "all"
+        raise HTTPException(
+            status_code=400,
+            detail="scope.messages must be 'all', 'none', or a filter object",
+        )
     raw_packets = scope.get("raw_packets", "all")
     if raw_packets not in ("all", "none"):
-        raw_packets = "all"
+        raise HTTPException(
+            status_code=400,
+            detail="scope.raw_packets must be 'all' or 'none'",
+        )
     return {"messages": messages, "raw_packets": raw_packets}
 
 
