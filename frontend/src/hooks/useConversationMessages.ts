@@ -12,7 +12,7 @@ interface PendingAckUpdate {
   paths?: MessagePath[];
 }
 
-function mergePendingAck(
+export function mergePendingAck(
   existing: PendingAckUpdate | undefined,
   ackCount: number,
   paths?: MessagePath[]

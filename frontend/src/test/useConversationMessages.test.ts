@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getMessageContentKey } from '../hooks/useConversationMessages';
+import { getMessageContentKey, mergePendingAck } from '../hooks/useConversationMessages';
 import type { Message } from '../types';
 
 function createMessage(overrides: Partial<Message> = {}): Message {
@@ -159,5 +159,80 @@ describe('getMessageContentKey', () => {
     const msg2 = createMessage({ id: 42, sender_timestamp: null, received_at: 1700000001 });
 
     expect(getMessageContentKey(msg1)).toBe(getMessageContentKey(msg2));
+  });
+});
+
+describe('mergePendingAck', () => {
+  const paths1 = [{ path: 'A1B2', received_at: 1700000000 }];
+  const paths2 = [
+    { path: 'A1B2', received_at: 1700000000 },
+    { path: 'C3D4', received_at: 1700000001 },
+  ];
+
+  it('creates new entry when no existing state', () => {
+    const result = mergePendingAck(undefined, 1, paths1);
+    expect(result).toEqual({ ackCount: 1, paths: paths1 });
+  });
+
+  it('creates new entry without paths when paths not provided', () => {
+    const result = mergePendingAck(undefined, 1);
+    expect(result).toEqual({ ackCount: 1 });
+    expect('paths' in result).toBe(false);
+  });
+
+  it('higher ack count replaces existing', () => {
+    const existing = { ackCount: 1, paths: paths1 };
+    const result = mergePendingAck(existing, 3, paths2);
+    expect(result).toEqual({ ackCount: 3, paths: paths2 });
+  });
+
+  it('higher ack count preserves existing paths when new paths undefined', () => {
+    const existing = { ackCount: 1, paths: paths1 };
+    const result = mergePendingAck(existing, 3);
+    expect(result).toEqual({ ackCount: 3, paths: paths1 });
+  });
+
+  it('higher ack count drops existing paths when new paths explicitly provided', () => {
+    const existing = { ackCount: 1, paths: paths2 };
+    const result = mergePendingAck(existing, 3, paths1);
+    expect(result).toEqual({ ackCount: 3, paths: paths1 });
+  });
+
+  it('lower ack count is ignored entirely', () => {
+    const existing = { ackCount: 5, paths: paths2 };
+    const result = mergePendingAck(existing, 2, paths1);
+    expect(result).toBe(existing);
+  });
+
+  it('same ack count with no new paths returns existing', () => {
+    const existing = { ackCount: 3, paths: paths1 };
+    const result = mergePendingAck(existing, 3);
+    expect(result).toBe(existing);
+  });
+
+  it('same ack count with more paths replaces', () => {
+    const existing = { ackCount: 3, paths: paths1 };
+    const result = mergePendingAck(existing, 3, paths2);
+    expect(result).toEqual({ ackCount: 3, paths: paths2 });
+  });
+
+  it('same ack count with fewer paths keeps existing', () => {
+    const existing = { ackCount: 3, paths: paths2 };
+    const result = mergePendingAck(existing, 3, paths1);
+    expect(result).toBe(existing);
+  });
+
+  it('same ack count with equal-length paths replaces (uses >=)', () => {
+    const existing = { ackCount: 3, paths: paths1 };
+    const newPaths = [{ path: 'X1Y2', received_at: 1700000005 }];
+    const result = mergePendingAck(existing, 3, newPaths);
+    expect(result).toEqual({ ackCount: 3, paths: newPaths });
+  });
+
+  it('same ack count with paths when existing has no paths', () => {
+    const existing = { ackCount: 2 };
+    const result = mergePendingAck(existing, 2, paths1);
+    // existing.paths is undefined → length -1, paths1.length (1) >= -1 → replaces
+    expect(result).toEqual({ ackCount: 2, paths: paths1 });
   });
 });
