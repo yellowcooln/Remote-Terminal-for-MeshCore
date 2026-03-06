@@ -189,31 +189,7 @@ function MqttPrivateConfigEditor({
 
       <Separator />
 
-      <div className="space-y-2">
-        <Label>Scope</Label>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={scope.messages === 'all'}
-            onChange={(e) =>
-              onScopeChange({ ...scope, messages: e.target.checked ? 'all' : 'none' })
-            }
-            className="h-4 w-4 rounded border-border"
-          />
-          <span className="text-sm">Forward decoded messages</span>
-        </label>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={scope.raw_packets === 'all'}
-            onChange={(e) =>
-              onScopeChange({ ...scope, raw_packets: e.target.checked ? 'all' : 'none' })
-            }
-            className="h-4 w-4 rounded border-border"
-          />
-          <span className="text-sm">Forward raw packets</span>
-        </label>
-      </div>
+      <ScopeSelector scope={scope} onChange={onScopeChange} showRawPackets />
     </div>
   );
 }
@@ -398,9 +374,11 @@ function getFilterKeys(filter: unknown): string[] {
 function ScopeSelector({
   scope,
   onChange,
+  showRawPackets = false,
 }: {
   scope: Record<string, unknown>;
   onChange: (scope: Record<string, unknown>) => void;
+  showRawPackets?: boolean;
 }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -425,7 +403,9 @@ function ScopeSelector({
   }, []);
 
   const messages = scope.messages ?? 'all';
-  const mode = getScopeMode(messages);
+  const rawMode = getScopeMode(messages);
+  // When raw packets aren't offered, "none" is not a valid choice — treat as "all"
+  const mode = !showRawPackets && rawMode === 'none' ? 'all' : rawMode;
   const isListMode = mode === 'only' || mode === 'except';
 
   const selectedChannels: string[] =
@@ -487,6 +467,19 @@ function ScopeSelector({
     except: 'All except listed channels/contacts',
   };
 
+  const rawEnabled = showRawPackets && scope.raw_packets === 'all';
+
+  // Warn when the effective scope matches nothing
+  const messagesEffectivelyNone =
+    mode === 'none' ||
+    (mode === 'only' && selectedChannels.length === 0 && selectedContacts.length === 0) ||
+    (mode === 'except' &&
+      channels.length > 0 &&
+      filteredContacts.length > 0 &&
+      selectedChannels.length >= channels.length &&
+      selectedContacts.length >= filteredContacts.length);
+  const showEmptyScopeWarning = messagesEffectivelyNone && !rawEnabled;
+
   // For "except" mode, checked means the item is in the exclusion list (will be excluded)
   const isChannelChecked = (key: string) =>
     mode === 'except' ? selectedChannels.includes(key) : selectedChannels.includes(key);
@@ -500,11 +493,28 @@ function ScopeSelector({
 
   const checkboxLabel = mode === 'except' ? 'exclude' : 'include';
 
+  const messageModes: ScopeMode[] = showRawPackets
+    ? ['all', 'none', 'only', 'except']
+    : ['all', 'only', 'except'];
+
   return (
     <div className="space-y-3">
       <Label>Message Scope</Label>
+
+      {showRawPackets && (
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={rawEnabled}
+            onChange={(e) => onChange({ ...scope, raw_packets: e.target.checked ? 'all' : 'none' })}
+            className="h-4 w-4 rounded border-border"
+          />
+          <span className="text-sm">Forward raw packets</span>
+        </label>
+      )}
+
       <div className="space-y-1">
-        {(['all', 'none', 'only', 'except'] as const).map((m) => (
+        {messageModes.map((m) => (
           <label key={m} className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -517,6 +527,12 @@ function ScopeSelector({
           </label>
         ))}
       </div>
+
+      {showEmptyScopeWarning && (
+        <div className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-warning">
+          Nothing is selected &mdash; this integration will not forward any data.
+        </div>
+      )}
 
       {isListMode && (
         <>

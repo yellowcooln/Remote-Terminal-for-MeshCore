@@ -190,7 +190,11 @@ function MyTypeConfigEditor({
 }
 ```
 
-If your type does NOT have user-configurable scope (like bot or community MQTT), omit the `scope`/`onScopeChange` props and the `ScopeSelector`. The `ScopeSelector` component is defined within the same file — it provides all/none/only/except radio buttons with channel and contact checklists.
+If your type does NOT have user-configurable scope (like bot or community MQTT), omit the `scope`/`onScopeChange` props and the `ScopeSelector`.
+
+The `ScopeSelector` component is defined within the same file. It accepts an optional `showRawPackets` prop:
+- **Without `showRawPackets`** (webhook, apprise): shows message scope only (all/only/except — no "none" option since that would make the integration a no-op). A warning appears when the effective selection matches nothing.
+- **With `showRawPackets`** (private MQTT): adds a "Forward raw packets" toggle and includes the "No messages" option (valid when raw packets are enabled). The warning appears only when both raw packets and messages are effectively disabled.
 
 **c)** Add default config and scope in `handleAddCreate`:
 ```tsx

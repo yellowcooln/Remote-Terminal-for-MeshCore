@@ -125,6 +125,118 @@ describe('SettingsFanoutSection', () => {
     });
   });
 
+  it('webhook with persisted "none" scope renders "All messages" selected', async () => {
+    const wh: FanoutConfig = {
+      ...webhookConfig,
+      scope: { messages: 'none', raw_packets: 'none' },
+    };
+    mockedApi.getFanoutConfigs.mockResolvedValue([wh]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    // "none" is not a valid mode without raw packets — should fall back to "all"
+    const allRadio = screen.getByLabelText('All messages');
+    expect(allRadio).toBeChecked();
+  });
+
+  it('does not show "No messages" scope option for webhook', async () => {
+    const wh: FanoutConfig = {
+      ...webhookConfig,
+      scope: { messages: 'all', raw_packets: 'none' },
+    };
+    mockedApi.getFanoutConfigs.mockResolvedValue([wh]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    expect(screen.getByText('All messages')).toBeInTheDocument();
+    expect(screen.queryByText('No messages')).not.toBeInTheDocument();
+  });
+
+  it('shows empty scope warning when "only" mode has nothing selected', async () => {
+    const wh: FanoutConfig = {
+      ...webhookConfig,
+      scope: { messages: { channels: [], contacts: [] }, raw_packets: 'none' },
+    };
+    mockedApi.getFanoutConfigs.mockResolvedValue([wh]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    expect(screen.getByText(/will not forward any data/)).toBeInTheDocument();
+  });
+
+  it('shows warning for private MQTT when both scope axes are off', async () => {
+    const mqtt: FanoutConfig = {
+      id: 'mqtt-1',
+      type: 'mqtt_private',
+      name: 'My MQTT',
+      enabled: true,
+      config: { broker_host: 'localhost', broker_port: 1883 },
+      scope: { messages: 'none', raw_packets: 'none' },
+      sort_order: 0,
+      created_at: 1000,
+    };
+    mockedApi.getFanoutConfigs.mockResolvedValue([mqtt]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('My MQTT')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    expect(screen.getByText(/will not forward any data/)).toBeInTheDocument();
+  });
+
+  it('private MQTT shows raw packets toggle and No messages option', async () => {
+    const mqtt: FanoutConfig = {
+      id: 'mqtt-1',
+      type: 'mqtt_private',
+      name: 'My MQTT',
+      enabled: true,
+      config: { broker_host: 'localhost', broker_port: 1883 },
+      scope: { messages: 'all', raw_packets: 'all' },
+      sort_order: 0,
+      created_at: 1000,
+    };
+    mockedApi.getFanoutConfigs.mockResolvedValue([mqtt]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('My MQTT')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    expect(screen.getByText('Forward raw packets')).toBeInTheDocument();
+    expect(screen.getByText('No messages')).toBeInTheDocument();
+  });
+
+  it('private MQTT hides warning when raw packets enabled but messages off', async () => {
+    const mqtt: FanoutConfig = {
+      id: 'mqtt-1',
+      type: 'mqtt_private',
+      name: 'My MQTT',
+      enabled: true,
+      config: { broker_host: 'localhost', broker_port: 1883 },
+      scope: { messages: 'none', raw_packets: 'all' },
+      sort_order: 0,
+      created_at: 1000,
+    };
+    mockedApi.getFanoutConfigs.mockResolvedValue([mqtt]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('My MQTT')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    expect(screen.queryByText(/will not forward any data/)).not.toBeInTheDocument();
+  });
+
   it('navigates to create view when clicking add button', async () => {
     const createdWebhook: FanoutConfig = {
       id: 'wh-new',
