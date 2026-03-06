@@ -29,10 +29,36 @@ export function useUnreadCounts(
   const [mentions, setMentions] = useState<Record<string, boolean>>({});
   const [lastMessageTimes, setLastMessageTimes] = useState<ConversationTimes>(getLastMessageTimes);
 
-  // Apply unreads data to state
+  // Track active conversation via ref so applyUnreads can filter without
+  // destabilizing the callback chain (avoids re-creating fetchUnreads on
+  // every conversation switch).
+  const activeConvRef = useRef(activeConversation);
+  activeConvRef.current = activeConversation;
+
+  // Apply unreads data to state, filtering out the active conversation
+  // (the user is already viewing it, so its count should stay at 0).
   const applyUnreads = useCallback((data: UnreadCounts) => {
-    setUnreadCounts(data.counts);
-    setMentions(data.mentions);
+    const ac = activeConvRef.current;
+    const activeKey =
+      ac &&
+      ac.type !== 'raw' &&
+      ac.type !== 'map' &&
+      ac.type !== 'visualizer' &&
+      ac.type !== 'search'
+        ? getStateKey(ac.type as 'channel' | 'contact', ac.id)
+        : null;
+
+    if (activeKey) {
+      const counts = { ...data.counts };
+      const mentionsData = { ...data.mentions };
+      delete counts[activeKey];
+      delete mentionsData[activeKey];
+      setUnreadCounts(counts);
+      setMentions(mentionsData);
+    } else {
+      setUnreadCounts(data.counts);
+      setMentions(data.mentions);
+    }
 
     if (Object.keys(data.last_message_times).length > 0) {
       for (const [key, ts] of Object.entries(data.last_message_times)) {
@@ -42,12 +68,20 @@ export function useUnreadCounts(
     }
   }, []);
 
-  // Fetch unreads from the server-side endpoint
+  // Fetch unreads from the server-side endpoint.
+  // Also re-marks the active conversation as read so the server's last_read_at
+  // stays current (otherwise subsequent fetches would re-report the same unreads).
   const fetchUnreads = useCallback(async () => {
     try {
       applyUnreads(await api.getUnreads());
     } catch (err) {
       console.error('Failed to fetch unreads:', err);
+    }
+    const ac = activeConvRef.current;
+    if (ac?.type === 'channel') {
+      api.markChannelRead(ac.id).catch(() => {});
+    } else if (ac?.type === 'contact') {
+      api.markContactRead(ac.id).catch(() => {});
     }
   }, [applyUnreads]);
 
