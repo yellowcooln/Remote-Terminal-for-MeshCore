@@ -94,184 +94,6 @@
   --overlay: 0 0% 0%;
 }
 
-/* ── Aurora ("Borealis") ───────────────────────────────────── */
-:root[data-theme='aurora'] {
-  --background: 240 18% 6%;
-  --foreground: 240 8% 88%;
-  --card: 240 16% 10%;
-  --card-foreground: 240 8% 88%;
-  --popover: 240 16% 11%;
-  --popover-foreground: 240 8% 88%;
-  --primary: 328 80% 56%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 245 14% 15%;
-  --secondary-foreground: 245 10% 82%;
-  --muted: 248 14% 13%;
-  --muted-foreground: 258 8% 62%;
-  --accent: 252 12% 18%;
-  --accent-foreground: 240 8% 88%;
-  --destructive: 355 78% 52%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 255 14% 21%;
-  --input: 255 14% 21%;
-  --ring: 328 80% 56%;
-  --msg-outgoing: 328 24% 12%;
-  --msg-incoming: 240 16% 12%;
-  --status-connected: 155 68% 42%;
-  --status-disconnected: 255 8% 44%;
-  --warning: 33 88% 52%;
-  --warning-foreground: 0 0% 100%;
-  --success: 155 68% 42%;
-  --success-foreground: 0 0% 100%;
-  --info: 228 72% 64%;
-  --info-foreground: 0 0% 100%;
-  --favorite: 328 60% 68%;
-  --console: 275 56% 62%;
-  --console-command: 275 56% 72%;
-  --console-bg: 240 18% 4%;
-  --toast-error: 350 28% 13%;
-  --toast-error-foreground: 350 60% 75%;
-  --toast-error-border: 350 24% 22%;
-  --code-editor-bg: 240 16% 8%;
-  --scrollbar: 255 14% 20%;
-  --scrollbar-hover: 255 14% 28%;
-  --overlay: 240 30% 3%;
-}
-
-/* ── Amber Terminal ("Phosphor Burn") ──────────────────────── */
-:root[data-theme='amber-terminal'] {
-  --background: 36 20% 3%;
-  --foreground: 36 28% 78%;
-  --card: 34 16% 6%;
-  --card-foreground: 36 28% 78%;
-  --popover: 34 16% 7%;
-  --popover-foreground: 36 28% 78%;
-  --primary: 40 100% 50%;
-  --primary-foreground: 40 100% 5%;
-  --secondary: 34 10% 10%;
-  --secondary-foreground: 36 18% 68%;
-  --muted: 34 8% 9%;
-  --muted-foreground: 36 12% 46%;
-  --accent: 34 12% 13%;
-  --accent-foreground: 36 28% 78%;
-  --destructive: 14 84% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 34 14% 16%;
-  --input: 34 14% 16%;
-  --ring: 40 100% 50%;
-  --radius: 0px;
-  --msg-outgoing: 40 26% 9%;
-  --msg-incoming: 34 12% 7%;
-  --status-connected: 130 60% 42%;
-  --status-disconnected: 36 10% 34%;
-  --warning: 48 96% 48%;
-  --warning-foreground: 48 96% 8%;
-  --success: 90 60% 40%;
-  --success-foreground: 90 60% 6%;
-  --info: 200 50% 48%;
-  --info-foreground: 0 0% 100%;
-  --favorite: 40 100% 54%;
-  --console: 40 100% 52%;
-  --console-command: 40 100% 64%;
-  --console-bg: 0 0% 1%;
-  --toast-error: 14 40% 10%;
-  --toast-error-foreground: 14 72% 68%;
-  --toast-error-border: 14 32% 18%;
-  --code-editor-bg: 34 14% 5%;
-  --font-mono: 'Courier New', 'Lucida Console', monospace;
-  --scrollbar: 34 14% 14%;
-  --scrollbar-hover: 34 14% 22%;
-  --overlay: 0 0% 0%;
-}
-
-/* ── Midnight Sun ("Solstice") ─────────────────────────────── */
-:root[data-theme='midnight-sun'] {
-  --background: 250 28% 7%;
-  --foreground: 42 16% 86%;
-  --card: 248 24% 13%;
-  --card-foreground: 42 16% 86%;
-  --popover: 248 24% 14%;
-  --popover-foreground: 42 16% 86%;
-  --primary: 44 86% 52%;
-  --primary-foreground: 44 86% 7%;
-  --secondary: 252 18% 17%;
-  --secondary-foreground: 42 12% 78%;
-  --muted: 252 16% 14%;
-  --muted-foreground: 248 10% 56%;
-  --accent: 264 14% 19%;
-  --accent-foreground: 42 16% 86%;
-  --destructive: 0 65% 54%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 256 14% 22%;
-  --input: 256 14% 22%;
-  --ring: 44 86% 52%;
-  --msg-outgoing: 44 22% 11%;
-  --msg-incoming: 250 20% 12%;
-  --status-connected: 152 58% 40%;
-  --status-disconnected: 252 8% 42%;
-  --warning: 32 88% 50%;
-  --warning-foreground: 32 88% 8%;
-  --success: 152 58% 40%;
-  --success-foreground: 0 0% 100%;
-  --info: 212 68% 54%;
-  --info-foreground: 0 0% 100%;
-  --favorite: 44 86% 56%;
-  --console: 44 76% 54%;
-  --console-command: 44 76% 66%;
-  --console-bg: 250 28% 5%;
-  --toast-error: 0 28% 14%;
-  --toast-error-foreground: 0 52% 68%;
-  --toast-error-border: 0 22% 22%;
-  --code-editor-bg: 248 22% 10%;
-  --scrollbar: 256 14% 20%;
-  --scrollbar-hover: 256 14% 28%;
-  --overlay: 250 30% 3%;
-}
-
-/* ── Basecamp ("Red Dust") ─────────────────────────────────── */
-:root[data-theme='basecamp'] {
-  --background: 24 20% 8%;
-  --foreground: 36 14% 82%;
-  --card: 24 18% 11%;
-  --card-foreground: 36 14% 82%;
-  --popover: 24 18% 12%;
-  --popover-foreground: 36 14% 82%;
-  --primary: 16 55% 50%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 24 14% 14%;
-  --secondary-foreground: 30 12% 72%;
-  --muted: 24 12% 12%;
-  --muted-foreground: 30 8% 50%;
-  --accent: 24 14% 16%;
-  --accent-foreground: 36 14% 82%;
-  --destructive: 0 70% 48%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 24 14% 20%;
-  --input: 24 14% 20%;
-  --ring: 16 55% 50%;
-  --msg-outgoing: 16 20% 12%;
-  --msg-incoming: 24 14% 10%;
-  --status-connected: 130 48% 40%;
-  --status-disconnected: 30 8% 38%;
-  --warning: 38 88% 48%;
-  --warning-foreground: 38 88% 8%;
-  --success: 130 48% 38%;
-  --success-foreground: 0 0% 100%;
-  --info: 180 30% 44%;
-  --info-foreground: 0 0% 100%;
-  --favorite: 38 80% 52%;
-  --console: 16 50% 54%;
-  --console-command: 16 50% 66%;
-  --console-bg: 24 20% 5%;
-  --toast-error: 0 30% 12%;
-  --toast-error-foreground: 0 56% 68%;
-  --toast-error-border: 0 24% 20%;
-  --code-editor-bg: 24 16% 7%;
-  --scrollbar: 24 12% 16%;
-  --scrollbar-hover: 24 12% 24%;
-  --overlay: 24 20% 3%;
-}
-
 /* ── High Contrast ("Beacon") ──────────────────────────────── */
 :root[data-theme='high-contrast'] {
   --background: 0 0% 0%;
@@ -317,50 +139,6 @@
   --scrollbar: 0 0% 24%;
   --scrollbar-hover: 0 0% 36%;
   --overlay: 0 0% 0%;
-}
-
-/* ── Lo-Fi ("Daydream") ────────────────────────────────────── */
-:root[data-theme='lo-fi'] {
-  --background: 270 10% 9%;
-  --foreground: 270 8% 86%;
-  --card: 260 10% 12%;
-  --card-foreground: 270 8% 86%;
-  --popover: 260 10% 13%;
-  --popover-foreground: 270 8% 86%;
-  --primary: 268 30% 73%;
-  --primary-foreground: 268 40% 12%;
-  --secondary: 260 10% 15%;
-  --secondary-foreground: 268 12% 74%;
-  --muted: 260 8% 13%;
-  --muted-foreground: 268 8% 52%;
-  --accent: 250 12% 16%;
-  --accent-foreground: 270 8% 86%;
-  --destructive: 350 56% 56%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 260 10% 20%;
-  --input: 260 10% 20%;
-  --ring: 268 30% 73%;
-  --msg-outgoing: 268 16% 14%;
-  --msg-incoming: 260 8% 11%;
-  --status-connected: 152 40% 52%;
-  --status-disconnected: 268 8% 42%;
-  --warning: 36 60% 60%;
-  --warning-foreground: 36 60% 10%;
-  --success: 152 40% 48%;
-  --success-foreground: 0 0% 100%;
-  --info: 200 40% 62%;
-  --info-foreground: 0 0% 100%;
-  --favorite: 36 50% 64%;
-  --console: 268 30% 68%;
-  --console-command: 268 30% 78%;
-  --console-bg: 270 10% 6%;
-  --toast-error: 350 24% 14%;
-  --toast-error-foreground: 350 44% 72%;
-  --toast-error-border: 350 20% 22%;
-  --code-editor-bg: 260 10% 8%;
-  --scrollbar: 260 10% 18%;
-  --scrollbar-hover: 260 10% 26%;
-  --overlay: 270 14% 4%;
 }
 
 /* ── Obsidian Glass ("Noir Lustre") ────────────────────────── */
@@ -430,4 +208,147 @@
 
 [data-theme='obsidian-glass'] ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, hsl(30 14% 24%), hsl(224 10% 20%));
+}
+
+/* ── Solar Flare ("Plasma Burn") ─────────────────────────── */
+
+@keyframes sf-glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px hsl(338 100% 50% / 0.3)); }
+  50% { filter: drop-shadow(0 0 10px hsl(338 100% 50% / 0.5)) drop-shadow(0 0 20px hsl(24 100% 50% / 0.2)); }
+}
+
+@keyframes sf-msg-highlight {
+  0% { box-shadow: 0 0 0 2px hsl(338 100% 50%), 0 0 20px hsl(338 100% 50% / 0.4); }
+  100% { box-shadow: 0 0 0 2px transparent, 0 0 0 transparent; }
+}
+
+:root[data-theme='solar-flare'] {
+  --background: 350 28% 4%;
+  --foreground: 38 18% 92%;
+  --card: 345 22% 7%;
+  --card-foreground: 38 18% 92%;
+  --popover: 345 22% 8%;
+  --popover-foreground: 38 18% 92%;
+  --primary: 338 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 346 18% 12%;
+  --secondary-foreground: 38 14% 78%;
+  --muted: 346 16% 10%;
+  --muted-foreground: 348 10% 50%;
+  --accent: 346 20% 15%;
+  --accent-foreground: 38 18% 92%;
+  --destructive: 0 85% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 342 18% 18%;
+  --input: 342 18% 18%;
+  --ring: 338 100% 50%;
+  --radius: 0px;
+  --msg-outgoing: 338 26% 10%;
+  --msg-incoming: 345 16% 8%;
+  --status-connected: 82 80% 48%;
+  --status-disconnected: 348 12% 38%;
+  --warning: 30 100% 54%;
+  --warning-foreground: 30 100% 6%;
+  --success: 82 80% 44%;
+  --success-foreground: 0 0% 100%;
+  --info: 198 80% 54%;
+  --info-foreground: 0 0% 100%;
+  --favorite: 46 100% 54%;
+  --console: 338 100% 54%;
+  --console-command: 338 100% 68%;
+  --console-bg: 0 0% 1%;
+  --toast-error: 0 38% 10%;
+  --toast-error-foreground: 0 66% 72%;
+  --toast-error-border: 0 32% 20%;
+  --code-editor-bg: 345 20% 5%;
+  --font-mono: 'Courier New', 'Lucida Console', monospace;
+  --scrollbar: 338 28% 16%;
+  --scrollbar-hover: 338 38% 24%;
+  --overlay: 350 30% 2%;
+}
+
+/* Solar Flare: Scan-line background texture */
+[data-theme='solar-flare'] body {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 3px,
+      hsl(338 100% 50% / 0.015) 3px,
+      hsl(338 100% 50% / 0.015) 4px
+    ),
+    hsl(350 28% 4%);
+}
+
+/* Solar Flare: Gradient surfaces */
+[data-theme='solar-flare'] .bg-card {
+  background: linear-gradient(145deg, hsl(345 22% 7%), hsl(338 18% 9%));
+}
+
+[data-theme='solar-flare'] .bg-popover {
+  background: linear-gradient(145deg, hsl(345 22% 8%), hsl(338 18% 10%));
+}
+
+[data-theme='solar-flare'] .bg-msg-outgoing {
+  background: linear-gradient(135deg, hsl(338 28% 10%), hsl(350 20% 8%));
+  border-left: 2px solid hsl(338 100% 50% / 0.5);
+}
+
+[data-theme='solar-flare'] .bg-msg-incoming {
+  background: linear-gradient(135deg, hsl(345 16% 8%), hsl(352 12% 7%));
+  border-left: 2px solid hsl(24 80% 50% / 0.25);
+}
+
+/* Solar Flare: Primary elements get magenta-to-orange gradient */
+[data-theme='solar-flare'] .bg-primary {
+  background: linear-gradient(135deg, hsl(338 100% 48%), hsl(355 90% 46%), hsl(14 90% 48%));
+  background-size: 200% 200%;
+  background-position: 0% 50%;
+  transition: background-position 0.4s ease;
+}
+
+[data-theme='solar-flare'] .bg-primary:hover {
+  background-position: 100% 50%;
+}
+
+/* Solar Flare: Chamfered button corners + hover glow */
+[data-theme='solar-flare'] button {
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  transition: filter 0.2s ease, transform 0.12s ease, background-color 0.15s ease, background-position 0.4s ease, color 0.15s ease;
+}
+
+[data-theme='solar-flare'] button:hover {
+  filter: drop-shadow(0 0 6px hsl(338 100% 50% / 0.45)) drop-shadow(0 0 14px hsl(24 100% 50% / 0.2));
+  transform: scale(1.02);
+}
+
+[data-theme='solar-flare'] button:active {
+  transform: scale(0.97);
+  filter: drop-shadow(0 0 3px hsl(338 100% 50% / 0.5));
+}
+
+/* Solar Flare: Input focus glow */
+[data-theme='solar-flare'] input:focus,
+[data-theme='solar-flare'] textarea:focus {
+  box-shadow: 0 0 0 1px hsl(338 100% 50% / 0.5), 0 0 10px hsl(338 100% 50% / 0.2);
+  outline: none;
+}
+
+/* Solar Flare: Primary text glow */
+[data-theme='solar-flare'] .text-primary {
+  text-shadow: 0 0 10px hsl(338 100% 50% / 0.3);
+}
+
+/* Solar Flare: Enhanced jump-to-message highlight */
+[data-theme='solar-flare'] .message-highlight {
+  animation: sf-msg-highlight 2s ease-out forwards;
+}
+
+/* Solar Flare: Gradient scrollbar */
+[data-theme='solar-flare'] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(338 80% 36%), hsl(24 80% 36%));
+}
+
+[data-theme='solar-flare'] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, hsl(338 90% 48%), hsl(24 90% 48%));
 }

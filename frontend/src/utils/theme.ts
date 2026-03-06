@@ -27,46 +27,22 @@ export const THEMES: Theme[] = [
     metaThemeColor: '#07080A',
   },
   {
-    id: 'aurora',
-    name: 'Aurora',
-    swatches: ['#0B0B14', '#131320', '#E8349A', '#1E1D30', '#E8A034', '#5B7FE8'],
-    metaThemeColor: '#0B0B14',
-  },
-  {
-    id: 'amber-terminal',
-    name: 'Amber Terminal',
-    swatches: ['#0A0906', '#12100B', '#FFAA00', '#1C1810', '#66BB22', '#E6451A'],
-    metaThemeColor: '#0A0906',
-  },
-  {
-    id: 'midnight-sun',
-    name: 'Midnight Sun',
-    swatches: ['#0E0C1A', '#181430', '#ECAA1A', '#22203C', '#2DA86C', '#D64040'],
-    metaThemeColor: '#0E0C1A',
-  },
-  {
-    id: 'basecamp',
-    name: 'Basecamp',
-    swatches: ['#1A1410', '#231D17', '#C4623A', '#2E2620', '#8B9A3C', '#5B8A8A'],
-    metaThemeColor: '#1A1410',
-  },
-  {
     id: 'high-contrast',
     name: 'High Contrast',
     swatches: ['#000000', '#141414', '#3B9EFF', '#1E1E1E', '#FFB800', '#FF4757'],
     metaThemeColor: '#000000',
   },
   {
-    id: 'lo-fi',
-    name: 'Lo-Fi',
-    swatches: ['#161418', '#1E1C22', '#B4A0D4', '#262430', '#D4A08C', '#7CA09C'],
-    metaThemeColor: '#161418',
-  },
-  {
     id: 'obsidian-glass',
     name: 'Obsidian Glass',
     swatches: ['#0C0E12', '#151821', '#D4A070', '#1E2230', '#D4924A', '#5B82B4'],
     metaThemeColor: '#0C0E12',
+  },
+  {
+    id: 'solar-flare',
+    name: 'Solar Flare',
+    swatches: ['#0D0607', '#151012', '#FF0066', '#2D1D22', '#FF8C1A', '#30ACD4'],
+    metaThemeColor: '#0D0607',
   },
 ];
 
