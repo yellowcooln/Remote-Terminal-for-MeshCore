@@ -74,7 +74,9 @@ function getStatusLabel(status: string | undefined, type?: string) {
   return 'Inactive';
 }
 
-function getStatusColor(status: string | undefined) {
+function getStatusColor(status: string | undefined, enabled?: boolean) {
+  if (enabled === false)
+    return 'bg-warning shadow-[0_0_6px_hsl(var(--warning)/0.5)]';
   if (status === 'connected')
     return 'bg-status-connected shadow-[0_0_6px_hsl(var(--status-connected)/0.5)]';
   if (status === 'error') return 'bg-destructive shadow-[0_0_6px_hsl(var(--destructive)/0.5)]';
@@ -855,18 +857,21 @@ export function SettingsFanoutSection({
     setEditName(cfg.name);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (enabled?: boolean) => {
     if (!editingId) return;
     setBusy(true);
     try {
-      await api.updateFanoutConfig(editingId, {
+      const update: Record<string, unknown> = {
         name: editName,
         config: editConfig,
         scope: editScope,
-      });
+      };
+      if (enabled !== undefined) update.enabled = enabled;
+      await api.updateFanoutConfig(editingId, update);
       await loadConfigs();
+      if (onHealthRefresh) await onHealthRefresh();
       setEditingId(null);
-      toast.success('Integration saved');
+      toast.success(enabled ? 'Integration saved and enabled' : 'Integration saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -1011,8 +1016,20 @@ export function SettingsFanoutSection({
         <Separator />
 
         <div className="flex gap-2">
-          <Button onClick={handleSave} disabled={busy} className="flex-1">
-            {busy ? 'Saving...' : 'Save'}
+          <Button
+            onClick={() => handleSave(true)}
+            disabled={busy}
+            className="flex-1 bg-status-connected hover:bg-status-connected/90 text-primary-foreground"
+          >
+            {busy ? 'Saving...' : 'Save as Enabled'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => handleSave(false)}
+            disabled={busy}
+            className="flex-1"
+          >
+            {busy ? 'Saving...' : 'Save as Disabled'}
           </Button>
           <Button variant="destructive" onClick={() => handleDelete(editingConfig.id)}>
             Delete
@@ -1071,8 +1088,8 @@ export function SettingsFanoutSection({
                   </span>
 
                   <div
-                    className={cn('w-2 h-2 rounded-full transition-colors', getStatusColor(status))}
-                    title={getStatusLabel(status, cfg.type)}
+                    className={cn('w-2 h-2 rounded-full transition-colors', getStatusColor(status, cfg.enabled))}
+                    title={cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
                     aria-hidden="true"
                   />
                   <span className="text-xs text-muted-foreground hidden sm:inline">
