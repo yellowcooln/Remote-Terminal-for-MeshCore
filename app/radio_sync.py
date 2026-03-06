@@ -325,7 +325,7 @@ async def drain_pending_messages(mc: MeshCore) -> int:
         except asyncio.TimeoutError:
             break
         except Exception as e:
-            logger.debug("Error draining messages: %s", e)
+            logger.warning("Error draining messages: %s", e, exc_info=True)
             break
 
     return count
@@ -359,7 +359,7 @@ async def poll_for_messages(mc: MeshCore) -> int:
     except asyncio.TimeoutError:
         pass
     except Exception as e:
-        logger.debug("Message poll exception: %s", e)
+        logger.warning("Message poll exception: %s", e, exc_info=True)
 
     return count
 
@@ -393,7 +393,7 @@ async def _message_poll_loop():
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.debug("Error in message poll loop: %s", e)
+            logger.warning("Error in message poll loop: %s", e, exc_info=True)
 
 
 def start_message_polling():
