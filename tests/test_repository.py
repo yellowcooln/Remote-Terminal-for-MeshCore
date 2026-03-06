@@ -492,21 +492,6 @@ class TestAppSettingsRepository:
                 "preferences_migrated": 0,
                 "advert_interval": None,
                 "last_advert_time": None,
-                "bots": "{bad-bots-json",
-                "mqtt_broker_host": "",
-                "mqtt_broker_port": 1883,
-                "mqtt_username": "",
-                "mqtt_password": "",
-                "mqtt_use_tls": 0,
-                "mqtt_tls_insecure": 0,
-                "mqtt_topic_prefix": "meshcore",
-                "mqtt_publish_messages": 0,
-                "mqtt_publish_raw_packets": 0,
-                "community_mqtt_enabled": 0,
-                "community_mqtt_iata": "",
-                "community_mqtt_broker_host": "mqtt-us-v1.letsmesh.net",
-                "community_mqtt_broker_port": 443,
-                "community_mqtt_email": "",
                 "flood_scope": "",
                 "blocked_keys": "[]",
                 "blocked_names": "[]",
@@ -525,7 +510,6 @@ class TestAppSettingsRepository:
         assert settings.favorites == []
         assert settings.last_message_times == {}
         assert settings.sidebar_sort_order == "recent"
-        assert settings.bots == []
         assert settings.advert_interval == 0
         assert settings.last_advert_time == 0
 

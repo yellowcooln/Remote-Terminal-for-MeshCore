@@ -31,7 +31,7 @@ test.describe('Webhook integration settings', () => {
     await page.getByRole('button', { name: 'Webhook' }).click();
 
     // Should navigate to the detail/edit view with default name
-    await expect(page.getByDisplayValue('Webhook')).toBeVisible();
+    await expect(page.locator('#fanout-edit-name')).toHaveValue('Webhook');
 
     // Fill in webhook URL
     const urlInput = page.locator('#fanout-webhook-url');
@@ -85,7 +85,7 @@ test.describe('Webhook integration settings', () => {
     await row.getByRole('button', { name: 'Edit' }).click();
 
     // Should be in edit view
-    await expect(page.getByDisplayValue('API Webhook')).toBeVisible();
+    await expect(page.locator('#fanout-edit-name')).toHaveValue('API Webhook');
 
     // Change method to PUT
     await page.locator('#fanout-webhook-method').selectOption('PUT');
@@ -129,9 +129,8 @@ test.describe('Webhook integration settings', () => {
     // Select "Only listed" to see channel/contact checkboxes
     await page.getByText('Only listed channels/contacts').click();
 
-    // Should show Channels and Contacts sections
-    await expect(page.getByText('Channels')).toBeVisible();
-    await expect(page.getByText('Contacts')).toBeVisible();
+    // Should show Channels section (Contacts only appears if non-repeater contacts exist)
+    await expect(page.getByText('Channels (include)')).toBeVisible();
 
     // Go back without saving
     await page.getByText('← Back to list').click();

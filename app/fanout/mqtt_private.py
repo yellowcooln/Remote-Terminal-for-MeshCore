@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
 from app.fanout.base import FanoutModule
-from app.models import AppSettings
-from app.mqtt import MqttPublisher, _build_message_topic, _build_raw_packet_topic
+from app.fanout.mqtt import MqttPublisher, _build_message_topic, _build_raw_packet_topic
 
 logger = logging.getLogger(__name__)
 
 
-def _config_to_settings(config: dict) -> AppSettings:
-    """Map a fanout config blob to AppSettings for the MqttPublisher."""
-    return AppSettings(
+def _config_to_settings(config: dict) -> SimpleNamespace:
+    """Map a fanout config blob to a settings namespace for the MqttPublisher."""
+    return SimpleNamespace(
         mqtt_broker_host=config.get("broker_host", ""),
         mqtt_broker_port=config.get("broker_port", 1883),
         mqtt_username=config.get("username", ""),
@@ -21,7 +21,6 @@ def _config_to_settings(config: dict) -> AppSettings:
         mqtt_use_tls=config.get("use_tls", False),
         mqtt_tls_insecure=config.get("tls_insecure", False),
         mqtt_topic_prefix=config.get("topic_prefix", "meshcore"),
-        # Always enable both publish flags; the fanout scope controls delivery.
         mqtt_publish_messages=True,
         mqtt_publish_raw_packets=True,
     )

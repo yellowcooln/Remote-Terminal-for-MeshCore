@@ -31,7 +31,7 @@ test.describe('Apprise integration settings', () => {
     await page.getByRole('button', { name: 'Apprise' }).click();
 
     // Should navigate to the detail/edit view with default name
-    await expect(page.getByDisplayValue('Apprise')).toBeVisible();
+    await expect(page.locator('#fanout-edit-name')).toHaveValue('Apprise');
 
     // Fill in notification URL
     const urlsTextarea = page.locator('#fanout-apprise-urls');
@@ -135,7 +135,7 @@ test.describe('Apprise integration settings', () => {
     await page.getByText('All except listed channels/contacts').click();
 
     // Should show channel and contact lists with exclude label
-    await expect(page.getByText('(exclude)')).toBeVisible();
+    await expect(page.getByText('Channels (exclude)')).toBeVisible();
 
     // Go back
     await page.getByText('← Back to list').click();
@@ -158,9 +158,9 @@ test.describe('Apprise integration settings', () => {
     await page.getByText('Settings').click();
     await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
 
-    // Should show "Disabled" text
+    // Should show "Disabled" status text
     const row = page.getByText('Disabled Apprise').locator('..');
-    await expect(row.getByText('Disabled')).toBeVisible();
+    await expect(row.getByText('Disabled', { exact: true })).toBeVisible();
 
     // Edit it
     await row.getByRole('button', { name: 'Edit' }).click();

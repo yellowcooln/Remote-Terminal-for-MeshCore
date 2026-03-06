@@ -296,6 +296,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 37)
         applied += 1
 
+    # Migration 38: Drop legacy MQTT, community MQTT, and bots columns from app_settings
+    if version < 38:
+        logger.info("Applying migration 38: drop legacy MQTT/bot columns from app_settings")
+        await _migrate_038_drop_legacy_columns(conn)
+        await set_version(conn, 38)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -2212,5 +2219,54 @@ async def _migrate_037_bots_to_fanout(conn: aiosqlite.Connection) -> None:
             ),
         )
         logger.info("Migrated bot '%s' to fanout_configs (enabled=%s)", bot_name, bot_enabled)
+
+    await conn.commit()
+
+
+async def _migrate_038_drop_legacy_columns(conn: aiosqlite.Connection) -> None:
+    """Drop legacy MQTT, community MQTT, and bots columns from app_settings.
+
+    These columns were migrated to fanout_configs in migrations 36 and 37.
+    SQLite 3.35.0+ supports ALTER TABLE DROP COLUMN. For older versions,
+    the columns remain but are harmless (no longer read or written).
+    """
+    # Check if app_settings table exists (some test DBs may not have it)
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+    )
+    if await cursor.fetchone() is None:
+        await conn.commit()
+        return
+
+    columns_to_drop = [
+        "bots",
+        "mqtt_broker_host",
+        "mqtt_broker_port",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_use_tls",
+        "mqtt_tls_insecure",
+        "mqtt_topic_prefix",
+        "mqtt_publish_messages",
+        "mqtt_publish_raw_packets",
+        "community_mqtt_enabled",
+        "community_mqtt_iata",
+        "community_mqtt_broker_host",
+        "community_mqtt_broker_port",
+        "community_mqtt_email",
+    ]
+
+    for column in columns_to_drop:
+        try:
+            await conn.execute(f"ALTER TABLE app_settings DROP COLUMN {column}")
+            logger.debug("Dropped %s from app_settings", column)
+        except aiosqlite.OperationalError as e:
+            error_msg = str(e).lower()
+            if "no such column" in error_msg:
+                logger.debug("app_settings.%s already dropped, skipping", column)
+            elif "syntax error" in error_msg or "drop column" in error_msg:
+                logger.debug("SQLite doesn't support DROP COLUMN, %s column will remain", column)
+            else:
+                raise
 
     await conn.commit()

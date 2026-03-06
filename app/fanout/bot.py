@@ -28,7 +28,11 @@ class BotModule(FanoutModule):
         asyncio.create_task(self._run_for_message(data))
 
     async def _run_for_message(self, data: dict) -> None:
-        from app.bot import BOT_EXECUTION_TIMEOUT, execute_bot_code, process_bot_response
+        from app.fanout.bot_exec import (
+            BOT_EXECUTION_TIMEOUT,
+            execute_bot_code,
+            process_bot_response,
+        )
 
         code = self.config.get("code", "")
         if not code or not code.strip():
@@ -83,7 +87,7 @@ class BotModule(FanoutModule):
         await asyncio.sleep(2)
 
         # Execute bot code in thread pool with timeout
-        from app.bot import _bot_executor, _bot_semaphore
+        from app.fanout.bot_exec import _bot_executor, _bot_semaphore
 
         async with _bot_semaphore:
             loop = asyncio.get_event_loop()

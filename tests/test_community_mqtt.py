@@ -3,12 +3,13 @@
 import json
 import time
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import nacl.bindings
 import pytest
 
-from app.community_mqtt import (
+from app.fanout.community_mqtt import (
     _CLIENT_ID,
     _DEFAULT_BROKER,
     _STATS_REFRESH_INTERVAL,
@@ -22,7 +23,6 @@ from app.community_mqtt import (
     _generate_jwt_token,
     _get_client_version,
 )
-from app.models import AppSettings
 
 
 def _make_test_keys() -> tuple[bytes, bytes]:
@@ -47,6 +47,19 @@ def _make_test_keys() -> tuple[bytes, bytes]:
     private_key = scalar + prefix
     public_key = nacl.bindings.crypto_scalarmult_ed25519_base_noclamp(scalar)
     return private_key, public_key
+
+
+def _make_community_settings(**overrides) -> SimpleNamespace:
+    """Create a settings namespace with all community MQTT fields."""
+    defaults = {
+        "community_mqtt_enabled": True,
+        "community_mqtt_broker_host": "mqtt-us-v1.letsmesh.net",
+        "community_mqtt_broker_port": 443,
+        "community_mqtt_iata": "",
+        "community_mqtt_email": "",
+    }
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
 
 
 class TestBase64UrlEncode:
@@ -376,19 +389,19 @@ class TestCommunityMqttPublisher:
 
     def test_is_configured_false_when_disabled(self):
         pub = CommunityMqttPublisher()
-        pub._settings = AppSettings(community_mqtt_enabled=False)
+        pub._settings = SimpleNamespace(community_mqtt_enabled=False)
         with patch("app.keystore.has_private_key", return_value=True):
             assert pub._is_configured() is False
 
     def test_is_configured_false_when_no_private_key(self):
         pub = CommunityMqttPublisher()
-        pub._settings = AppSettings(community_mqtt_enabled=True)
+        pub._settings = SimpleNamespace(community_mqtt_enabled=True)
         with patch("app.keystore.has_private_key", return_value=False):
             assert pub._is_configured() is False
 
     def test_is_configured_true_when_enabled_with_key(self):
         pub = CommunityMqttPublisher()
-        pub._settings = AppSettings(community_mqtt_enabled=True)
+        pub._settings = SimpleNamespace(community_mqtt_enabled=True)
         with patch("app.keystore.has_private_key", return_value=True):
             assert pub._is_configured() is True
 
@@ -408,12 +421,12 @@ class TestPublishFailureSetsDisconnected:
 
 class TestBuildStatusTopic:
     def test_builds_correct_topic(self):
-        settings = AppSettings(community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_iata="LAX")
         topic = _build_status_topic(settings, "AABB1122")
         assert topic == "meshcore/LAX/AABB1122/status"
 
     def test_iata_uppercased_and_stripped(self):
-        settings = AppSettings(community_mqtt_iata=" lax ")
+        settings = SimpleNamespace(community_mqtt_iata=" lax ")
         topic = _build_status_topic(settings, "PUBKEY")
         assert topic == "meshcore/LAX/PUBKEY/status"
 
@@ -424,10 +437,7 @@ class TestLwtAndStatusPublish:
         pub = CommunityMqttPublisher()
         private_key, public_key = _make_test_keys()
         pubkey_hex = public_key.hex().upper()
-        settings = AppSettings(
-            community_mqtt_enabled=True,
-            community_mqtt_iata="SFO",
-        )
+        settings = _make_community_settings(community_mqtt_iata="SFO")
 
         mock_radio = MagicMock()
         mock_radio.meshcore = MagicMock()
@@ -457,7 +467,7 @@ class TestLwtAndStatusPublish:
         pub = CommunityMqttPublisher()
         private_key, public_key = _make_test_keys()
         pubkey_hex = public_key.hex().upper()
-        settings = AppSettings(
+        settings = SimpleNamespace(
             community_mqtt_enabled=True,
             community_mqtt_iata="LAX",
         )
@@ -478,8 +488,8 @@ class TestLwtAndStatusPublish:
             patch.object(
                 pub, "_fetch_stats", new_callable=AsyncMock, return_value={"battery_mv": 4200}
             ),
-            patch("app.community_mqtt._build_radio_info", return_value="915.0,250.0,10,8"),
-            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm 2.4.0"),
+            patch("app.fanout.community_mqtt._build_radio_info", return_value="915.0,250.0,10,8"),
+            patch("app.fanout.community_mqtt._get_client_version", return_value="RemoteTerm 2.4.0"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
             await pub._on_connected_async(settings)
@@ -507,10 +517,7 @@ class TestLwtAndStatusPublish:
         pub = CommunityMqttPublisher()
         private_key, public_key = _make_test_keys()
         pubkey_hex = public_key.hex().upper()
-        settings = AppSettings(
-            community_mqtt_enabled=True,
-            community_mqtt_iata="JFK",
-        )
+        settings = _make_community_settings(community_mqtt_iata="JFK")
 
         mock_radio = MagicMock()
         mock_radio.meshcore = None
@@ -530,7 +537,7 @@ class TestLwtAndStatusPublish:
     async def test_on_connected_async_skips_when_no_public_key(self):
         """_on_connected_async should no-op when public key is unavailable."""
         pub = CommunityMqttPublisher()
-        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
         with (
             patch("app.keystore.get_public_key", return_value=None),
@@ -545,7 +552,7 @@ class TestLwtAndStatusPublish:
         """Should use 'MeshCore Device' when radio name is unavailable."""
         pub = CommunityMqttPublisher()
         _, public_key = _make_test_keys()
-        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
         mock_radio = MagicMock()
         mock_radio.meshcore = None
@@ -560,8 +567,10 @@ class TestLwtAndStatusPublish:
                 return_value={"model": "unknown", "firmware_version": "unknown"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
-            patch("app.community_mqtt._build_radio_info", return_value="0,0,0,0"),
-            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm unknown"),
+            patch("app.fanout.community_mqtt._build_radio_info", return_value="0,0,0,0"),
+            patch(
+                "app.fanout.community_mqtt._get_client_version", return_value="RemoteTerm unknown"
+            ),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
             await pub._on_connected_async(settings)
@@ -844,14 +853,15 @@ class TestGetClientVersion:
 
     def test_returns_version_from_metadata(self):
         """Should use importlib.metadata to get version."""
-        with patch("app.community_mqtt.importlib.metadata.version", return_value="1.2.3"):
+        with patch("app.fanout.community_mqtt.importlib.metadata.version", return_value="1.2.3"):
             result = _get_client_version()
         assert result == "RemoteTerm 1.2.3"
 
     def test_fallback_on_error(self):
         """Should return 'RemoteTerm unknown' if metadata lookup fails."""
         with patch(
-            "app.community_mqtt.importlib.metadata.version", side_effect=Exception("not found")
+            "app.fanout.community_mqtt.importlib.metadata.version",
+            side_effect=Exception("not found"),
         ):
             result = _get_client_version()
         assert result == "RemoteTerm unknown"
@@ -864,7 +874,7 @@ class TestPublishStatus:
         pub = CommunityMqttPublisher()
         _, public_key = _make_test_keys()
         pubkey_hex = public_key.hex().upper()
-        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
         mock_radio = MagicMock()
         mock_radio.meshcore = MagicMock()
@@ -882,8 +892,8 @@ class TestPublishStatus:
                 return_value={"model": "T-Deck", "firmware_version": "v2.2.2 (Build: 2025-01-15)"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=stats),
-            patch("app.community_mqtt._build_radio_info", return_value="915.0,250.0,10,8"),
-            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm 2.4.0"),
+            patch("app.fanout.community_mqtt._build_radio_info", return_value="915.0,250.0,10,8"),
+            patch("app.fanout.community_mqtt._get_client_version", return_value="RemoteTerm 2.4.0"),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
             await pub._publish_status(settings)
@@ -904,7 +914,7 @@ class TestPublishStatus:
         """Should not include 'stats' key when stats are None."""
         pub = CommunityMqttPublisher()
         _, public_key = _make_test_keys()
-        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
         mock_radio = MagicMock()
         mock_radio.meshcore = None
@@ -919,8 +929,10 @@ class TestPublishStatus:
                 return_value={"model": "unknown", "firmware_version": "unknown"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
-            patch("app.community_mqtt._build_radio_info", return_value="0,0,0,0"),
-            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm unknown"),
+            patch("app.fanout.community_mqtt._build_radio_info", return_value="0,0,0,0"),
+            patch(
+                "app.fanout.community_mqtt._get_client_version", return_value="RemoteTerm unknown"
+            ),
             patch.object(pub, "publish", new_callable=AsyncMock) as mock_publish,
         ):
             await pub._publish_status(settings)
@@ -933,7 +945,7 @@ class TestPublishStatus:
         """Should update _last_status_publish after publishing."""
         pub = CommunityMqttPublisher()
         _, public_key = _make_test_keys()
-        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
         mock_radio = MagicMock()
         mock_radio.meshcore = None
@@ -950,8 +962,10 @@ class TestPublishStatus:
                 return_value={"model": "unknown", "firmware_version": "unknown"},
             ),
             patch.object(pub, "_fetch_stats", new_callable=AsyncMock, return_value=None),
-            patch("app.community_mqtt._build_radio_info", return_value="0,0,0,0"),
-            patch("app.community_mqtt._get_client_version", return_value="RemoteTerm unknown"),
+            patch("app.fanout.community_mqtt._build_radio_info", return_value="0,0,0,0"),
+            patch(
+                "app.fanout.community_mqtt._get_client_version", return_value="RemoteTerm unknown"
+            ),
             patch.object(pub, "publish", new_callable=AsyncMock),
         ):
             await pub._publish_status(settings)
@@ -962,7 +976,7 @@ class TestPublishStatus:
     async def test_no_publish_key_returns_none(self):
         """Should skip publish when public key is unavailable."""
         pub = CommunityMqttPublisher()
-        settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
 
         with (
             patch("app.keystore.get_public_key", return_value=None),
@@ -978,7 +992,7 @@ class TestPeriodicWake:
     async def test_skips_before_interval(self):
         """Should not republish before _STATS_REFRESH_INTERVAL."""
         pub = CommunityMqttPublisher()
-        pub._settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        pub._settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
         pub._last_status_publish = time.monotonic()  # Just published
 
         with patch.object(pub, "_publish_status", new_callable=AsyncMock) as mock_ps:
@@ -990,7 +1004,7 @@ class TestPeriodicWake:
     async def test_publishes_after_interval(self):
         """Should republish after _STATS_REFRESH_INTERVAL elapsed."""
         pub = CommunityMqttPublisher()
-        pub._settings = AppSettings(community_mqtt_enabled=True, community_mqtt_iata="LAX")
+        pub._settings = SimpleNamespace(community_mqtt_enabled=True, community_mqtt_iata="LAX")
         pub._last_status_publish = time.monotonic() - _STATS_REFRESH_INTERVAL - 1
 
         with patch.object(pub, "_publish_status", new_callable=AsyncMock) as mock_ps:

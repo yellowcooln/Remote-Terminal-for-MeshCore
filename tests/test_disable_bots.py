@@ -1,19 +1,16 @@
 """Tests for the --disable-bots (MESHCORE_DISABLE_BOTS) startup flag.
 
 Verifies that when disable_bots=True:
-- run_bot_for_message() exits immediately without any work
 - POST /api/fanout with type=bot returns 403
 - Health endpoint includes bots_disabled=True
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 
-from app.bot import run_bot_for_message
 from app.config import Settings
-from app.models import BotConfig
 from app.routers.fanout import FanoutConfigCreate, create_fanout_config
 from app.routers.health import build_health_data
 
@@ -28,54 +25,6 @@ class TestDisableBotsConfig:
     def test_disable_bots_can_be_set_true(self):
         s = Settings(serial_port="", tcp_host="", ble_address="", disable_bots=True)
         assert s.disable_bots is True
-
-
-class TestDisableBotsBotExecution:
-    """Test that run_bot_for_message exits immediately when bots are disabled."""
-
-    @pytest.mark.asyncio
-    async def test_returns_immediately_when_disabled(self):
-        """No settings load, no semaphore, no bot execution."""
-        with patch("app.bot.server_settings", MagicMock(disable_bots=True)):
-            with patch("app.repository.AppSettingsRepository") as mock_repo:
-                mock_repo.get = AsyncMock()
-
-                await run_bot_for_message(
-                    sender_name="Alice",
-                    sender_key="ab" * 32,
-                    message_text="Hello",
-                    is_dm=True,
-                    channel_key=None,
-                )
-
-                # Should never even load settings
-                mock_repo.get.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_runs_normally_when_not_disabled(self):
-        """Bots execute normally when disable_bots is False."""
-        with patch("app.bot.server_settings", MagicMock(disable_bots=False)):
-            with patch("app.repository.AppSettingsRepository") as mock_repo:
-                mock_settings = MagicMock()
-                mock_settings.bots = [
-                    BotConfig(id="1", name="Echo", enabled=True, code="def bot(**k): return 'echo'")
-                ]
-                mock_repo.get = AsyncMock(return_value=mock_settings)
-
-                with (
-                    patch("app.bot.asyncio.sleep", new_callable=AsyncMock),
-                    patch("app.bot.execute_bot_code", return_value="echo") as mock_exec,
-                    patch("app.bot.process_bot_response", new_callable=AsyncMock),
-                ):
-                    await run_bot_for_message(
-                        sender_name="Alice",
-                        sender_key="ab" * 32,
-                        message_text="Hello",
-                        is_dm=True,
-                        channel_key=None,
-                    )
-
-                    mock_exec.assert_called_once()
 
 
 class TestDisableBotsFanoutEndpoint:

@@ -46,14 +46,30 @@ Setting `realtime=False` (used during historical decryption) skips fanout dispat
 ## Current Module Types
 
 ### mqtt_private (mqtt_private.py)
-Wraps `MqttPublisher` from `app/mqtt.py`. Config blob:
+Wraps `MqttPublisher` from `app/fanout/mqtt.py`. Config blob:
 - `broker_host`, `broker_port`, `username`, `password`
 - `use_tls`, `tls_insecure`, `topic_prefix`
 
 ### mqtt_community (mqtt_community.py)
-Wraps `CommunityMqttPublisher` from `app/community_mqtt.py`. Config blob:
+Wraps `CommunityMqttPublisher` from `app/fanout/community_mqtt.py`. Config blob:
 - `broker_host`, `broker_port`, `iata`, `email`
 - Only publishes raw packets (on_message is a no-op)
+
+### bot (bot.py)
+Wraps bot code execution via `app/fanout/bot_exec.py`. Config blob:
+- `code` — Python bot function source code
+- Executes in a thread pool with timeout and semaphore concurrency control
+- Rate-limits outgoing messages for repeater compatibility
+
+### webhook (webhook.py)
+HTTP POST webhook delivery. Config blob:
+- `url`, `secret` (optional HMAC signing key)
+- Delivers messages and raw packets as JSON payloads
+
+### apprise (apprise_mod.py)
+Push notifications via Apprise library. Config blob:
+- `urls` — list of Apprise notification service URLs
+- Formats messages for human-readable notification delivery
 
 ## Adding a New Integration Type
 
@@ -73,19 +89,29 @@ Wraps `CommunityMqttPublisher` from `app/community_mqtt.py`. Config blob:
 
 ## Database
 
-`fanout_configs` table (created in migration 36):
+`fanout_configs` table:
 - `id` TEXT PRIMARY KEY
 - `type`, `name`, `enabled`, `config` (JSON), `scope` (JSON)
 - `sort_order`, `created_at`
 
-Migration 36 also migrates existing `app_settings` MQTT columns into fanout rows.
+Migrations:
+- **36**: Creates `fanout_configs` table, migrates existing MQTT settings from `app_settings`
+- **37**: Migrates bot configs from `app_settings.bots` JSON column into fanout rows
+- **38**: Drops legacy `mqtt_*`, `community_mqtt_*`, and `bots` columns from `app_settings`
 
 ## Key Files
 
 - `app/fanout/base.py` — FanoutModule ABC
 - `app/fanout/manager.py` — FanoutManager singleton
-- `app/fanout/mqtt_private.py` — Private MQTT module
-- `app/fanout/mqtt_community.py` — Community MQTT module
+- `app/fanout/mqtt_base.py` — BaseMqttPublisher ABC (shared MQTT connection loop)
+- `app/fanout/mqtt.py` — MqttPublisher (private MQTT publishing)
+- `app/fanout/community_mqtt.py` — CommunityMqttPublisher (community MQTT with JWT auth)
+- `app/fanout/mqtt_private.py` — Private MQTT fanout module
+- `app/fanout/mqtt_community.py` — Community MQTT fanout module
+- `app/fanout/bot.py` — Bot fanout module
+- `app/fanout/bot_exec.py` — Bot code execution, response processing, rate limiting
+- `app/fanout/webhook.py` — Webhook fanout module
+- `app/fanout/apprise_mod.py` — Apprise fanout module
 - `app/repository/fanout.py` — Database CRUD
 - `app/routers/fanout.py` — REST API
 - `app/websocket.py` — `broadcast_event()` dispatches to fanout

@@ -21,7 +21,7 @@ A web interface for MeshCore mesh radio networks. The backend connects to a Mesh
 - `frontend/AGENTS.md` - Frontend (React, state management, WebSocket, components)
 
 Ancillary AGENTS.md files which should generally not be reviewed unless specific work is being performed on those features include:
-- `app/AGENTS_MQTT.md` - MQTT architecture (private broker, community analytics, JWT auth, packet format protocol)
+- `app/fanout/AGENTS_fanout.md` - Fanout bus architecture (MQTT, bots, webhooks, Apprise)
 - `frontend/src/components/AGENTS_packet_visualizer.md` - Packet visualizer (force-directed graph, advert-path identity, layout engine)
 
 ## Architecture Overview
@@ -97,7 +97,7 @@ The following are **deliberate design choices**, not bugs. They are documented i
 
 1. **No CORS restrictions**: The backend allows all origins (`allow_origins=["*"]`). This lets users access their radio from any device/origin on their network without configuration hassle.
 2. **No authentication or authorization**: There is no login, no API keys, no session management. The app is designed for trusted networks (home LAN, VPN). The README warns users not to expose it to untrusted networks.
-3. **Arbitrary bot code execution**: The bot system (`app/bot.py`) executes user-provided Python via `exec()` with full `__builtins__`. This is intentional — bots are a power-user feature for automation. The README explicitly warns that anyone on the network can execute arbitrary code through this. Operators can set `MESHCORE_DISABLE_BOTS=true` to completely disable the bot system at startup — this skips all bot execution, returns 403 on bot settings updates, and shows a disabled message in the frontend.
+3. **Arbitrary bot code execution**: The bot system (`app/fanout/bot_exec.py`) executes user-provided Python via `exec()` with full `__builtins__`. This is intentional — bots are a power-user feature for automation. The README explicitly warns that anyone on the network can execute arbitrary code through this. Operators can set `MESHCORE_DISABLE_BOTS=true` to completely disable the bot system at startup — this skips all bot execution, returns 403 on bot settings updates, and shows a disabled message in the frontend.
 
 ## Intentional Packet Handling Decision
 
@@ -147,17 +147,14 @@ This message-layer echo/path handling is independent of raw-packet storage dedup
 .
 ├── app/                    # FastAPI backend
 │   ├── AGENTS.md           # Backend documentation
-│   ├── bot.py              # Bot execution and outbound bot sends
 │   ├── main.py             # App entry, lifespan
 │   ├── routers/            # API endpoints
 │   ├── packet_processor.py # Raw packet pipeline, dedup, path handling
-│   ├── repository/         # Database CRUD (contacts, channels, messages, raw_packets, settings)
+│   ├── repository/         # Database CRUD (contacts, channels, messages, raw_packets, settings, fanout)
 │   ├── event_handlers.py   # Radio events
 │   ├── decoder.py          # Packet decryption
 │   ├── websocket.py        # Real-time broadcasts
-│   ├── mqtt_base.py        # Shared MQTT publisher base class (lifecycle, reconnect, backoff)
-│   ├── mqtt.py             # Private MQTT publisher
-│   └── community_mqtt.py   # Community MQTT publisher (raw packet sharing)
+│   └── fanout/             # Fanout bus: MQTT, bots, webhooks, Apprise (see fanout/AGENTS_fanout.md)
 ├── frontend/               # React frontend
 │   ├── AGENTS.md           # Frontend documentation
 │   ├── src/
@@ -360,33 +357,11 @@ Read state (`last_read_at`) is tracked **server-side** for consistency across de
 
 **Note:** These are NOT the same as `Message.conversation_key` (the database field).
 
-### MQTT Publishing
+### Fanout Bus (MQTT, Bots, Webhooks, Apprise)
 
-Optional MQTT integration forwards mesh events to an external broker for home automation, logging, or alerting. All MQTT config is stored in the database (`app_settings`), not env vars — configured from the Settings pane, no server restart needed.
+All external integrations are managed through the fanout bus (`app/fanout/`). Each integration is a `FanoutModule` with scope-based event filtering, stored in the `fanout_configs` table and managed via `GET/POST/PATCH/DELETE /api/fanout`.
 
-**Two independent toggles**: publish decrypted messages, publish raw packets.
-
-**Topic structure** (default prefix `meshcore`):
-- `meshcore/dm:<contact_public_key>` — decrypted DM
-- `meshcore/gm:<channel_key>` — decrypted channel message
-- `meshcore/raw/dm:<contact_key>` — raw packet attributed to a DM contact
-- `meshcore/raw/gm:<channel_key>` — raw packet attributed to a channel
-- `meshcore/raw/unrouted` — raw packets that couldn't be attributed
-
-**Architecture**: `broadcast_event()` in `websocket.py` calls `mqtt_broadcast()` — a single hook covering all message and raw_packet broadcasts. The `MqttPublisher` in `app/mqtt.py` manages a background connection loop with auto-reconnect and backoff. Publishes are fire-and-forget (silent drop if disconnected). Connection state changes trigger toasts via `broadcast_error`/`broadcast_success`. The health endpoint includes `mqtt_status` (`disabled` when no broker host is set, or when both publish toggles are off).
-
-**Security**: MQTT password stored in plaintext in SQLite, consistent with the project's trusted-network design.
-
-### Community MQTT Sharing
-
-Separate from private MQTT, the community publisher (`app/community_mqtt.py`) shares raw packets with the MeshCore community aggregator for coverage mapping and analysis. Only raw packets are shared — never decrypted messages.
-
-- Connects to community broker (default `mqtt-us-v1.letsmesh.net:443`) via WebSockets over TLS.
-- Authentication via Ed25519 JWT signed with the radio's private key. Tokens auto-renew before 24h expiry.
-- Broker address: separate `community_mqtt_broker_host` and `community_mqtt_broker_port` fields; defaults to `mqtt-us-v1.letsmesh.net:443`.
-- Topic: `meshcore/{IATA}/{pubkey}/packets` — IATA is a 3-letter region code.
-- JWT `email` claim enables node claiming on the community aggregator.
-- Config: `community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email` in `app_settings`.
+`broadcast_event()` in `websocket.py` dispatches `message` and `raw_packet` events to the fanout manager. See `app/fanout/AGENTS_fanout.md` for full architecture details.
 
 ### Server-Side Decryption
 
@@ -430,7 +405,7 @@ mc.subscribe(EventType.ACK, handler)
 | `MESHCORE_DATABASE_PATH` | `data/meshcore.db` | SQLite database location |
 | `MESHCORE_DISABLE_BOTS` | `false` | Disable bot system entirely (blocks execution and config) |
 
-**Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, `bots`, all MQTT configuration (`mqtt_broker_host`, `mqtt_broker_port`, `mqtt_username`, `mqtt_password`, `mqtt_use_tls`, `mqtt_tls_insecure`, `mqtt_topic_prefix`, `mqtt_publish_messages`, `mqtt_publish_raw_packets`), community MQTT configuration (`community_mqtt_enabled`, `community_mqtt_iata`, `community_mqtt_broker_host`, `community_mqtt_broker_port`, `community_mqtt_email`), `flood_scope`, `blocked_keys`, and `blocked_names`. They are configured via `GET/PATCH /api/settings` (and related settings endpoints).
+**Note:** Runtime app settings are stored in the database (`app_settings` table), not environment variables. These include `max_radio_contacts`, `auto_decrypt_dm_on_advert`, `sidebar_sort_order`, `advert_interval`, `last_advert_time`, `favorites`, `last_message_times`, `flood_scope`, `blocked_keys`, and `blocked_names`. They are configured via `GET/PATCH /api/settings`. MQTT, bot, webhook, and Apprise configs are stored in the `fanout_configs` table, managed via `/api/fanout`.
 
 Byte-perfect channel retries are user-triggered via `POST /api/messages/channel/{message_id}/resend` and are allowed for 30 seconds after the original send.
 
