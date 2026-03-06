@@ -208,6 +208,7 @@ async def create_message_from_decrypted(
             paths=paths,
             sender_name=sender,
             sender_key=resolved_sender_key,
+            channel_name=channel_name,
         ).model_dump(),
         realtime=trigger_bot,
     )
@@ -301,6 +302,7 @@ async def create_dm_message_from_decrypted(
     paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
     # Broadcast new message to connected clients (and fanout modules when realtime)
+    sender_name = contact.name if contact and not outgoing else None
     broadcast_event(
         "message",
         Message(

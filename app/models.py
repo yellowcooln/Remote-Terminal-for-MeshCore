@@ -196,6 +196,7 @@ class Message(BaseModel):
     outgoing: bool = False
     acked: int = 0
     sender_name: str | None = None
+    channel_name: str | None = None
 
 
 class MessagesAroundResponse(BaseModel):

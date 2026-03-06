@@ -172,6 +172,7 @@ export interface Message {
   /** ACK count: 0 = not acked, 1+ = number of acks/flood echoes received */
   acked: number;
   sender_name: string | null;
+  channel_name?: string | null;
 }
 
 export interface MessagesAroundResponse {

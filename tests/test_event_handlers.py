@@ -290,6 +290,7 @@ class TestContactMessageCLIFiltering:
             "outgoing",
             "acked",
             "sender_name",
+            "channel_name",
         }
 
         with patch("app.event_handlers.broadcast_event") as mock_broadcast:
