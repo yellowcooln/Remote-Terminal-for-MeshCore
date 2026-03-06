@@ -49,11 +49,14 @@ class BotModule(FanoutModule):
             channel_key = None
             channel_name = None
 
-            # Look up sender name from contacts
-            from app.repository import ContactRepository
+            # Outgoing DMs: sender is us, not the contact
+            if is_outgoing:
+                sender_name = None
+            else:
+                from app.repository import ContactRepository
 
-            contact = await ContactRepository.get_by_key(conversation_key)
-            sender_name = contact.name if contact else None
+                contact = await ContactRepository.get_by_key(conversation_key)
+                sender_name = contact.name if contact else None
         else:
             conversation_key = data.get("conversation_key", "")
             sender_key = None
@@ -89,7 +92,7 @@ class BotModule(FanoutModule):
         from app.fanout.bot_exec import _bot_executor, _bot_semaphore
 
         async with _bot_semaphore:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             try:
                 response = await asyncio.wait_for(
                     loop.run_in_executor(
