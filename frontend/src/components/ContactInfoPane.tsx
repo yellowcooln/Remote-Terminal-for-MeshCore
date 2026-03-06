@@ -20,6 +20,7 @@ const CONTACT_TYPE_LABELS: Record<number, string> = {
 
 interface ContactInfoPaneProps {
   contactKey: string | null;
+  fromChannel?: boolean;
   onClose: () => void;
   contacts: Contact[];
   config: RadioConfig | null;
@@ -34,6 +35,7 @@ interface ContactInfoPaneProps {
 
 export function ContactInfoPane({
   contactKey,
+  fromChannel = false,
   onClose,
   contacts,
   config,
@@ -117,6 +119,8 @@ export function ContactInfoPane({
               </div>
             </div>
 
+            {fromChannel && <ChannelAttributionWarning />}
+
             {/* Block by name toggle */}
             {onToggleBlockedName && (
               <div className="px-5 py-3 border-b border-border">
@@ -185,6 +189,8 @@ export function ContactInfoPane({
                 </div>
               </div>
             </div>
+
+            {fromChannel && <ChannelAttributionWarning />}
 
             {/* Info grid */}
             <div className="px-5 py-3 border-b border-border">
@@ -433,6 +439,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
       {children}
     </h3>
+  );
+}
+
+function ChannelAttributionWarning() {
+  return (
+    <div className="mx-5 my-3 px-3 py-2 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+        Channel sender identity is based on best-effort name matching. Different nodes using the
+        same name will be attributed to the same contact. Message counts and key-based statistics
+        may be inaccurate.
+      </p>
+    </div>
   );
 }
 

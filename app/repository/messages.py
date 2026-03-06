@@ -129,6 +129,22 @@ class MessageRepository:
         return cursor.rowcount
 
     @staticmethod
+    async def backfill_channel_sender_key(public_key: str, name: str) -> int:
+        """Backfill sender_key on channel messages that match a contact's name.
+
+        When a contact becomes known (via advert, sync, or manual creation),
+        any channel messages with a matching sender_name but no sender_key
+        are updated to associate them with this contact's public key.
+        """
+        cursor = await db.conn.execute(
+            """UPDATE messages SET sender_key = ?
+               WHERE type = 'CHAN' AND sender_name = ? AND sender_key IS NULL""",
+            (public_key.lower(), name),
+        )
+        await db.conn.commit()
+        return cursor.rowcount
+
+    @staticmethod
     def _normalize_conversation_key(conversation_key: str) -> tuple[str, str]:
         """Normalize a conversation key and return (sql_clause, normalized_key).
 

@@ -154,6 +154,14 @@ async def create_contact(
     if claimed > 0:
         logger.info("Claimed %d prefix messages for contact %s", claimed, lower_key[:12])
 
+    # Backfill sender_key on channel messages that match this contact's name
+    if request.name:
+        backfilled = await MessageRepository.backfill_channel_sender_key(lower_key, request.name)
+        if backfilled > 0:
+            logger.info(
+                "Backfilled sender_key on %d channel message(s) for %s", backfilled, request.name
+            )
+
     # Trigger historical decryption if requested
     if request.try_historical:
         await start_historical_dm_decryption(background_tasks, lower_key, request.name)
@@ -281,6 +289,15 @@ async def sync_contacts_from_radio() -> dict:
         claimed = await MessageRepository.claim_prefix_messages(lower_key)
         if claimed > 0:
             logger.info("Claimed %d prefix DM message(s) for contact %s", claimed, public_key[:12])
+        adv_name = contact_data.get("adv_name")
+        if adv_name:
+            backfilled = await MessageRepository.backfill_channel_sender_key(lower_key, adv_name)
+            if backfilled > 0:
+                logger.info(
+                    "Backfilled sender_key on %d channel message(s) for %s",
+                    backfilled,
+                    adv_name,
+                )
         count += 1
 
     # Clear on_radio for contacts not found on the radio

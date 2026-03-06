@@ -27,7 +27,7 @@ interface MessageListProps {
   onResendChannelMessage?: (messageId: number, newTimestamp?: boolean) => void;
   radioName?: string;
   config?: RadioConfig | null;
-  onOpenContactInfo?: (publicKey: string) => void;
+  onOpenContactInfo?: (publicKey: string, fromChannel?: boolean) => void;
   targetMessageId?: number | null;
   onTargetReached?: () => void;
   hasNewerMessages?: boolean;
@@ -532,7 +532,11 @@ export function MessageList({
                       role={onOpenContactInfo ? 'button' : undefined}
                       tabIndex={onOpenContactInfo ? 0 : undefined}
                       onKeyDown={onOpenContactInfo ? handleKeyboardActivate : undefined}
-                      onClick={onOpenContactInfo ? () => onOpenContactInfo(avatarKey) : undefined}
+                      onClick={
+                        onOpenContactInfo
+                          ? () => onOpenContactInfo(avatarKey, msg.type === 'CHAN')
+                          : undefined
+                      }
                     >
                       <ContactAvatar
                         name={avatarName}

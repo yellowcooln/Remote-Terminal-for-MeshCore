@@ -136,6 +136,17 @@ async def sync_and_offload_contacts(mc: MeshCore) -> dict:
                     claimed,
                     public_key[:12],
                 )
+            adv_name = contact_data.get("adv_name")
+            if adv_name:
+                backfilled = await MessageRepository.backfill_channel_sender_key(
+                    public_key, adv_name
+                )
+                if backfilled > 0:
+                    logger.info(
+                        "Backfilled sender_key on %d channel message(s) for %s",
+                        backfilled,
+                        adv_name,
+                    )
             synced += 1
 
             # Remove from radio

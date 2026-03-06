@@ -763,6 +763,16 @@ async def _process_advertisement(
             claimed,
             advert.public_key[:12],
         )
+    if advert.name:
+        backfilled = await MessageRepository.backfill_channel_sender_key(
+            advert.public_key, advert.name
+        )
+        if backfilled > 0:
+            logger.info(
+                "Backfilled sender_key on %d channel message(s) for %s",
+                backfilled,
+                advert.name,
+            )
 
     # Read back from DB so the broadcast includes all fields (last_contacted,
     # last_read_at, flags, on_radio, etc.) matching the REST Contact shape exactly.

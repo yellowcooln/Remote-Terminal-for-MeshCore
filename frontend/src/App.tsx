@@ -84,6 +84,7 @@ export function App() {
   const [crackerRunning, setCrackerRunning] = useState(false);
   const [localLabel, setLocalLabel] = useState(getLocalLabel);
   const [infoPaneContactKey, setInfoPaneContactKey] = useState<string | null>(null);
+  const [infoPaneFromChannel, setInfoPaneFromChannel] = useState(false);
   const [infoPaneChannelKey, setInfoPaneChannelKey] = useState<string | null>(null);
   const [targetMessageId, setTargetMessageId] = useState<number | null>(null);
 
@@ -523,8 +524,9 @@ export function App() {
     setShowCracker((prev) => !prev);
   }, []);
 
-  const handleOpenContactInfo = useCallback((publicKey: string) => {
+  const handleOpenContactInfo = useCallback((publicKey: string, fromChannel?: boolean) => {
     setInfoPaneContactKey(publicKey);
+    setInfoPaneFromChannel(fromChannel ?? false);
   }, []);
 
   const handleCloseContactInfo = useCallback(() => {
@@ -934,6 +936,7 @@ export function App() {
 
       <ContactInfoPane
         contactKey={infoPaneContactKey}
+        fromChannel={infoPaneFromChannel}
         onClose={handleCloseContactInfo}
         contacts={contacts}
         config={config}

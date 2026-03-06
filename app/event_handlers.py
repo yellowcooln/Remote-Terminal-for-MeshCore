@@ -267,6 +267,13 @@ async def on_new_contact(event: "Event") -> None:
         await ContactNameHistoryRepository.record_name(
             public_key.lower(), adv_name, int(time.time())
         )
+        backfilled = await MessageRepository.backfill_channel_sender_key(public_key, adv_name)
+        if backfilled > 0:
+            logger.info(
+                "Backfilled sender_key on %d channel message(s) for %s",
+                backfilled,
+                adv_name,
+            )
 
     # Read back from DB so the broadcast includes all fields (last_contacted,
     # last_read_at, etc.) matching the REST Contact shape exactly.
