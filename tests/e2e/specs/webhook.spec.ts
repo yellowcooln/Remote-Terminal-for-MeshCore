@@ -23,9 +23,9 @@ test.describe('Webhook integration settings', () => {
     await page.goto('/');
     await expect(page.getByText('Connected')).toBeVisible();
 
-    // Open settings and navigate to MQTT & Forwarding
+    // Open settings and navigate to MQTT & Automation
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Click the Webhook add button
     await page.getByRole('button', { name: 'Webhook' }).click();
@@ -74,7 +74,7 @@ test.describe('Webhook integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Click Edit on our webhook
     const row = page.getByText('API Webhook').locator('..');
@@ -109,7 +109,7 @@ test.describe('Webhook integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Click Edit
     const row = page.getByText('Scope Webhook').locator('..');
@@ -144,7 +144,7 @@ test.describe('Webhook integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Click Edit
     const row = page.getByText('Delete Me Webhook').locator('..');

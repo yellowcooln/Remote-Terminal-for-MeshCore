@@ -23,9 +23,9 @@ test.describe('Apprise integration settings', () => {
     await page.goto('/');
     await expect(page.getByText('Connected')).toBeVisible();
 
-    // Open settings and navigate to MQTT & Forwarding
+    // Open settings and navigate to MQTT & Automation
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Click the Apprise add button
     await page.getByRole('button', { name: 'Apprise' }).click();
@@ -82,7 +82,7 @@ test.describe('Apprise integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Click Edit on our apprise config
     const row = page.getByText('API Apprise').locator('..');
@@ -122,7 +122,7 @@ test.describe('Apprise integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     const row = page.getByText('Scope Apprise').locator('..');
     await row.getByRole('button', { name: 'Edit' }).click();
@@ -156,7 +156,7 @@ test.describe('Apprise integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // Should show "Disabled" status text
     const row = page.getByText('Disabled Apprise').locator('..');
@@ -187,7 +187,7 @@ test.describe('Apprise integration settings', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     const row = page.getByText('Delete Me Apprise').locator('..');
     await row.getByRole('button', { name: 'Edit' }).click();

@@ -13,7 +13,7 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   radio: '📻 Radio',
   local: '🖥️ Local Configuration',
   database: '🗄️ Database & Messaging',
-  fanout: '📤 MQTT & Forwarding',
+  fanout: '📤 MQTT & Automation',
   statistics: '📊 Statistics',
   about: 'About',
 };

@@ -45,7 +45,7 @@ test.describe('Bot functionality', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
 
     // The bot name should be visible in the integration list
     await expect(page.getByText('E2E Test Bot')).toBeVisible();
