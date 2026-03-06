@@ -129,7 +129,7 @@ async def create_message_from_decrypted(
     received_at: int | None = None,
     path: str | None = None,
     channel_name: str | None = None,
-    trigger_bot: bool = True,
+    realtime: bool = True,
 ) -> int | None:
     """Create a message record from decrypted channel packet content.
 
@@ -145,7 +145,7 @@ async def create_message_from_decrypted(
         timestamp: Sender timestamp from the packet
         received_at: When the packet was received (defaults to now)
         path: Hex-encoded routing path
-        trigger_bot: Whether to trigger bot response (False for historical decryption)
+        realtime: If False, skip fanout dispatch (used for historical decryption)
 
     Returns the message ID if created, None if duplicate.
     """
@@ -210,7 +210,7 @@ async def create_message_from_decrypted(
             sender_key=resolved_sender_key,
             channel_name=channel_name,
         ).model_dump(),
-        realtime=trigger_bot,
+        realtime=realtime,
     )
 
     return msg_id
@@ -224,7 +224,7 @@ async def create_dm_message_from_decrypted(
     received_at: int | None = None,
     path: str | None = None,
     outgoing: bool = False,
-    trigger_bot: bool = True,
+    realtime: bool = True,
 ) -> int | None:
     """Create a message record from decrypted direct message packet content.
 
@@ -239,7 +239,7 @@ async def create_dm_message_from_decrypted(
         received_at: When the packet was received (defaults to now)
         path: Hex-encoded routing path
         outgoing: Whether this is an outgoing message (we sent it)
-        trigger_bot: Whether to trigger bot response (False for historical decryption)
+        realtime: If False, skip fanout dispatch (used for historical decryption)
 
     Returns the message ID if created, None if duplicate.
     """
@@ -317,7 +317,7 @@ async def create_dm_message_from_decrypted(
             sender_name=sender_name,
             sender_key=conversation_key if not outgoing else None,
         ).model_dump(),
-        realtime=trigger_bot,
+        realtime=realtime,
     )
 
     # Update contact's last_contacted timestamp (for sorting)
@@ -392,7 +392,7 @@ async def run_historical_dm_decryption(
                 received_at=packet_timestamp,
                 path=path_hex,
                 outgoing=outgoing,
-                trigger_bot=False,  # Historical decryption should not trigger bot
+                realtime=False,  # Historical decryption should not trigger fanout
             )
 
             if msg_id is not None:

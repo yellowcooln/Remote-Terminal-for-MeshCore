@@ -481,11 +481,8 @@ function ScopeSelector({
       selectedContacts.length >= filteredContacts.length);
   const showEmptyScopeWarning = messagesEffectivelyNone && !rawEnabled;
 
-  // For "except" mode, checked means the item is in the exclusion list (will be excluded)
-  const isChannelChecked = (key: string) =>
-    mode === 'except' ? selectedChannels.includes(key) : selectedChannels.includes(key);
-  const isContactChecked = (key: string) =>
-    mode === 'except' ? selectedContacts.includes(key) : selectedContacts.includes(key);
+  const isChannelChecked = (key: string) => selectedChannels.includes(key);
+  const isContactChecked = (key: string) => selectedContacts.includes(key);
 
   const listHint =
     mode === 'only'

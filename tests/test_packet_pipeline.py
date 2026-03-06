@@ -1852,8 +1852,8 @@ class TestRunHistoricalDmDecryption:
         assert len(messages) == 0
 
     @pytest.mark.asyncio
-    async def test_sets_trigger_bot_false(self, test_db, captured_broadcasts):
-        """Historical decryption calls create_dm_message_from_decrypted with trigger_bot=False."""
+    async def test_sets_realtime_false(self, test_db, captured_broadcasts):
+        """Historical decryption calls create_dm_message_from_decrypted with realtime=False."""
         from app.packet_processor import run_historical_dm_decryption
 
         raw = self._make_text_message_bytes(b"\x20")
@@ -1891,7 +1891,7 @@ class TestRunHistoricalDmDecryption:
 
         mock_create.assert_awaited_once()
         call_kwargs = mock_create.call_args[1]
-        assert call_kwargs["trigger_bot"] is False
+        assert call_kwargs["realtime"] is False
 
     @pytest.mark.asyncio
     async def test_broadcasts_success_when_decrypted(self, test_db, captured_broadcasts):
