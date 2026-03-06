@@ -106,6 +106,7 @@ async def on_contact_message(event: "Event") -> None:
     # If the packet processor already stored this message, this returns None
     ts = payload.get("sender_timestamp")
     sender_timestamp = ts if ts is not None else received_at
+    sender_name = contact.name if contact else None
     msg_id = await MessageRepository.create(
         msg_type="PRIV",
         text=payload.get("text", ""),
@@ -116,6 +117,7 @@ async def on_contact_message(event: "Event") -> None:
         txt_type=txt_type,
         signature=payload.get("signature"),
         sender_key=sender_pubkey,
+        sender_name=sender_name,
     )
 
     if msg_id is None:
@@ -144,6 +146,8 @@ async def on_contact_message(event: "Event") -> None:
             paths=paths,
             txt_type=txt_type,
             signature=payload.get("signature"),
+            sender_key=sender_pubkey,
+            sender_name=sender_name,
         ).model_dump(),
     )
 

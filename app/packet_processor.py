@@ -275,6 +275,9 @@ async def create_dm_message_from_decrypted(
     # conversation_key is always the other party's public key
     conversation_key = their_public_key.lower()
 
+    # Resolve sender name for incoming messages (used for name-based blocking)
+    sender_name = contact.name if contact and not outgoing else None
+
     # Try to create message - INSERT OR IGNORE handles duplicates atomically
     msg_id = await MessageRepository.create(
         msg_type="PRIV",
@@ -285,6 +288,7 @@ async def create_dm_message_from_decrypted(
         path=path,
         outgoing=outgoing,
         sender_key=conversation_key if not outgoing else None,
+        sender_name=sender_name,
     )
 
     if msg_id is None:
@@ -325,6 +329,8 @@ async def create_dm_message_from_decrypted(
             received_at=received,
             paths=paths,
             outgoing=outgoing,
+            sender_name=sender_name,
+            sender_key=conversation_key if not outgoing else None,
         ).model_dump(),
     )
 
@@ -335,13 +341,9 @@ async def create_dm_message_from_decrypted(
     if trigger_bot:
         from app.bot import run_bot_for_message
 
-        # Get contact name for the bot
-        contact = await ContactRepository.get_by_key(their_public_key)
-        sender_name = contact.name if contact else None
-
         asyncio.create_task(
             run_bot_for_message(
-                sender_name=sender_name,
+                sender_name=contact.name if contact else None,
                 sender_key=their_public_key,
                 message_text=decrypted.message,
                 is_dm=True,
