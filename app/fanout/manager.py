@@ -17,6 +17,7 @@ def _register_module_types() -> None:
     """Lazily populate the type registry to avoid circular imports."""
     if _MODULE_TYPES:
         return
+    from app.fanout.apprise_mod import AppriseModule
     from app.fanout.bot import BotModule
     from app.fanout.mqtt_community import MqttCommunityModule
     from app.fanout.mqtt_private import MqttPrivateModule
@@ -26,6 +27,7 @@ def _register_module_types() -> None:
     _MODULE_TYPES["mqtt_community"] = MqttCommunityModule
     _MODULE_TYPES["bot"] = BotModule
     _MODULE_TYPES["webhook"] = WebhookModule
+    _MODULE_TYPES["apprise"] = AppriseModule
 
 
 def _matches_filter(filter_value: Any, key: str) -> bool:

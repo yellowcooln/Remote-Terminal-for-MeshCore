@@ -17,6 +17,7 @@ const TYPE_LABELS: Record<string, string> = {
   mqtt_community: 'Community MQTT',
   bot: 'Bot',
   webhook: 'Webhook',
+  apprise: 'Apprise',
 };
 
 const TYPE_OPTIONS = [
@@ -24,6 +25,7 @@ const TYPE_OPTIONS = [
   { value: 'mqtt_community', label: 'Community MQTT' },
   { value: 'bot', label: 'Bot' },
   { value: 'webhook', label: 'Webhook' },
+  { value: 'apprise', label: 'Apprise' },
 ];
 
 const DEFAULT_BOT_CODE = `def bot(
@@ -65,7 +67,8 @@ const DEFAULT_BOT_CODE = `def bot(
     return None`;
 
 function getStatusLabel(status: string | undefined, type?: string) {
-  if (status === 'connected') return type === 'bot' || type === 'webhook' ? 'Active' : 'Connected';
+  if (status === 'connected')
+    return type === 'bot' || type === 'webhook' || type === 'apprise' ? 'Active' : 'Connected';
   if (status === 'error') return 'Error';
   if (status === 'disconnected') return 'Disconnected';
   return 'Inactive';
@@ -627,6 +630,91 @@ function ScopeSelector({
   );
 }
 
+function AppriseConfigEditor({
+  config,
+  scope,
+  onChange,
+  onScopeChange,
+}: {
+  config: Record<string, unknown>;
+  scope: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+  onScopeChange: (scope: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Send push notifications via{' '}
+        <a
+          href="https://github.com/caronc/apprise"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-foreground"
+        >
+          Apprise
+        </a>{' '}
+        when messages are received. Supports Discord, Slack, Telegram, email, and{' '}
+        <a
+          href="https://github.com/caronc/apprise/wiki#supported-notifications"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-foreground"
+        >
+          100+ other services
+        </a>
+        .
+      </p>
+
+      <div className="space-y-2">
+        <Label htmlFor="fanout-apprise-urls">Notification URLs</Label>
+        <textarea
+          id="fanout-apprise-urls"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono min-h-[80px]"
+          placeholder={
+            'discord://webhook_id/token\nslack://token_a/token_b/token_c\ntgram://bot_token/chat_id'
+          }
+          value={(config.urls as string) || ''}
+          onChange={(e) => onChange({ ...config, urls: e.target.value })}
+          rows={4}
+        />
+        <p className="text-xs text-muted-foreground">
+          One URL per line. All URLs receive every matched notification.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={config.preserve_identity !== false}
+          onChange={(e) => onChange({ ...config, preserve_identity: e.target.checked })}
+          className="h-4 w-4 rounded border-border"
+        />
+        <div>
+          <span className="text-sm">Preserve identity on Discord</span>
+          <p className="text-xs text-muted-foreground">
+            When enabled, Discord webhooks will use their configured name/avatar instead of
+            overriding with MeshCore sender info.
+          </p>
+        </div>
+      </label>
+
+      <label className="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={config.include_path !== false}
+          onChange={(e) => onChange({ ...config, include_path: e.target.checked })}
+          className="h-4 w-4 rounded border-border"
+        />
+        <span className="text-sm">Include routing path in notifications</span>
+      </label>
+
+      <Separator />
+
+      <ScopeSelector scope={scope} onChange={onScopeChange} />
+    </div>
+  );
+}
+
 function WebhookConfigEditor({
   config,
   scope,
@@ -825,12 +913,18 @@ export function SettingsFanoutSection({
         headers: {},
         secret: '',
       },
+      apprise: {
+        urls: '',
+        preserve_identity: true,
+        include_path: true,
+      },
     };
     const defaultScopes: Record<string, Record<string, unknown>> = {
       mqtt_private: { messages: 'all', raw_packets: 'all' },
       mqtt_community: { messages: 'none', raw_packets: 'all' },
       bot: { messages: 'all', raw_packets: 'none' },
       webhook: { messages: 'all', raw_packets: 'none' },
+      apprise: { messages: 'all', raw_packets: 'none' },
     };
 
     try {
@@ -894,6 +988,15 @@ export function SettingsFanoutSection({
 
         {editingConfig.type === 'bot' && (
           <BotConfigEditor config={editConfig} onChange={setEditConfig} />
+        )}
+
+        {editingConfig.type === 'apprise' && (
+          <AppriseConfigEditor
+            config={editConfig}
+            scope={editScope}
+            onChange={setEditConfig}
+            onScopeChange={setEditScope}
+          />
         )}
 
         {editingConfig.type === 'webhook' && (
