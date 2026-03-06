@@ -335,7 +335,8 @@ function BotConfigEditor({
         <p>
           <strong>Note:</strong> Bots respond to all messages, including your own. For channel
           messages, <code>sender_key</code> is <code>None</code>. Multiple enabled bots run
-          serially, with a two-second delay between messages to prevent repeater collision.
+          concurrently. Outgoing messages are serialized with a two-second delay between sends to
+          prevent repeater collision.
         </p>
       </div>
     </div>
@@ -925,6 +926,7 @@ export function SettingsFanoutSection({
       await api.deleteFanoutConfig(id);
       if (editingId === id) setEditingId(null);
       await loadConfigs();
+      if (onHealthRefresh) await onHealthRefresh();
       toast.success('Integration deleted');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete');
