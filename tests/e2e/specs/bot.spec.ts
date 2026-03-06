@@ -1,12 +1,9 @@
 import { test, expect } from '@playwright/test';
 import {
   ensureFlightlessChannel,
-  getFanoutConfigs,
   createFanoutConfig,
   deleteFanoutConfig,
-  updateFanoutConfig,
 } from '../helpers/api';
-import type { FanoutConfig } from '../helpers/api';
 
 const BOT_CODE = `def bot(sender_name, sender_key, message_text, is_dm, channel_key, channel_name, sender_timestamp, path):
     if channel_name == "#flightless" and "!e2etest" in message_text.lower():
@@ -48,7 +45,7 @@ test.describe('Bot functionality', () => {
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /Fanout/ }).click();
+    await page.getByRole('button', { name: /MQTT.*Forwarding/ }).click();
 
     // The bot name should be visible in the integration list
     await expect(page.getByText('E2E Test Bot')).toBeVisible();

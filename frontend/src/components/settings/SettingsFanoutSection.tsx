@@ -75,8 +75,7 @@ function getStatusLabel(status: string | undefined, type?: string) {
 }
 
 function getStatusColor(status: string | undefined, enabled?: boolean) {
-  if (enabled === false)
-    return 'bg-warning shadow-[0_0_6px_hsl(var(--warning)/0.5)]';
+  if (enabled === false) return 'bg-warning shadow-[0_0_6px_hsl(var(--warning)/0.5)]';
   if (status === 'connected')
     return 'bg-status-connected shadow-[0_0_6px_hsl(var(--status-connected)/0.5)]';
   if (status === 'error') return 'bg-destructive shadow-[0_0_6px_hsl(var(--destructive)/0.5)]';
@@ -1088,7 +1087,10 @@ export function SettingsFanoutSection({
                   </span>
 
                   <div
-                    className={cn('w-2 h-2 rounded-full transition-colors', getStatusColor(status, cfg.enabled))}
+                    className={cn(
+                      'w-2 h-2 rounded-full transition-colors',
+                      getStatusColor(status, cfg.enabled)
+                    )}
                     title={cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
                     aria-hidden="true"
                   />

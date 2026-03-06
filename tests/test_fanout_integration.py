@@ -4,6 +4,8 @@ Spins up a minimal in-process MQTT 3.1.1 broker on a random port, creates
 fanout configs in an in-memory DB, starts real MqttPrivateModule instances
 via the FanoutManager, and verifies that PUBLISH packets arrive (or don't)
 based on enabled/disabled state and scope settings.
+
+Also covers webhook and Apprise modules with real HTTP capture servers.
 """
 
 import asyncio
@@ -835,3 +837,361 @@ class TestFanoutWebhookIntegration:
         assert "yes" in texts
         assert "dm yes" in texts
         assert "nope" not in texts
+
+    @pytest.mark.asyncio
+    async def test_webhook_delivers_outgoing_messages(self, webhook_server, integration_db):
+        """Webhooks should deliver outgoing messages (unlike Apprise which skips them)."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="webhook",
+            name="Outgoing Hook",
+            config=_webhook_config(webhook_server.port),
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            await _wait_connected(manager, cfg["id"])
+
+            await manager.broadcast_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": "pk1",
+                    "text": "outgoing msg",
+                    "outgoing": True,
+                }
+            )
+
+            results = await webhook_server.wait_for(1)
+        finally:
+            await manager.stop_all()
+
+        assert len(results) == 1
+        assert results[0]["body"]["text"] == "outgoing msg"
+        assert results[0]["body"]["outgoing"] is True
+
+
+# ---------------------------------------------------------------------------
+# Apprise integration tests (real HTTP capture server + real AppriseModule)
+# ---------------------------------------------------------------------------
+
+
+class AppriseJsonCaptureServer:
+    """Minimal HTTP server that captures JSON POSTs from Apprise's json:// plugin.
+
+    Apprise json:// sends POST with JSON body containing title, body, type fields.
+    """
+
+    def __init__(self):
+        self.received: list[dict] = []
+        self._server: asyncio.Server | None = None
+        self.port: int = 0
+
+    async def start(self) -> int:
+        self._server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
+        self.port = self._server.sockets[0].getsockname()[1]
+        return self.port
+
+    async def stop(self):
+        if self._server:
+            self._server.close()
+            await self._server.wait_closed()
+
+    async def wait_for(self, count: int, timeout: float = 10.0) -> list[dict]:
+        deadline = asyncio.get_event_loop().time() + timeout
+        while len(self.received) < count:
+            if asyncio.get_event_loop().time() >= deadline:
+                break
+            await asyncio.sleep(0.05)
+        return list(self.received)
+
+    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        try:
+            request_line = await reader.readline()
+            if not request_line:
+                return
+
+            headers: dict[str, str] = {}
+            while True:
+                line = await reader.readline()
+                if line in (b"\r\n", b"\n", b""):
+                    break
+                decoded = line.decode("utf-8", errors="replace").strip()
+                if ":" in decoded:
+                    key, val = decoded.split(":", 1)
+                    headers[key.strip().lower()] = val.strip()
+
+            content_length = int(headers.get("content-length", "0"))
+            body = b""
+            if content_length > 0:
+                body = await reader.readexactly(content_length)
+
+            if body:
+                try:
+                    payload = json.loads(body)
+                except Exception:
+                    payload = {"_raw": body.decode("utf-8", errors="replace")}
+                self.received.append(payload)
+
+            response = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK"
+            writer.write(response)
+            await writer.drain()
+        except (asyncio.IncompleteReadError, ConnectionError, OSError):
+            pass
+        finally:
+            writer.close()
+
+
+@pytest.fixture
+async def apprise_capture_server():
+    server = AppriseJsonCaptureServer()
+    await server.start()
+    yield server
+    await server.stop()
+
+
+class TestFanoutAppriseIntegration:
+    """End-to-end: real HTTP capture server <-> real AppriseModule via json:// URL."""
+
+    @pytest.mark.asyncio
+    async def test_apprise_delivers_incoming_dm(self, apprise_capture_server, integration_db):
+        """Apprise module delivers incoming DMs via json:// to a real HTTP server."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="apprise",
+            name="Test Apprise",
+            config={
+                "urls": f"json://127.0.0.1:{apprise_capture_server.port}",
+                "preserve_identity": True,
+                "include_path": False,
+            },
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            assert cfg["id"] in manager._modules
+
+            await manager.broadcast_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": "pk1",
+                    "text": "hello from mesh",
+                    "sender_name": "Alice",
+                    "outgoing": False,
+                }
+            )
+
+            results = await apprise_capture_server.wait_for(1)
+        finally:
+            await manager.stop_all()
+
+        assert len(results) >= 1
+        # Apprise json:// sends body field with the formatted message
+        body_text = str(results[0])
+        assert "Alice" in body_text
+        assert "hello from mesh" in body_text
+
+    @pytest.mark.asyncio
+    async def test_apprise_delivers_incoming_channel_msg(
+        self, apprise_capture_server, integration_db
+    ):
+        """Apprise module delivers incoming channel messages."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="apprise",
+            name="Channel Apprise",
+            config={
+                "urls": f"json://127.0.0.1:{apprise_capture_server.port}",
+                "include_path": False,
+            },
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            assert cfg["id"] in manager._modules
+
+            await manager.broadcast_message(
+                {
+                    "type": "CHAN",
+                    "conversation_key": "ch1",
+                    "channel_name": "#general",
+                    "text": "channel hello",
+                    "sender_name": "Bob",
+                    "outgoing": False,
+                }
+            )
+
+            results = await apprise_capture_server.wait_for(1)
+        finally:
+            await manager.stop_all()
+
+        assert len(results) >= 1
+        body_text = str(results[0])
+        assert "Bob" in body_text
+        assert "channel hello" in body_text
+        assert "#general" in body_text
+
+    @pytest.mark.asyncio
+    async def test_apprise_skips_outgoing(self, apprise_capture_server, integration_db):
+        """Apprise should NOT deliver outgoing messages."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="apprise",
+            name="No Outgoing",
+            config={
+                "urls": f"json://127.0.0.1:{apprise_capture_server.port}",
+            },
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            assert cfg["id"] in manager._modules
+
+            await manager.broadcast_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": "pk1",
+                    "text": "my outgoing",
+                    "sender_name": "Me",
+                    "outgoing": True,
+                }
+            )
+
+            await asyncio.sleep(1.0)
+        finally:
+            await manager.stop_all()
+
+        assert len(apprise_capture_server.received) == 0
+
+    @pytest.mark.asyncio
+    async def test_apprise_disabled_no_delivery(self, apprise_capture_server, integration_db):
+        """Disabled Apprise module should not deliver anything."""
+        await FanoutConfigRepository.create(
+            config_type="apprise",
+            name="Disabled Apprise",
+            config={
+                "urls": f"json://127.0.0.1:{apprise_capture_server.port}",
+            },
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=False,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            assert len(manager._modules) == 0
+
+            await manager.broadcast_message(
+                {"type": "PRIV", "conversation_key": "pk1", "text": "nope"}
+            )
+            await asyncio.sleep(0.5)
+        finally:
+            await manager.stop_all()
+
+        assert len(apprise_capture_server.received) == 0
+
+    @pytest.mark.asyncio
+    async def test_apprise_scope_selective_channels(self, apprise_capture_server, integration_db):
+        """Apprise with selective channel scope only delivers matching channels."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="apprise",
+            name="Selective Apprise",
+            config={
+                "urls": f"json://127.0.0.1:{apprise_capture_server.port}",
+                "include_path": False,
+            },
+            scope={
+                "messages": {"channels": ["ch-yes"], "contacts": "none"},
+                "raw_packets": "none",
+            },
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            assert cfg["id"] in manager._modules
+
+            # Matching channel
+            await manager.broadcast_message(
+                {
+                    "type": "CHAN",
+                    "conversation_key": "ch-yes",
+                    "channel_name": "#yes",
+                    "text": "included",
+                    "sender_name": "A",
+                }
+            )
+            # Non-matching channel
+            await manager.broadcast_message(
+                {
+                    "type": "CHAN",
+                    "conversation_key": "ch-no",
+                    "channel_name": "#no",
+                    "text": "excluded",
+                    "sender_name": "B",
+                }
+            )
+            # DM — contacts is "none"
+            await manager.broadcast_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": "pk1",
+                    "text": "dm excluded",
+                    "sender_name": "C",
+                }
+            )
+
+            await apprise_capture_server.wait_for(1)
+            await asyncio.sleep(1.0)
+        finally:
+            await manager.stop_all()
+
+        assert len(apprise_capture_server.received) == 1
+        body_text = str(apprise_capture_server.received[0])
+        assert "included" in body_text
+
+    @pytest.mark.asyncio
+    async def test_apprise_includes_routing_path(self, apprise_capture_server, integration_db):
+        """Apprise with include_path=True shows routing hops in the body."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="apprise",
+            name="Path Apprise",
+            config={
+                "urls": f"json://127.0.0.1:{apprise_capture_server.port}",
+                "include_path": True,
+            },
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            assert cfg["id"] in manager._modules
+
+            await manager.broadcast_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": "pk1",
+                    "text": "routed msg",
+                    "sender_name": "Eve",
+                    "paths": [{"path": "2a3b"}],
+                }
+            )
+
+            results = await apprise_capture_server.wait_for(1)
+        finally:
+            await manager.stop_all()
+
+        assert len(results) >= 1
+        body_text = str(results[0])
+        assert "Eve" in body_text
+        assert "routed msg" in body_text

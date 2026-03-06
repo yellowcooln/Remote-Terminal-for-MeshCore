@@ -673,6 +673,25 @@ class TestWebhookModule:
         await mod.stop()
 
     @pytest.mark.asyncio
+    async def test_does_not_skip_outgoing_messages(self):
+        """Webhook should forward outgoing messages (unlike Apprise)."""
+        from app.fanout.webhook import WebhookModule
+
+        mod = WebhookModule("test", {"url": "http://localhost:9999/hook"})
+        await mod.start()
+        # Mock the client to capture the request
+        sent_data: list[dict] = []
+
+        async def capture_send(data: dict, *, event_type: str) -> None:
+            sent_data.append(data)
+
+        mod._send = capture_send
+        await mod.on_message({"type": "PRIV", "text": "outgoing", "outgoing": True})
+        assert len(sent_data) == 1
+        assert sent_data[0]["outgoing"] is True
+        await mod.stop()
+
+    @pytest.mark.asyncio
     async def test_dispatch_with_matching_scope(self):
         """WebhookModule dispatches through FanoutManager scope matching."""
         manager = FanoutManager()
@@ -883,3 +902,142 @@ class TestAppriseValidation:
         scope = _enforce_scope("apprise", {"messages": "all", "raw_packets": "all"})
         assert scope["raw_packets"] == "none"
         assert scope["messages"] == "all"
+
+
+# ---------------------------------------------------------------------------
+# Comprehensive scope/filter selection logic tests
+# ---------------------------------------------------------------------------
+
+
+class TestMatchesFilter:
+    """Test _matches_filter directly for all filter shapes."""
+
+    def test_all_matches_any_key(self):
+        from app.fanout.manager import _matches_filter
+
+        assert _matches_filter("all", "anything")
+        assert _matches_filter("all", "")
+        assert _matches_filter("all", "special-chars-!@#")
+
+    def test_none_matches_nothing(self):
+        from app.fanout.manager import _matches_filter
+
+        assert not _matches_filter("none", "anything")
+        assert not _matches_filter("none", "")
+
+    def test_list_matches_present_key(self):
+        from app.fanout.manager import _matches_filter
+
+        assert _matches_filter(["a", "b", "c"], "b")
+
+    def test_list_no_match_absent_key(self):
+        from app.fanout.manager import _matches_filter
+
+        assert not _matches_filter(["a", "b"], "c")
+
+    def test_list_empty_matches_nothing(self):
+        from app.fanout.manager import _matches_filter
+
+        assert not _matches_filter([], "anything")
+
+    def test_except_excludes_listed(self):
+        from app.fanout.manager import _matches_filter
+
+        assert not _matches_filter({"except": ["blocked"]}, "blocked")
+
+    def test_except_includes_unlisted(self):
+        from app.fanout.manager import _matches_filter
+
+        assert _matches_filter({"except": ["blocked"]}, "allowed")
+
+    def test_except_empty_matches_everything(self):
+        from app.fanout.manager import _matches_filter
+
+        assert _matches_filter({"except": []}, "anything")
+        assert _matches_filter({"except": []}, "")
+
+    def test_except_multiple_excludes(self):
+        from app.fanout.manager import _matches_filter
+
+        filt = {"except": ["x", "y", "z"]}
+        assert not _matches_filter(filt, "x")
+        assert not _matches_filter(filt, "y")
+        assert not _matches_filter(filt, "z")
+        assert _matches_filter(filt, "a")
+
+    def test_unrecognized_shape_returns_false(self):
+        from app.fanout.manager import _matches_filter
+
+        assert not _matches_filter(42, "key")
+        assert not _matches_filter({"other": "thing"}, "key")
+        assert not _matches_filter(True, "key")
+
+
+class TestScopeMatchesMessageCombinations:
+    """Test _scope_matches_message with complex combinations."""
+
+    def test_channel_with_only_channels_listed(self):
+        scope = {"messages": {"channels": ["ch1", "ch2"], "contacts": "all"}}
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch2"})
+        assert not _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch3"})
+
+    def test_contact_with_only_contacts_listed(self):
+        scope = {"messages": {"channels": "all", "contacts": ["pk1"]}}
+        assert _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk1"})
+        assert not _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk2"})
+
+    def test_mixed_channels_all_contacts_except(self):
+        scope = {"messages": {"channels": "all", "contacts": {"except": ["pk-blocked"]}}}
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        assert _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk-ok"})
+        assert not _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk-blocked"})
+
+    def test_channels_except_contacts_only(self):
+        scope = {
+            "messages": {
+                "channels": {"except": ["ch-muted"]},
+                "contacts": ["pk-friend"],
+            }
+        }
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch-ok"})
+        assert not _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch-muted"})
+        assert _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk-friend"})
+        assert not _scope_matches_message(
+            scope, {"type": "PRIV", "conversation_key": "pk-stranger"}
+        )
+
+    def test_both_channels_and_contacts_none(self):
+        scope = {"messages": {"channels": "none", "contacts": "none"}}
+        assert not _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        assert not _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk1"})
+
+    def test_both_channels_and_contacts_all(self):
+        scope = {"messages": {"channels": "all", "contacts": "all"}}
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        assert _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk1"})
+
+    def test_missing_contacts_key_defaults_false(self):
+        scope = {"messages": {"channels": "all"}}
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        # Missing contacts -> defaults to "none" -> no match for DMs
+        assert not _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk1"})
+
+    def test_missing_channels_key_defaults_false(self):
+        scope = {"messages": {"contacts": "all"}}
+        assert not _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        assert _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk1"})
+
+    def test_unknown_message_type_no_match(self):
+        scope = {"messages": {"channels": "all", "contacts": "all"}}
+        assert not _scope_matches_message(scope, {"type": "UNKNOWN", "conversation_key": "x"})
+
+    def test_both_except_empty_matches_everything(self):
+        scope = {
+            "messages": {
+                "channels": {"except": []},
+                "contacts": {"except": []},
+            }
+        }
+        assert _scope_matches_message(scope, {"type": "CHAN", "conversation_key": "ch1"})
+        assert _scope_matches_message(scope, {"type": "PRIV", "conversation_key": "pk1"})
