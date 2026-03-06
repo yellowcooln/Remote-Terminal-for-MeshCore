@@ -1235,3 +1235,217 @@ class TestFanoutAppriseIntegration:
         body_text = str(results[0])
         assert "Eve" in body_text
         assert "routed msg" in body_text
+
+
+# ---------------------------------------------------------------------------
+# Bot lifecycle tests
+# ---------------------------------------------------------------------------
+
+
+class TestBotModuleLifecycle:
+    """BotModule.stop() must cancel in-flight tasks and prevent response delivery."""
+
+    @pytest.mark.asyncio
+    async def test_stop_cancels_pending_tasks(self):
+        """Stopping a bot module cancels tasks still in the settle delay."""
+        from app.fanout.bot import BotModule
+
+        mod = BotModule("bot1", {"code": "def bot(**k): return 'hi'"}, name="Test Bot")
+        mod._active = True
+
+        # Fire off a message — it will enter the 2s settle sleep
+        await mod.on_message(
+            {"type": "PRIV", "conversation_key": "abc123", "text": "hello", "outgoing": False}
+        )
+        assert len(mod._tasks) == 1
+
+        # Stop immediately — should cancel the pending task
+        await mod.stop()
+
+        assert mod._active is False
+        assert len(mod._tasks) == 0
+
+    @pytest.mark.asyncio
+    async def test_stop_prevents_response_delivery(self):
+        """Even if bot code returns a response, stop() prevents it from being sent."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.fanout.bot import BotModule
+
+        mod = BotModule("bot1", {"code": "def bot(**k): return 'reply'"}, name="Test Bot")
+
+        mock_process = AsyncMock()
+        with patch("app.fanout.bot.asyncio.sleep", new_callable=AsyncMock):
+            # Manually run the handler with _active=True, then set _active=False
+            # before process_bot_response would be called
+            original_run = mod._run_for_message
+
+            async def run_then_deactivate(data):
+                # Deactivate mid-flight by stopping
+                mod._active = False
+                await original_run(data)
+
+            with patch.object(mod, "_run_for_message", run_then_deactivate):
+                await mod.on_message(
+                    {
+                        "type": "PRIV",
+                        "conversation_key": "abc123",
+                        "text": "hello",
+                        "outgoing": False,
+                    }
+                )
+                # Wait for the task to finish
+                if mod._tasks:
+                    await asyncio.gather(*mod._tasks, return_exceptions=True)
+
+        # process_bot_response should never have been called
+        mock_process.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_multiple_tasks_all_cancelled(self):
+        """Multiple in-flight tasks are all cancelled on stop."""
+        from app.fanout.bot import BotModule
+
+        mod = BotModule("bot1", {"code": "def bot(**k): return 'hi'"}, name="Test Bot")
+        mod._active = True
+
+        # Fire off several messages
+        for i in range(5):
+            await mod.on_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": f"key{i}",
+                    "text": f"msg{i}",
+                    "outgoing": False,
+                }
+            )
+        assert len(mod._tasks) == 5
+
+        await mod.stop()
+
+        assert mod._active is False
+        assert len(mod._tasks) == 0
+
+
+# ---------------------------------------------------------------------------
+# Manager restart failure tests
+# ---------------------------------------------------------------------------
+
+
+class TestManagerRestartFailure:
+    """_restart_module removes dead module from dispatch table on failure."""
+
+    @pytest.mark.asyncio
+    async def test_failed_restart_removes_module(self):
+        """When module.start() fails during restart, the module is removed from _modules."""
+
+        from app.fanout.base import FanoutModule
+
+        class FailingModule(FanoutModule):
+            def __init__(self):
+                super().__init__("fail1", {}, name="Failer")
+                self.stop_called = False
+                self.start_calls = 0
+
+            async def stop(self):
+                self.stop_called = True
+
+            async def start(self):
+                self.start_calls += 1
+                raise ConnectionError("broker down")
+
+            @property
+            def status(self):
+                return "error"
+
+        manager = FanoutManager()
+        mod = FailingModule()
+        manager._modules["fail1"] = (mod, {"messages": "all", "raw_packets": "none"})
+
+        # Restart should catch the error and remove the module
+        await manager._restart_module("fail1", mod)
+
+        assert mod.stop_called
+        assert mod.start_calls == 1
+        assert "fail1" not in manager._modules
+
+    @pytest.mark.asyncio
+    async def test_successful_restart_keeps_module(self):
+        """When restart succeeds, the module stays in _modules."""
+        from app.fanout.base import FanoutModule
+
+        class GoodModule(FanoutModule):
+            def __init__(self):
+                super().__init__("good1", {}, name="Goodie")
+
+            async def stop(self):
+                pass
+
+            async def start(self):
+                pass
+
+            @property
+            def status(self):
+                return "connected"
+
+        manager = FanoutManager()
+        mod = GoodModule()
+        scope = {"messages": "all", "raw_packets": "none"}
+        manager._modules["good1"] = (mod, scope)
+
+        await manager._restart_module("good1", mod)
+
+        assert "good1" in manager._modules
+
+    @pytest.mark.asyncio
+    async def test_dead_module_not_dispatched_after_failed_restart(self):
+        """After failed restart, the dead module does not receive further dispatches."""
+        from app.fanout.base import FanoutModule
+
+        class TrackingModule(FanoutModule):
+            def __init__(self, config_id):
+                super().__init__(config_id, {}, name=config_id)
+                self.messages_received = []
+
+            async def start(self):
+                raise RuntimeError("can't start")
+
+            async def stop(self):
+                pass
+
+            async def on_message(self, data):
+                self.messages_received.append(data)
+
+            @property
+            def status(self):
+                return "error"
+
+        class HealthyModule(FanoutModule):
+            def __init__(self):
+                super().__init__("healthy", {}, name="Healthy")
+                self.messages_received = []
+
+            async def on_message(self, data):
+                self.messages_received.append(data)
+
+            @property
+            def status(self):
+                return "connected"
+
+        manager = FanoutManager()
+        dead = TrackingModule("dead1")
+        healthy = HealthyModule()
+
+        scope = {"messages": "all", "raw_packets": "none"}
+        manager._modules["dead1"] = (dead, scope)
+        manager._modules["healthy"] = (healthy, scope)
+
+        # Simulate failed restart of dead module
+        await manager._restart_module("dead1", dead)
+        assert "dead1" not in manager._modules
+
+        # Now broadcast — only the healthy module should receive
+        await manager.broadcast_message({"type": "PRIV", "conversation_key": "k1", "text": "hi"})
+
+        assert len(healthy.messages_received) == 1
+        assert len(dead.messages_received) == 0

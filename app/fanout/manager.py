@@ -194,6 +194,7 @@ class FanoutManager:
                 await module.start()
             except Exception:
                 logger.exception("Failed to restart timed-out fanout module %s", config_id)
+                self._modules.pop(config_id, None)
 
     async def broadcast_message(self, data: dict) -> None:
         """Dispatch a decoded message to modules whose scope matches."""

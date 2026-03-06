@@ -21,10 +21,23 @@ class BotModule(FanoutModule):
 
     def __init__(self, config_id: str, config: dict, *, name: str = "Bot") -> None:
         super().__init__(config_id, config, name=name)
+        self._tasks: set[asyncio.Task] = set()
+        self._active = True
+
+    async def stop(self) -> None:
+        self._active = False
+        for task in self._tasks:
+            task.cancel()
+        # Wait briefly for tasks to acknowledge cancellation
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
 
     async def on_message(self, data: dict) -> None:
         """Kick off bot execution in a background task so we don't block dispatch."""
-        asyncio.create_task(self._run_for_message(data))
+        task = asyncio.create_task(self._run_for_message(data))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _run_for_message(self, data: dict) -> None:
         from app.fanout.bot_exec import (
@@ -118,7 +131,7 @@ class BotModule(FanoutModule):
                 logger.warning("Bot '%s' execution error: %s", self.name, e)
                 return
 
-        if response:
+        if response and self._active:
             await process_bot_response(response, is_dm, sender_key or "", channel_key)
 
     @property
