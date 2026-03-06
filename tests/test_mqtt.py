@@ -1,28 +1,29 @@
 """Tests for MQTT publisher module."""
 
 import ssl
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models import AppSettings
-from app.mqtt import MqttPublisher, _build_message_topic, _build_raw_packet_topic
+from app.fanout.mqtt import MqttPublisher, _build_message_topic, _build_raw_packet_topic
 
 
-def _make_settings(**overrides) -> AppSettings:
-    """Create an AppSettings with MQTT fields."""
+def _make_settings(**overrides) -> SimpleNamespace:
+    """Create a settings namespace with MQTT fields."""
     defaults = {
         "mqtt_broker_host": "broker.local",
         "mqtt_broker_port": 1883,
         "mqtt_username": "",
         "mqtt_password": "",
         "mqtt_use_tls": False,
+        "mqtt_tls_insecure": False,
         "mqtt_topic_prefix": "meshcore",
         "mqtt_publish_messages": True,
         "mqtt_publish_raw_packets": True,
     }
     defaults.update(overrides)
-    return AppSettings(**defaults)
+    return SimpleNamespace(**defaults)
 
 
 class TestTopicBuilders:
@@ -214,8 +215,8 @@ class TestConnectionLoop:
         mock_client.__aenter__ = AsyncMock(side_effect=side_effect_aenter)
 
         with (
-            patch("app.mqtt_base.aiomqtt.Client", return_value=mock_client),
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base.aiomqtt.Client", return_value=mock_client),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_health"),
         ):
@@ -235,7 +236,7 @@ class TestConnectionLoop:
         """Connection loop should retry after a connection error with backoff."""
         import asyncio
 
-        from app.mqtt_base import _BACKOFF_MIN
+        from app.fanout.mqtt_base import _BACKOFF_MIN
 
         pub = MqttPublisher()
         settings = _make_settings()
@@ -268,12 +269,12 @@ class TestConnectionLoop:
             return factory
 
         with (
-            patch("app.mqtt_base.aiomqtt.Client", side_effect=make_client_factory()),
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base.aiomqtt.Client", side_effect=make_client_factory()),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
-            patch("app.mqtt_base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("app.fanout.mqtt_base.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
         ):
             await pub.start(settings)
 
@@ -292,7 +293,7 @@ class TestConnectionLoop:
         """Backoff should double after each failure, capped at _backoff_max."""
         import asyncio
 
-        from app.mqtt_base import _BACKOFF_MIN
+        from app.fanout.mqtt_base import _BACKOFF_MIN
 
         pub = MqttPublisher()
         settings = _make_settings()
@@ -322,11 +323,11 @@ class TestConnectionLoop:
                 raise asyncio.CancelledError
 
         with (
-            patch("app.mqtt_base.aiomqtt.Client", side_effect=factory),
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base.aiomqtt.Client", side_effect=factory),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
-            patch("app.mqtt_base.asyncio.sleep", side_effect=capture_sleep),
+            patch("app.fanout.mqtt_base.asyncio.sleep", side_effect=capture_sleep),
         ):
             await pub.start(settings)
             try:
@@ -363,8 +364,8 @@ class TestConnectionLoop:
             return mock
 
         with (
-            patch("app.mqtt_base.aiomqtt.Client", side_effect=make_success_client),
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base.aiomqtt.Client", side_effect=make_success_client),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_health"),
         ):
@@ -411,8 +412,8 @@ class TestConnectionLoop:
             return mock
 
         with (
-            patch("app.mqtt_base.aiomqtt.Client", side_effect=make_client),
-            patch("app.mqtt_base._broadcast_health", side_effect=track_health),
+            patch("app.fanout.mqtt_base.aiomqtt.Client", side_effect=make_client),
+            patch("app.fanout.mqtt_base._broadcast_health", side_effect=track_health),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_health"),
         ):
@@ -448,11 +449,11 @@ class TestConnectionLoop:
             return mock
 
         with (
-            patch("app.mqtt_base.aiomqtt.Client", side_effect=make_failing_client),
-            patch("app.mqtt_base._broadcast_health", side_effect=track_health),
+            patch("app.fanout.mqtt_base.aiomqtt.Client", side_effect=make_failing_client),
+            patch("app.fanout.mqtt_base._broadcast_health", side_effect=track_health),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
-            patch("app.mqtt_base.asyncio.sleep", side_effect=cancel_on_sleep),
+            patch("app.fanout.mqtt_base.asyncio.sleep", side_effect=cancel_on_sleep),
         ):
             await pub.start(settings)
             try:

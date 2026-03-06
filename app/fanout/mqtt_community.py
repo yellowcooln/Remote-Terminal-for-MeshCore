@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import logging
 import re
+from types import SimpleNamespace
 from typing import Any
 
-from app.community_mqtt import CommunityMqttPublisher, _format_raw_packet
 from app.fanout.base import FanoutModule
-from app.models import AppSettings
+from app.fanout.community_mqtt import CommunityMqttPublisher, _format_raw_packet
 
 logger = logging.getLogger(__name__)
 
 _IATA_RE = re.compile(r"^[A-Z]{3}$")
 
 
-def _config_to_settings(config: dict) -> AppSettings:
-    """Map a fanout config blob to AppSettings for the CommunityMqttPublisher."""
-    return AppSettings(
+def _config_to_settings(config: dict) -> SimpleNamespace:
+    """Map a fanout config blob to a settings namespace for the CommunityMqttPublisher."""
+    return SimpleNamespace(
         community_mqtt_enabled=True,
         community_mqtt_broker_host=config.get("broker_host", "mqtt-us-v1.letsmesh.net"),
         community_mqtt_broker_port=config.get("broker_port", 443),

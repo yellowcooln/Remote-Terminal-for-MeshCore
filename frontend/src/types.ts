@@ -214,13 +214,6 @@ export interface Favorite {
   id: string; // channel key or contact public key
 }
 
-export interface BotConfig {
-  id: string; // UUID for stable identity across renames/reorders
-  name: string; // User-editable name
-  enabled: boolean; // Whether this bot is enabled
-  code: string; // Python code for this bot
-}
-
 export interface AppSettings {
   max_radio_contacts: number;
   favorites: Favorite[];
@@ -230,21 +223,6 @@ export interface AppSettings {
   preferences_migrated: boolean;
   advert_interval: number;
   last_advert_time: number;
-  bots: BotConfig[];
-  mqtt_broker_host: string;
-  mqtt_broker_port: number;
-  mqtt_username: string;
-  mqtt_password: string;
-  mqtt_use_tls: boolean;
-  mqtt_tls_insecure: boolean;
-  mqtt_topic_prefix: string;
-  mqtt_publish_messages: boolean;
-  mqtt_publish_raw_packets: boolean;
-  community_mqtt_enabled: boolean;
-  community_mqtt_iata: string;
-  community_mqtt_broker_host: string;
-  community_mqtt_broker_port: number;
-  community_mqtt_email: string;
   flood_scope: string;
   blocked_keys: string[];
   blocked_names: string[];

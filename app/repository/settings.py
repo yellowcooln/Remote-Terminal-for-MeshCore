@@ -4,7 +4,7 @@ import time
 from typing import Any, Literal
 
 from app.database import db
-from app.models import AppSettings, BotConfig, Favorite
+from app.models import AppSettings, Favorite
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +26,7 @@ class AppSettingsRepository:
             """
             SELECT max_radio_contacts, favorites, auto_decrypt_dm_on_advert,
                    sidebar_sort_order, last_message_times, preferences_migrated,
-                   advert_interval, last_advert_time, bots,
-                   mqtt_broker_host, mqtt_broker_port, mqtt_username, mqtt_password,
-                   mqtt_use_tls, mqtt_tls_insecure, mqtt_topic_prefix,
-                   mqtt_publish_messages, mqtt_publish_raw_packets,
-                   community_mqtt_enabled, community_mqtt_iata,
-                   community_mqtt_broker_host, community_mqtt_broker_port,
-                   community_mqtt_email, flood_scope,
+                   advert_interval, last_advert_time, flood_scope,
                    blocked_keys, blocked_names
             FROM app_settings WHERE id = 1
             """
@@ -69,20 +63,6 @@ class AppSettingsRepository:
                 )
                 last_message_times = {}
 
-        # Parse bots JSON
-        bots: list[BotConfig] = []
-        if row["bots"]:
-            try:
-                bots_data = json.loads(row["bots"])
-                bots = [BotConfig(**b) for b in bots_data]
-            except (json.JSONDecodeError, TypeError, KeyError) as e:
-                logger.warning(
-                    "Failed to parse bots JSON, using empty list: %s (data=%r)",
-                    e,
-                    row["bots"][:100] if row["bots"] else None,
-                )
-                bots = []
-
         # Parse blocked_keys JSON
         blocked_keys: list[str] = []
         if row["blocked_keys"]:
@@ -113,22 +93,6 @@ class AppSettingsRepository:
             preferences_migrated=bool(row["preferences_migrated"]),
             advert_interval=row["advert_interval"] or 0,
             last_advert_time=row["last_advert_time"] or 0,
-            bots=bots,
-            mqtt_broker_host=row["mqtt_broker_host"] or "",
-            mqtt_broker_port=row["mqtt_broker_port"] or 1883,
-            mqtt_username=row["mqtt_username"] or "",
-            mqtt_password=row["mqtt_password"] or "",
-            mqtt_use_tls=bool(row["mqtt_use_tls"]),
-            mqtt_tls_insecure=bool(row["mqtt_tls_insecure"]),
-            mqtt_topic_prefix=row["mqtt_topic_prefix"] or "meshcore",
-            mqtt_publish_messages=bool(row["mqtt_publish_messages"]),
-            mqtt_publish_raw_packets=bool(row["mqtt_publish_raw_packets"]),
-            community_mqtt_enabled=bool(row["community_mqtt_enabled"]),
-            community_mqtt_iata=row["community_mqtt_iata"] or "",
-            community_mqtt_broker_host=row["community_mqtt_broker_host"]
-            or "mqtt-us-v1.letsmesh.net",
-            community_mqtt_broker_port=row["community_mqtt_broker_port"] or 443,
-            community_mqtt_email=row["community_mqtt_email"] or "",
             flood_scope=row["flood_scope"] or "",
             blocked_keys=blocked_keys,
             blocked_names=blocked_names,
@@ -144,21 +108,6 @@ class AppSettingsRepository:
         preferences_migrated: bool | None = None,
         advert_interval: int | None = None,
         last_advert_time: int | None = None,
-        bots: list[BotConfig] | None = None,
-        mqtt_broker_host: str | None = None,
-        mqtt_broker_port: int | None = None,
-        mqtt_username: str | None = None,
-        mqtt_password: str | None = None,
-        mqtt_use_tls: bool | None = None,
-        mqtt_tls_insecure: bool | None = None,
-        mqtt_topic_prefix: str | None = None,
-        mqtt_publish_messages: bool | None = None,
-        mqtt_publish_raw_packets: bool | None = None,
-        community_mqtt_enabled: bool | None = None,
-        community_mqtt_iata: str | None = None,
-        community_mqtt_broker_host: str | None = None,
-        community_mqtt_broker_port: int | None = None,
-        community_mqtt_email: str | None = None,
         flood_scope: str | None = None,
         blocked_keys: list[str] | None = None,
         blocked_names: list[str] | None = None,
@@ -199,67 +148,6 @@ class AppSettingsRepository:
         if last_advert_time is not None:
             updates.append("last_advert_time = ?")
             params.append(last_advert_time)
-
-        if bots is not None:
-            updates.append("bots = ?")
-            bots_json = json.dumps([b.model_dump() for b in bots])
-            params.append(bots_json)
-
-        if mqtt_broker_host is not None:
-            updates.append("mqtt_broker_host = ?")
-            params.append(mqtt_broker_host)
-
-        if mqtt_broker_port is not None:
-            updates.append("mqtt_broker_port = ?")
-            params.append(mqtt_broker_port)
-
-        if mqtt_username is not None:
-            updates.append("mqtt_username = ?")
-            params.append(mqtt_username)
-
-        if mqtt_password is not None:
-            updates.append("mqtt_password = ?")
-            params.append(mqtt_password)
-
-        if mqtt_use_tls is not None:
-            updates.append("mqtt_use_tls = ?")
-            params.append(1 if mqtt_use_tls else 0)
-
-        if mqtt_tls_insecure is not None:
-            updates.append("mqtt_tls_insecure = ?")
-            params.append(1 if mqtt_tls_insecure else 0)
-
-        if mqtt_topic_prefix is not None:
-            updates.append("mqtt_topic_prefix = ?")
-            params.append(mqtt_topic_prefix)
-
-        if mqtt_publish_messages is not None:
-            updates.append("mqtt_publish_messages = ?")
-            params.append(1 if mqtt_publish_messages else 0)
-
-        if mqtt_publish_raw_packets is not None:
-            updates.append("mqtt_publish_raw_packets = ?")
-            params.append(1 if mqtt_publish_raw_packets else 0)
-
-        if community_mqtt_enabled is not None:
-            updates.append("community_mqtt_enabled = ?")
-            params.append(1 if community_mqtt_enabled else 0)
-
-        if community_mqtt_iata is not None:
-            updates.append("community_mqtt_iata = ?")
-            params.append(community_mqtt_iata)
-
-        if community_mqtt_broker_host is not None:
-            updates.append("community_mqtt_broker_host = ?")
-            params.append(community_mqtt_broker_host)
-
-        if community_mqtt_broker_port is not None:
-            updates.append("community_mqtt_broker_port = ?")
-            params.append(community_mqtt_broker_port)
-
-        if community_mqtt_email is not None:
-            updates.append("community_mqtt_email = ?")
-            params.append(community_mqtt_email)
 
         if flood_scope is not None:
             updates.append("flood_scope = ?")

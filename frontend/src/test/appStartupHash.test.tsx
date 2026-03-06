@@ -168,7 +168,6 @@ describe('App startup hash resolution', () => {
       preferences_migrated: true,
       advert_interval: 0,
       last_advert_time: 0,
-      bots: [],
     });
     mocks.api.getUndecryptedPacketCount.mockResolvedValue({ count: 0 });
     mocks.api.getChannels.mockResolvedValue([publicChannel]);

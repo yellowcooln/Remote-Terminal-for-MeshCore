@@ -174,7 +174,7 @@ class TestFanoutMqttIntegration:
 
         manager = FanoutManager()
         with (
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
@@ -218,7 +218,7 @@ class TestFanoutMqttIntegration:
 
         manager = FanoutManager()
         with (
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
@@ -264,7 +264,7 @@ class TestFanoutMqttIntegration:
 
         manager = FanoutManager()
         with (
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
@@ -297,7 +297,7 @@ class TestFanoutMqttIntegration:
 
         manager = FanoutManager()
         with (
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
@@ -345,7 +345,7 @@ class TestFanoutMqttIntegration:
 
         manager = FanoutManager()
         with (
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),
@@ -382,7 +382,7 @@ class TestFanoutMqttIntegration:
 
         manager = FanoutManager()
         with (
-            patch("app.mqtt_base._broadcast_health"),
+            patch("app.fanout.mqtt_base._broadcast_health"),
             patch("app.websocket.broadcast_success"),
             patch("app.websocket.broadcast_error"),
             patch("app.websocket.broadcast_health"),

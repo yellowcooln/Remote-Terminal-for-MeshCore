@@ -18,8 +18,6 @@ from typing import Any
 
 import aiomqtt
 
-from app.models import AppSettings
-
 logger = logging.getLogger(__name__)
 
 _BACKOFF_MIN = 5
@@ -38,6 +36,11 @@ class BaseMqttPublisher(ABC):
 
     Subclasses implement the abstract hooks to control configuration checks,
     client construction, toast messages, and optional wait-loop behavior.
+
+    The settings type is duck-typed — each subclass defines a Protocol
+    describing the attributes it expects (e.g. ``PrivateMqttSettings``,
+    ``CommunityMqttSettings``). Callers pass ``SimpleNamespace`` instances
+    that satisfy the protocol.
     """
 
     _backoff_max: int = 30
@@ -47,14 +50,14 @@ class BaseMqttPublisher(ABC):
     def __init__(self) -> None:
         self._client: aiomqtt.Client | None = None
         self._task: asyncio.Task[None] | None = None
-        self._settings: AppSettings | None = None
+        self._settings: Any = None
         self._settings_version: int = 0
         self._version_event: asyncio.Event = asyncio.Event()
         self.connected: bool = False
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
-    async def start(self, settings: AppSettings) -> None:
+    async def start(self, settings: object) -> None:
         """Start the background connection loop."""
         self._settings = settings
         self._settings_version += 1
@@ -74,7 +77,7 @@ class BaseMqttPublisher(ABC):
         self._client = None
         self.connected = False
 
-    async def restart(self, settings: AppSettings) -> None:
+    async def restart(self, settings: object) -> None:
         """Called when settings change — stop + start."""
         await self.stop()
         await self.start(settings)
@@ -99,11 +102,11 @@ class BaseMqttPublisher(ABC):
         """Return True when this publisher should attempt to connect."""
 
     @abstractmethod
-    def _build_client_kwargs(self, settings: AppSettings) -> dict[str, Any]:
+    def _build_client_kwargs(self, settings: object) -> dict[str, Any]:
         """Return the keyword arguments for ``aiomqtt.Client(...)``."""
 
     @abstractmethod
-    def _on_connected(self, settings: AppSettings) -> tuple[str, str]:
+    def _on_connected(self, settings: object) -> tuple[str, str]:
         """Return ``(title, detail)`` for the success toast on connect."""
 
     @abstractmethod
@@ -116,7 +119,7 @@ class BaseMqttPublisher(ABC):
         """Return True to break the inner wait (e.g. token expiry)."""
         return False
 
-    async def _pre_connect(self, settings: AppSettings) -> bool:
+    async def _pre_connect(self, settings: object) -> bool:
         """Called before connecting. Return True to proceed, False to retry."""
         return True
 
@@ -124,7 +127,7 @@ class BaseMqttPublisher(ABC):
         """Called each time the loop finds the publisher not configured."""
         return  # no-op by default; subclasses may override
 
-    async def _on_connected_async(self, settings: AppSettings) -> None:
+    async def _on_connected_async(self, settings: object) -> None:
         """Async hook called after connection succeeds (before health broadcast).
 
         Subclasses can override to publish messages immediately after connecting.

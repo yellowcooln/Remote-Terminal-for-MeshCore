@@ -399,15 +399,6 @@ class Favorite(BaseModel):
     id: str = Field(description="Channel key or contact public key")
 
 
-class BotConfig(BaseModel):
-    """Configuration for a single bot."""
-
-    id: str = Field(description="UUID for stable identity across renames/reorders")
-    name: str = Field(description="User-editable name")
-    enabled: bool = Field(default=False, description="Whether this bot is enabled")
-    code: str = Field(default="", description="Python code for this bot")
-
-
 class UnreadCounts(BaseModel):
     """Aggregated unread counts, mention flags, and last message times for all conversations."""
 
@@ -459,66 +450,6 @@ class AppSettings(BaseModel):
         default=0,
         description="Unix timestamp of last advertisement sent (0 = never)",
     )
-    bots: list[BotConfig] = Field(
-        default_factory=list,
-        description="List of bot configurations",
-    )
-    mqtt_broker_host: str = Field(
-        default="",
-        description="MQTT broker hostname (empty = disabled)",
-    )
-    mqtt_broker_port: int = Field(
-        default=1883,
-        description="MQTT broker port",
-    )
-    mqtt_username: str = Field(
-        default="",
-        description="MQTT username (optional)",
-    )
-    mqtt_password: str = Field(
-        default="",
-        description="MQTT password (optional)",
-    )
-    mqtt_use_tls: bool = Field(
-        default=False,
-        description="Whether to use TLS for MQTT connection",
-    )
-    mqtt_tls_insecure: bool = Field(
-        default=False,
-        description="Skip TLS certificate verification (for self-signed certs)",
-    )
-    mqtt_topic_prefix: str = Field(
-        default="meshcore",
-        description="MQTT topic prefix",
-    )
-    mqtt_publish_messages: bool = Field(
-        default=False,
-        description="Whether to publish decrypted messages to MQTT",
-    )
-    mqtt_publish_raw_packets: bool = Field(
-        default=False,
-        description="Whether to publish raw packets to MQTT",
-    )
-    community_mqtt_enabled: bool = Field(
-        default=False,
-        description="Whether to publish raw packets to the community MQTT broker (letsmesh.net)",
-    )
-    community_mqtt_iata: str = Field(
-        default="",
-        description="IATA region code for community MQTT topic routing (3 alpha chars)",
-    )
-    community_mqtt_broker_host: str = Field(
-        default="mqtt-us-v1.letsmesh.net",
-        description="Community MQTT broker hostname",
-    )
-    community_mqtt_broker_port: int = Field(
-        default=443,
-        description="Community MQTT broker port",
-    )
-    community_mqtt_email: str = Field(
-        default="",
-        description="Email address for node claiming on the community aggregator (optional)",
-    )
     flood_scope: str = Field(
         default="",
         description="Outbound flood scope / region name (empty = disabled, no tagging)",
@@ -537,7 +468,7 @@ class FanoutConfig(BaseModel):
     """Configuration for a single fanout integration."""
 
     id: str
-    type: str  # 'mqtt_private' | 'mqtt_community'
+    type: str  # 'mqtt_private' | 'mqtt_community' | 'bot' | 'webhook' | 'apprise'
     name: str
     enabled: bool
     config: dict

@@ -185,7 +185,6 @@ const baseSettings = {
   preferences_migrated: false,
   advert_interval: 0,
   last_advert_time: 0,
-  bots: [],
 };
 
 const publicChannel = {
