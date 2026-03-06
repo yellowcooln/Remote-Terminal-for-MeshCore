@@ -68,7 +68,7 @@ def captured_broadcasts():
     """Capture WebSocket broadcasts for verification."""
     broadcasts = []
 
-    def mock_broadcast(event_type: str, data: dict):
+    def mock_broadcast(event_type: str, data: dict, **kwargs):
         broadcasts.append({"type": event_type, "data": data})
 
     return broadcasts, mock_broadcast

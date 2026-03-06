@@ -21,7 +21,6 @@ from app.community_mqtt import (
     _format_raw_packet,
     _generate_jwt_token,
     _get_client_version,
-    community_mqtt_broadcast,
 )
 from app.models import AppSettings
 
@@ -392,39 +391,6 @@ class TestCommunityMqttPublisher:
         pub._settings = AppSettings(community_mqtt_enabled=True)
         with patch("app.keystore.has_private_key", return_value=True):
             assert pub._is_configured() is True
-
-
-class TestCommunityMqttBroadcast:
-    def test_filters_non_raw_packet(self):
-        """Non-raw_packet events should be ignored."""
-        with patch("app.community_mqtt.community_publisher") as mock_pub:
-            mock_pub.connected = True
-            mock_pub._settings = AppSettings(community_mqtt_enabled=True)
-            community_mqtt_broadcast("message", {"text": "hello"})
-            # No asyncio.create_task should be called for non-raw_packet events
-            # Since we're filtering, we just verify no exception
-
-    def test_skips_when_disconnected(self):
-        """Should not publish when disconnected."""
-        with (
-            patch("app.community_mqtt.community_publisher") as mock_pub,
-            patch("app.community_mqtt.asyncio.create_task") as mock_task,
-        ):
-            mock_pub.connected = False
-            mock_pub._settings = AppSettings(community_mqtt_enabled=True)
-            community_mqtt_broadcast("raw_packet", {"data": "00"})
-            mock_task.assert_not_called()
-
-    def test_skips_when_settings_none(self):
-        """Should not publish when settings are None."""
-        with (
-            patch("app.community_mqtt.community_publisher") as mock_pub,
-            patch("app.community_mqtt.asyncio.create_task") as mock_task,
-        ):
-            mock_pub.connected = True
-            mock_pub._settings = None
-            community_mqtt_broadcast("raw_packet", {"data": "00"})
-            mock_task.assert_not_called()
 
 
 class TestPublishFailureSetsDisconnected:

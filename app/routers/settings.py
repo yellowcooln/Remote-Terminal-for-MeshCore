@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import re
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -60,66 +59,6 @@ class AppSettingsUpdate(BaseModel):
     bots: list[BotConfig] | None = Field(
         default=None,
         description="List of bot configurations",
-    )
-    mqtt_broker_host: str | None = Field(
-        default=None,
-        description="MQTT broker hostname (empty = disabled)",
-    )
-    mqtt_broker_port: int | None = Field(
-        default=None,
-        ge=1,
-        le=65535,
-        description="MQTT broker port",
-    )
-    mqtt_username: str | None = Field(
-        default=None,
-        description="MQTT username (optional)",
-    )
-    mqtt_password: str | None = Field(
-        default=None,
-        description="MQTT password (optional)",
-    )
-    mqtt_use_tls: bool | None = Field(
-        default=None,
-        description="Whether to use TLS for MQTT connection",
-    )
-    mqtt_tls_insecure: bool | None = Field(
-        default=None,
-        description="Skip TLS certificate verification (for self-signed certs)",
-    )
-    mqtt_topic_prefix: str | None = Field(
-        default=None,
-        description="MQTT topic prefix",
-    )
-    mqtt_publish_messages: bool | None = Field(
-        default=None,
-        description="Whether to publish decrypted messages to MQTT",
-    )
-    mqtt_publish_raw_packets: bool | None = Field(
-        default=None,
-        description="Whether to publish raw packets to MQTT",
-    )
-    community_mqtt_enabled: bool | None = Field(
-        default=None,
-        description="Whether to publish raw packets to the community MQTT broker",
-    )
-    community_mqtt_iata: str | None = Field(
-        default=None,
-        description="IATA region code for community MQTT topic routing (3 alpha chars)",
-    )
-    community_mqtt_broker_host: str | None = Field(
-        default=None,
-        description="Community MQTT broker hostname",
-    )
-    community_mqtt_broker_port: int | None = Field(
-        default=None,
-        ge=1,
-        le=65535,
-        description="Community MQTT broker port",
-    )
-    community_mqtt_email: str | None = Field(
-        default=None,
-        description="Email address for node claiming on the community aggregator",
     )
     flood_scope: str | None = Field(
         default=None,
@@ -210,53 +149,6 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         logger.info("Updating bots (count=%d)", len(update.bots))
         kwargs["bots"] = update.bots
 
-    # MQTT fields
-    mqtt_fields = [
-        "mqtt_broker_host",
-        "mqtt_broker_port",
-        "mqtt_username",
-        "mqtt_password",
-        "mqtt_use_tls",
-        "mqtt_tls_insecure",
-        "mqtt_topic_prefix",
-        "mqtt_publish_messages",
-        "mqtt_publish_raw_packets",
-    ]
-    mqtt_changed = False
-    for field in mqtt_fields:
-        value = getattr(update, field)
-        if value is not None:
-            kwargs[field] = value
-            mqtt_changed = True
-
-    # Community MQTT fields
-    community_mqtt_changed = False
-    if update.community_mqtt_enabled is not None:
-        kwargs["community_mqtt_enabled"] = update.community_mqtt_enabled
-        community_mqtt_changed = True
-
-    if update.community_mqtt_iata is not None:
-        iata = update.community_mqtt_iata.upper().strip()
-        if iata and not re.fullmatch(r"[A-Z]{3}", iata):
-            raise HTTPException(
-                status_code=400,
-                detail="IATA code must be exactly 3 uppercase alphabetic characters",
-            )
-        kwargs["community_mqtt_iata"] = iata
-        community_mqtt_changed = True
-
-    if update.community_mqtt_broker_host is not None:
-        kwargs["community_mqtt_broker_host"] = update.community_mqtt_broker_host
-        community_mqtt_changed = True
-
-    if update.community_mqtt_broker_port is not None:
-        kwargs["community_mqtt_broker_port"] = update.community_mqtt_broker_port
-        community_mqtt_changed = True
-
-    if update.community_mqtt_email is not None:
-        kwargs["community_mqtt_email"] = update.community_mqtt_email
-        community_mqtt_changed = True
-
     # Block lists
     if update.blocked_keys is not None:
         kwargs["blocked_keys"] = [k.lower() for k in update.blocked_keys]
@@ -270,33 +162,8 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
         kwargs["flood_scope"] = stripped
         flood_scope_changed = True
 
-    # Require IATA when enabling community MQTT
-    if kwargs.get("community_mqtt_enabled", False):
-        # Check the IATA value being set, or fall back to current settings
-        iata_value = kwargs.get("community_mqtt_iata")
-        if iata_value is None:
-            current = await AppSettingsRepository.get()
-            iata_value = current.community_mqtt_iata
-        if not iata_value or not re.fullmatch(r"[A-Z]{3}", iata_value):
-            raise HTTPException(
-                status_code=400,
-                detail="A valid IATA region code is required to enable community sharing",
-            )
-
     if kwargs:
         result = await AppSettingsRepository.update(**kwargs)
-
-        # Restart MQTT publisher if any MQTT settings changed
-        if mqtt_changed:
-            from app.mqtt import mqtt_publisher
-
-            await mqtt_publisher.restart(result)
-
-        # Restart community MQTT publisher if any community settings changed
-        if community_mqtt_changed:
-            from app.community_mqtt import community_publisher
-
-            await community_publisher.restart(result)
 
         # Apply flood scope to radio immediately if changed
         if flood_scope_changed:

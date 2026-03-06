@@ -23,15 +23,31 @@ export interface RadioConfigUpdate {
   radio?: RadioSettings;
 }
 
+export interface FanoutStatusEntry {
+  name: string;
+  type: string;
+  status: string;
+}
+
 export interface HealthStatus {
   status: string;
   radio_connected: boolean;
   connection_info: string | null;
   database_size_mb: number;
   oldest_undecrypted_timestamp: number | null;
-  mqtt_status: string | null;
-  community_mqtt_status: string | null;
+  fanout_statuses: Record<string, FanoutStatusEntry>;
   bots_disabled: boolean;
+}
+
+export interface FanoutConfig {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  scope: Record<string, unknown>;
+  sort_order: number;
+  created_at: number;
 }
 
 export interface MaintenanceResult {
@@ -240,20 +256,6 @@ export interface AppSettingsUpdate {
   sidebar_sort_order?: 'recent' | 'alpha';
   advert_interval?: number;
   bots?: BotConfig[];
-  mqtt_broker_host?: string;
-  mqtt_broker_port?: number;
-  mqtt_username?: string;
-  mqtt_password?: string;
-  mqtt_use_tls?: boolean;
-  mqtt_tls_insecure?: boolean;
-  mqtt_topic_prefix?: string;
-  mqtt_publish_messages?: boolean;
-  mqtt_publish_raw_packets?: boolean;
-  community_mqtt_enabled?: boolean;
-  community_mqtt_iata?: string;
-  community_mqtt_broker_host?: string;
-  community_mqtt_broker_port?: number;
-  community_mqtt_email?: string;
   flood_scope?: string;
   blocked_keys?: string[];
   blocked_names?: string[];

@@ -209,6 +209,7 @@ async def create_message_from_decrypted(
             sender_name=sender,
             sender_key=resolved_sender_key,
         ).model_dump(),
+        realtime=trigger_bot,
     )
 
     # Run bot if enabled (for incoming channel messages, not historical decryption)
@@ -332,6 +333,7 @@ async def create_dm_message_from_decrypted(
             sender_name=sender_name,
             sender_key=conversation_key if not outgoing else None,
         ).model_dump(),
+        realtime=trigger_bot,
     )
 
     # Update contact's last_contacted timestamp (for sorting)

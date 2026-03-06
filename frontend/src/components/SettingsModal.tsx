@@ -11,7 +11,7 @@ import { SETTINGS_SECTION_LABELS, type SettingsSection } from './settings/settin
 
 import { SettingsRadioSection } from './settings/SettingsRadioSection';
 import { SettingsLocalSection } from './settings/SettingsLocalSection';
-import { SettingsMqttSection } from './settings/SettingsMqttSection';
+import { SettingsFanoutSection } from './settings/SettingsFanoutSection';
 import { SettingsDatabaseSection } from './settings/SettingsDatabaseSection';
 import { SettingsBotSection } from './settings/SettingsBotSection';
 import { SettingsStatisticsSection } from './settings/SettingsStatisticsSection';
@@ -78,7 +78,7 @@ export function SettingsModal(props: SettingsModalProps) {
   const [expandedSections, setExpandedSections] = useState<Record<SettingsSection, boolean>>({
     radio: false,
     local: false,
-    mqtt: false,
+    fanout: false,
     database: false,
     bot: false,
     statistics: false,
@@ -232,16 +232,11 @@ export function SettingsModal(props: SettingsModalProps) {
         </section>
       )}
 
-      {shouldRenderSection('mqtt') && (
+      {shouldRenderSection('fanout') && (
         <section className={sectionWrapperClass}>
-          {renderSectionHeader('mqtt')}
-          {isSectionVisible('mqtt') && appSettings && (
-            <SettingsMqttSection
-              appSettings={appSettings}
-              health={health}
-              onSaveAppSettings={onSaveAppSettings}
-              className={sectionContentClass}
-            />
+          {renderSectionHeader('fanout')}
+          {isSectionVisible('fanout') && (
+            <SettingsFanoutSection health={health} className={sectionContentClass} />
           )}
         </section>
       )}

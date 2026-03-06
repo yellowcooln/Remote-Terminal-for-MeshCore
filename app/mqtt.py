@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import ssl
 from typing import Any
@@ -52,38 +51,6 @@ class MqttPublisher(BaseMqttPublisher):
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
         return ctx
-
-
-# Module-level singleton
-mqtt_publisher = MqttPublisher()
-
-
-def mqtt_broadcast(event_type: str, data: dict[str, Any]) -> None:
-    """Fire-and-forget MQTT publish, matching broadcast_event's pattern."""
-    if event_type not in ("message", "raw_packet"):
-        return
-    if not mqtt_publisher.connected or mqtt_publisher._settings is None:
-        return
-    asyncio.create_task(_mqtt_maybe_publish(event_type, data))
-
-
-async def _mqtt_maybe_publish(event_type: str, data: dict[str, Any]) -> None:
-    """Check settings and build topic, then publish."""
-    settings = mqtt_publisher._settings
-    if settings is None:
-        return
-
-    try:
-        if event_type == "message" and settings.mqtt_publish_messages:
-            topic = _build_message_topic(settings.mqtt_topic_prefix, data)
-            await mqtt_publisher.publish(topic, data)
-
-        elif event_type == "raw_packet" and settings.mqtt_publish_raw_packets:
-            topic = _build_raw_packet_topic(settings.mqtt_topic_prefix, data)
-            await mqtt_publisher.publish(topic, data)
-
-    except Exception as e:
-        logger.warning("MQTT broadcast error: %s", e)
 
 
 def _build_message_topic(prefix: str, data: dict[str, Any]) -> str:

@@ -6,11 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.models import AppSettings
-from app.mqtt import (
-    MqttPublisher,
-    _build_message_topic,
-    _build_raw_packet_topic,
-)
+from app.mqtt import MqttPublisher, _build_message_topic, _build_raw_packet_topic
 
 
 def _make_settings(**overrides) -> AppSettings:
@@ -160,114 +156,6 @@ class TestMqttPublisher:
 
         assert pub.connected is False
         assert pub._client is None
-
-
-class TestMqttBroadcast:
-    @pytest.mark.asyncio
-    async def test_mqtt_broadcast_skips_when_disconnected(self):
-        """mqtt_broadcast should return immediately if publisher is disconnected."""
-        from app.mqtt import mqtt_publisher
-
-        original_settings = mqtt_publisher._settings
-        original_connected = mqtt_publisher.connected
-
-        try:
-            mqtt_publisher.connected = False
-            mqtt_publisher._settings = _make_settings()
-
-            # This should not create any tasks or fail
-            from app.mqtt import mqtt_broadcast
-
-            mqtt_broadcast("message", {"type": "PRIV", "conversation_key": "abc"})
-        finally:
-            mqtt_publisher._settings = original_settings
-            mqtt_publisher.connected = original_connected
-
-    @pytest.mark.asyncio
-    async def test_mqtt_maybe_publish_message(self):
-        """_mqtt_maybe_publish should call publish for message events."""
-        from app.mqtt import _mqtt_maybe_publish, mqtt_publisher
-
-        original_settings = mqtt_publisher._settings
-        original_connected = mqtt_publisher.connected
-
-        try:
-            mqtt_publisher._settings = _make_settings(mqtt_publish_messages=True)
-            mqtt_publisher.connected = True
-
-            with patch.object(mqtt_publisher, "publish", new_callable=AsyncMock) as mock_pub:
-                await _mqtt_maybe_publish("message", {"type": "PRIV", "conversation_key": "abc123"})
-                mock_pub.assert_called_once()
-                topic = mock_pub.call_args[0][0]
-                assert topic == "meshcore/dm:abc123"
-        finally:
-            mqtt_publisher._settings = original_settings
-            mqtt_publisher.connected = original_connected
-
-    @pytest.mark.asyncio
-    async def test_mqtt_maybe_publish_raw_packet(self):
-        """_mqtt_maybe_publish should call publish for raw_packet events."""
-        from app.mqtt import _mqtt_maybe_publish, mqtt_publisher
-
-        original_settings = mqtt_publisher._settings
-        original_connected = mqtt_publisher.connected
-
-        try:
-            mqtt_publisher._settings = _make_settings(mqtt_publish_raw_packets=True)
-            mqtt_publisher.connected = True
-
-            with patch.object(mqtt_publisher, "publish", new_callable=AsyncMock) as mock_pub:
-                await _mqtt_maybe_publish(
-                    "raw_packet",
-                    {"decrypted_info": {"channel_key": "ch1", "contact_key": None}},
-                )
-                mock_pub.assert_called_once()
-                topic = mock_pub.call_args[0][0]
-                assert topic == "meshcore/raw/gm:ch1"
-        finally:
-            mqtt_publisher._settings = original_settings
-            mqtt_publisher.connected = original_connected
-
-    @pytest.mark.asyncio
-    async def test_mqtt_maybe_publish_skips_disabled_messages(self):
-        """_mqtt_maybe_publish should skip messages when publish_messages is False."""
-        from app.mqtt import _mqtt_maybe_publish, mqtt_publisher
-
-        original_settings = mqtt_publisher._settings
-        original_connected = mqtt_publisher.connected
-
-        try:
-            mqtt_publisher._settings = _make_settings(mqtt_publish_messages=False)
-            mqtt_publisher.connected = True
-
-            with patch.object(mqtt_publisher, "publish", new_callable=AsyncMock) as mock_pub:
-                await _mqtt_maybe_publish("message", {"type": "PRIV", "conversation_key": "abc"})
-                mock_pub.assert_not_called()
-        finally:
-            mqtt_publisher._settings = original_settings
-            mqtt_publisher.connected = original_connected
-
-    @pytest.mark.asyncio
-    async def test_mqtt_maybe_publish_skips_disabled_raw_packets(self):
-        """_mqtt_maybe_publish should skip raw_packets when publish_raw_packets is False."""
-        from app.mqtt import _mqtt_maybe_publish, mqtt_publisher
-
-        original_settings = mqtt_publisher._settings
-        original_connected = mqtt_publisher.connected
-
-        try:
-            mqtt_publisher._settings = _make_settings(mqtt_publish_raw_packets=False)
-            mqtt_publisher.connected = True
-
-            with patch.object(mqtt_publisher, "publish", new_callable=AsyncMock) as mock_pub:
-                await _mqtt_maybe_publish(
-                    "raw_packet",
-                    {"decrypted_info": None},
-                )
-                mock_pub.assert_not_called()
-        finally:
-            mqtt_publisher._settings = original_settings
-            mqtt_publisher.connected = original_connected
 
 
 class TestBuildTlsContext:

@@ -533,6 +533,19 @@ class AppSettings(BaseModel):
     )
 
 
+class FanoutConfig(BaseModel):
+    """Configuration for a single fanout integration."""
+
+    id: str
+    type: str  # 'mqtt_private' | 'mqtt_community'
+    name: str
+    enabled: bool
+    config: dict
+    scope: dict
+    sort_order: int = 0
+    created_at: int = 0
+
+
 class BusyChannel(BaseModel):
     channel_key: str
     channel_name: str

@@ -3,7 +3,7 @@ export type SettingsSection =
   | 'local'
   | 'database'
   | 'bot'
-  | 'mqtt'
+  | 'fanout'
   | 'statistics'
   | 'about';
 
@@ -12,7 +12,7 @@ export const SETTINGS_SECTION_ORDER: SettingsSection[] = [
   'local',
   'database',
   'bot',
-  'mqtt',
+  'fanout',
   'statistics',
   'about',
 ];
@@ -22,7 +22,7 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   local: '🖥️ Local Configuration',
   database: '🗄️ Database & Messaging',
   bot: '🤖 Bots',
-  mqtt: '📤 MQTT',
+  fanout: '📤 Fanout & Forwarding',
   statistics: '📊 Statistics',
   about: 'About',
 };
