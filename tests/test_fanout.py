@@ -1,5 +1,6 @@
 """Tests for fanout bus: manager, scope matching, repository, and modules."""
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from app.database import Database
 from app.fanout.base import FanoutModule
 from app.fanout.manager import (
+    _DISPATCH_TIMEOUT_SECONDS,
     FanoutManager,
     _scope_matches_message,
     _scope_matches_raw,
@@ -198,6 +200,59 @@ class TestFanoutManagerDispatch:
 
         # Good module should still receive the message despite the bad one failing
         assert len(good_mod.message_calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_broadcast_message_dispatches_matching_modules_concurrently(self):
+        manager = FanoutManager()
+
+        class BlockingModule(StubModule):
+            def __init__(self):
+                super().__init__()
+                self.started = asyncio.Event()
+                self.release = asyncio.Event()
+
+            async def on_message(self, data: dict) -> None:
+                self.started.set()
+                await self.release.wait()
+                self.message_calls.append(data)
+
+        slow_mod = BlockingModule()
+        fast_mod = StubModule()
+
+        manager._modules["slow"] = (slow_mod, {"messages": "all"})
+        manager._modules["fast"] = (fast_mod, {"messages": "all"})
+
+        broadcast_task = asyncio.create_task(
+            manager.broadcast_message({"type": "PRIV", "conversation_key": "pk1"})
+        )
+
+        await slow_mod.started.wait()
+        await asyncio.sleep(0)
+
+        assert len(fast_mod.message_calls) == 1
+        assert not broadcast_task.done()
+
+        slow_mod.release.set()
+        await broadcast_task
+
+    @pytest.mark.asyncio
+    async def test_timed_out_module_is_restarted(self):
+        manager = FanoutManager()
+        mod = StubModule()
+        mod.start = AsyncMock()
+        mod.stop = AsyncMock()
+
+        async def slow_message(data: dict) -> None:
+            await asyncio.sleep(_DISPATCH_TIMEOUT_SECONDS * 2)
+
+        mod.on_message = slow_message
+        manager._modules["slow"] = (mod, {"messages": "all"})
+
+        with patch("app.fanout.manager._DISPATCH_TIMEOUT_SECONDS", 0.01):
+            await manager.broadcast_message({"type": "PRIV", "conversation_key": "pk1"})
+
+        mod.stop.assert_called_once()
+        mod.start.assert_called_once()
 
     def test_get_statuses(self):
         manager = FanoutManager()
