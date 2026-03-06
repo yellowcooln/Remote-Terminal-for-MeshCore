@@ -2,7 +2,7 @@
 
 Verifies that when disable_bots=True:
 - run_bot_for_message() exits immediately without any work
-- PATCH /api/settings with bots returns 403
+- POST /api/fanout with type=bot returns 403
 - Health endpoint includes bots_disabled=True
 """
 
@@ -14,8 +14,8 @@ from fastapi import HTTPException
 from app.bot import run_bot_for_message
 from app.config import Settings
 from app.models import BotConfig
+from app.routers.fanout import FanoutConfigCreate, create_fanout_config
 from app.routers.health import build_health_data
-from app.routers.settings import AppSettingsUpdate, update_settings
 
 
 class TestDisableBotsConfig:
@@ -78,19 +78,20 @@ class TestDisableBotsBotExecution:
                     mock_exec.assert_called_once()
 
 
-class TestDisableBotsSettingsEndpoint:
-    """Test that bot settings updates are rejected when bots are disabled."""
+class TestDisableBotsFanoutEndpoint:
+    """Test that bot creation via fanout router is rejected when bots are disabled."""
 
     @pytest.mark.asyncio
-    async def test_bot_update_returns_403_when_disabled(self, test_db):
-        """PATCH /api/settings with bots field returns 403."""
-        with patch("app.routers.settings.server_settings", MagicMock(disable_bots=True)):
+    async def test_bot_create_returns_403_when_disabled(self, test_db):
+        """POST /api/fanout with type=bot returns 403."""
+        with patch("app.routers.fanout.server_settings", MagicMock(disable_bots=True)):
             with pytest.raises(HTTPException) as exc_info:
-                await update_settings(
-                    AppSettingsUpdate(
-                        bots=[
-                            BotConfig(id="1", name="Bot", enabled=True, code="def bot(**k): pass")
-                        ]
+                await create_fanout_config(
+                    FanoutConfigCreate(
+                        type="bot",
+                        name="Test Bot",
+                        config={"code": "def bot(**k): pass"},
+                        enabled=False,
                     )
                 )
 
@@ -98,22 +99,19 @@ class TestDisableBotsSettingsEndpoint:
             assert "disabled" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_non_bot_update_allowed_when_disabled(self, test_db):
-        """Other settings can still be updated when bots are disabled."""
-        with patch("app.routers.settings.server_settings", MagicMock(disable_bots=True)):
-            result = await update_settings(AppSettingsUpdate(max_radio_contacts=50))
-            assert result.max_radio_contacts == 50
-
-    @pytest.mark.asyncio
-    async def test_bot_update_allowed_when_not_disabled(self, test_db):
-        """Bot updates work normally when disable_bots is False."""
-        with patch("app.routers.settings.server_settings", MagicMock(disable_bots=False)):
-            result = await update_settings(
-                AppSettingsUpdate(
-                    bots=[BotConfig(id="1", name="Bot", enabled=False, code="def bot(**k): pass")]
+    async def test_mqtt_create_allowed_when_bots_disabled(self, test_db):
+        """Non-bot fanout configs can still be created when bots are disabled."""
+        with patch("app.routers.fanout.server_settings", MagicMock(disable_bots=True)):
+            # Create as disabled so fanout_manager.reload_config is not called
+            result = await create_fanout_config(
+                FanoutConfigCreate(
+                    type="mqtt_private",
+                    name="Test MQTT",
+                    config={"broker_host": "localhost", "broker_port": 1883},
+                    enabled=False,
                 )
             )
-            assert len(result.bots) == 1
+            assert result["type"] == "mqtt_private"
 
 
 class TestDisableBotsHealthEndpoint:

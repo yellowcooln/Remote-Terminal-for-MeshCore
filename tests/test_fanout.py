@@ -526,3 +526,103 @@ class TestMigration036:
             assert row[0] == 0
         finally:
             await db.disconnect()
+
+
+async def _setup_db_with_fanout_table():
+    """Create a DB with app_settings + fanout_configs tables for migration 37 tests."""
+    from app.migrations import _migrate_036_create_fanout_configs
+
+    db = Database(":memory:")
+    await db.connect()
+
+    await db.conn.execute(_create_app_settings_table_sql())
+    await db.conn.execute("INSERT OR IGNORE INTO app_settings (id) VALUES (1)")
+    await db.conn.commit()
+    await _migrate_036_create_fanout_configs(db.conn)
+    return db
+
+
+class TestMigration037:
+    @pytest.mark.asyncio
+    async def test_migration_creates_bot_from_settings(self):
+        """Migration should create a fanout_configs row for each bot in app_settings."""
+        from app.migrations import _migrate_037_bots_to_fanout
+
+        db = await _setup_db_with_fanout_table()
+        try:
+            bots_json = json.dumps(
+                [
+                    {
+                        "id": "bot-1",
+                        "name": "EchoBot",
+                        "enabled": True,
+                        "code": "def bot(**k): return 'echo'",
+                    },
+                    {
+                        "id": "bot-2",
+                        "name": "Quiet",
+                        "enabled": False,
+                        "code": "def bot(**k): pass",
+                    },
+                ]
+            )
+            await db.conn.execute("UPDATE app_settings SET bots = ? WHERE id = 1", (bots_json,))
+            await db.conn.commit()
+
+            await _migrate_037_bots_to_fanout(db.conn)
+
+            cursor = await db.conn.execute(
+                "SELECT * FROM fanout_configs WHERE type = 'bot' ORDER BY sort_order"
+            )
+            rows = await cursor.fetchall()
+            assert len(rows) == 2
+
+            # First bot
+            assert rows[0]["name"] == "EchoBot"
+            assert bool(rows[0]["enabled"])
+            config0 = json.loads(rows[0]["config"])
+            assert config0["code"] == "def bot(**k): return 'echo'"
+            scope0 = json.loads(rows[0]["scope"])
+            assert scope0["messages"] == "all"
+            assert scope0["raw_packets"] == "none"
+            assert rows[0]["sort_order"] == 200
+
+            # Second bot
+            assert rows[1]["name"] == "Quiet"
+            assert not bool(rows[1]["enabled"])
+            assert rows[1]["sort_order"] == 201
+        finally:
+            await db.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_migration_skips_when_no_bots(self):
+        """Migration should not create rows when there are no bots."""
+        from app.migrations import _migrate_037_bots_to_fanout
+
+        db = await _setup_db_with_fanout_table()
+        try:
+            await _migrate_037_bots_to_fanout(db.conn)
+
+            cursor = await db.conn.execute("SELECT COUNT(*) FROM fanout_configs WHERE type = 'bot'")
+            row = await cursor.fetchone()
+            assert row[0] == 0
+        finally:
+            await db.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_migration_handles_empty_bots_array(self):
+        """Migration handles bots=[] gracefully."""
+        from app.migrations import _migrate_037_bots_to_fanout
+
+        db = await _setup_db_with_fanout_table()
+        try:
+            await db.conn.execute("UPDATE app_settings SET bots = '[]' WHERE id = 1")
+            await db.conn.commit()
+
+            await _migrate_037_bots_to_fanout(db.conn)
+
+            cursor = await db.conn.execute("SELECT COUNT(*) FROM fanout_configs WHERE type = 'bot'")
+            row = await cursor.fetchone()
+            assert row[0] == 0
+        finally:
+            await db.disconnect()

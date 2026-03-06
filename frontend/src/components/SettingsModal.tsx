@@ -13,7 +13,6 @@ import { SettingsRadioSection } from './settings/SettingsRadioSection';
 import { SettingsLocalSection } from './settings/SettingsLocalSection';
 import { SettingsFanoutSection } from './settings/SettingsFanoutSection';
 import { SettingsDatabaseSection } from './settings/SettingsDatabaseSection';
-import { SettingsBotSection } from './settings/SettingsBotSection';
 import { SettingsStatisticsSection } from './settings/SettingsStatisticsSection';
 import { SettingsAboutSection } from './settings/SettingsAboutSection';
 
@@ -80,7 +79,6 @@ export function SettingsModal(props: SettingsModalProps) {
     local: false,
     fanout: false,
     database: false,
-    bot: false,
     statistics: false,
     about: false,
   });
@@ -217,26 +215,15 @@ export function SettingsModal(props: SettingsModalProps) {
         </section>
       )}
 
-      {shouldRenderSection('bot') && (
-        <section className={sectionWrapperClass}>
-          {renderSectionHeader('bot')}
-          {isSectionVisible('bot') && appSettings && (
-            <SettingsBotSection
-              appSettings={appSettings}
-              health={health}
-              isMobileLayout={isMobileLayout}
-              onSaveAppSettings={onSaveAppSettings}
-              className={sectionContentClass}
-            />
-          )}
-        </section>
-      )}
-
       {shouldRenderSection('fanout') && (
         <section className={sectionWrapperClass}>
           {renderSectionHeader('fanout')}
           {isSectionVisible('fanout') && (
-            <SettingsFanoutSection health={health} className={sectionContentClass} />
+            <SettingsFanoutSection
+              health={health}
+              onHealthRefresh={onHealthRefresh}
+              className={sectionContentClass}
+            />
           )}
         </section>
       )}

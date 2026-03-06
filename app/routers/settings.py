@@ -2,36 +2,14 @@ import asyncio
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.config import settings as server_settings
-from app.models import AppSettings, BotConfig
+from app.models import AppSettings
 from app.repository import AppSettingsRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["settings"])
-
-
-def validate_bot_code(code: str, bot_name: str | None = None) -> None:
-    """Validate bot code syntax. Raises HTTPException on error."""
-    if not code or not code.strip():
-        return  # Empty code is valid (disables bot)
-
-    try:
-        compile(code, "<bot_code>", "exec")
-    except SyntaxError as e:
-        name_part = f"'{bot_name}' " if bot_name else ""
-        raise HTTPException(
-            status_code=400,
-            detail=f"Bot {name_part}has syntax error at line {e.lineno}: {e.msg}",
-        ) from None
-
-
-def validate_all_bots(bots: list[BotConfig]) -> None:
-    """Validate all bots' code syntax. Raises HTTPException on first error."""
-    for bot in bots:
-        validate_bot_code(bot.code, bot.name)
 
 
 class AppSettingsUpdate(BaseModel):
@@ -55,10 +33,6 @@ class AppSettingsUpdate(BaseModel):
         default=None,
         ge=0,
         description="Periodic advertisement interval in seconds (0 = disabled, minimum 3600)",
-    )
-    bots: list[BotConfig] | None = Field(
-        default=None,
-        description="List of bot configurations",
     )
     flood_scope: str | None = Field(
         default=None,
@@ -139,15 +113,6 @@ async def update_settings(update: AppSettingsUpdate) -> AppSettings:
             interval = 3600
         logger.info("Updating advert_interval to %d", interval)
         kwargs["advert_interval"] = interval
-
-    if update.bots is not None:
-        if server_settings.disable_bots:
-            raise HTTPException(
-                status_code=403, detail="Bot system disabled by server configuration"
-            )
-        validate_all_bots(update.bots)
-        logger.info("Updating bots (count=%d)", len(update.bots))
-        kwargs["bots"] = update.bots
 
     # Block lists
     if update.blocked_keys is not None:

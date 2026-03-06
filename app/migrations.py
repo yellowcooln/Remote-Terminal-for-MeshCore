@@ -289,6 +289,13 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 36)
         applied += 1
 
+    # Migration 37: Migrate bots from app_settings to fanout_configs
+    if version < 37:
+        logger.info("Applying migration 37: migrate bots to fanout_configs")
+        await _migrate_037_bots_to_fanout(conn)
+        await set_version(conn, 37)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -2147,5 +2154,63 @@ async def _migrate_036_create_fanout_configs(conn: aiosqlite.Connection) -> None
             ),
         )
         logger.info("Migrated community MQTT settings to fanout_configs")
+
+    await conn.commit()
+
+
+async def _migrate_037_bots_to_fanout(conn: aiosqlite.Connection) -> None:
+    """Migrate bots from app_settings.bots JSON to fanout_configs rows."""
+    import json
+    import uuid
+
+    try:
+        cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
+        row = await cursor.fetchone()
+    except Exception:
+        row = None
+
+    if row is None:
+        await conn.commit()
+        return
+
+    bots_json = row["bots"] or "[]"
+    try:
+        bots = json.loads(bots_json)
+    except (json.JSONDecodeError, TypeError):
+        bots = []
+
+    if not bots:
+        await conn.commit()
+        return
+
+    import time
+
+    now = int(time.time())
+
+    # Use sort_order starting at 200 to place bots after MQTT configs (0-99)
+    for i, bot in enumerate(bots):
+        bot_name = bot.get("name") or f"Bot {i + 1}"
+        bot_enabled = bool(bot.get("enabled", False))
+        bot_code = bot.get("code", "")
+
+        config_blob = json.dumps({"code": bot_code})
+        scope = json.dumps({"messages": "all", "raw_packets": "none"})
+
+        await conn.execute(
+            """
+            INSERT INTO fanout_configs (id, type, name, enabled, config, scope, sort_order, created_at)
+            VALUES (?, 'bot', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                bot_name,
+                1 if bot_enabled else 0,
+                config_blob,
+                scope,
+                200 + i,
+                now,
+            ),
+        )
+        logger.info("Migrated bot '%s' to fanout_configs (enabled=%s)", bot_name, bot_enabled)
 
     await conn.commit()

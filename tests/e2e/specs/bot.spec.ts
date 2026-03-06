@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { ensureFlightlessChannel, getSettings, updateSettings } from '../helpers/api';
-import type { BotConfig } from '../helpers/api';
+import {
+  ensureFlightlessChannel,
+  getFanoutConfigs,
+  createFanoutConfig,
+  deleteFanoutConfig,
+  updateFanoutConfig,
+} from '../helpers/api';
+import type { FanoutConfig } from '../helpers/api';
 
 const BOT_CODE = `def bot(sender_name, sender_key, message_text, is_dm, channel_key, channel_name, sender_timestamp, path):
     if channel_name == "#flightless" and "!e2etest" in message_text.lower():
@@ -8,45 +14,43 @@ const BOT_CODE = `def bot(sender_name, sender_key, message_text, is_dm, channel_
     return None`;
 
 test.describe('Bot functionality', () => {
-  let originalBots: BotConfig[];
+  let createdBotId: string | null = null;
 
   test.beforeAll(async () => {
     await ensureFlightlessChannel();
-    const settings = await getSettings();
-    originalBots = settings.bots ?? [];
   });
 
   test.afterAll(async () => {
-    // Restore original bot config
-    try {
-      await updateSettings({ bots: originalBots });
-    } catch {
-      console.warn('Failed to restore bot config');
+    // Clean up the bot we created
+    if (createdBotId) {
+      try {
+        await deleteFanoutConfig(createdBotId);
+      } catch {
+        console.warn('Failed to delete test bot');
+      }
     }
   });
 
   test('create a bot via API, verify it in UI, trigger it, and verify response', async ({
     page,
   }) => {
-    // --- Step 1: Create and enable bot via API ---
-    // CodeMirror is difficult to drive via Playwright (contenteditable, lazy-loaded),
-    // so we set the bot code via the REST API and verify it through the UI.
-    const testBot: BotConfig = {
-      id: crypto.randomUUID(),
+    // --- Step 1: Create and enable bot via fanout API ---
+    const bot = await createFanoutConfig({
+      type: 'bot',
       name: 'E2E Test Bot',
+      config: { code: BOT_CODE },
       enabled: true,
-      code: BOT_CODE,
-    };
-    await updateSettings({ bots: [...originalBots, testBot] });
+    });
+    createdBotId = bot.id;
 
     // --- Step 2: Verify bot appears in settings UI ---
     await page.goto('/');
     await expect(page.getByText('Connected')).toBeVisible();
 
     await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /🤖 Bots/ }).click();
+    await page.getByRole('button', { name: /Fanout/ }).click();
 
-    // The bot name should be visible in the bot list
+    // The bot name should be visible in the integration list
     await expect(page.getByText('E2E Test Bot')).toBeVisible();
 
     // Exit settings page mode

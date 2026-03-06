@@ -183,13 +183,6 @@ export function markAllRead(): Promise<{ status: string; timestamp: number }> {
 
 export type Favorite = { type: string; id: string };
 
-export interface BotConfig {
-  id: string;
-  name: string;
-  enabled: boolean;
-  code: string;
-}
-
 export interface AppSettings {
   max_radio_contacts: number;
   favorites: Favorite[];
@@ -197,7 +190,6 @@ export interface AppSettings {
   sidebar_sort_order: string;
   last_message_times: Record<string, number>;
   preferences_migrated: boolean;
-  bots: BotConfig[];
   advert_interval: number;
 }
 
@@ -210,6 +202,50 @@ export function updateSettings(patch: Partial<AppSettings>): Promise<AppSettings
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
+}
+
+// --- Fanout ---
+
+export interface FanoutConfig {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  scope: Record<string, unknown>;
+  sort_order: number;
+  created_at: number;
+}
+
+export function getFanoutConfigs(): Promise<FanoutConfig[]> {
+  return fetchJson('/fanout');
+}
+
+export function createFanoutConfig(body: {
+  type: string;
+  name: string;
+  config: Record<string, unknown>;
+  scope?: Record<string, unknown>;
+  enabled?: boolean;
+}): Promise<FanoutConfig> {
+  return fetchJson('/fanout', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateFanoutConfig(
+  id: string,
+  patch: Partial<{ name: string; config: Record<string, unknown>; scope: Record<string, unknown>; enabled: boolean }>
+): Promise<FanoutConfig> {
+  return fetchJson(`/fanout/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export function deleteFanoutConfig(id: string): Promise<{ deleted: boolean }> {
+  return fetchJson(`/fanout/${id}`, { method: 'DELETE' });
 }
 
 // --- Helpers ---

@@ -162,16 +162,10 @@ class TestMessagesEndpoint:
             return_value=MagicMock(type=EventType.MSG_SENT, payload={})
         )
 
-        def _capture_task(coro):
-            coro.close()
-            return MagicMock()
-
         radio_manager._meshcore = mock_mc
         with (
             patch("app.dependencies.radio_manager") as mock_rm,
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
-            patch("app.routers.messages.asyncio.create_task", side_effect=_capture_task),
-            patch("app.routers.messages.broadcast_event", create=True) as mock_broadcast,
+            patch("app.routers.messages.broadcast_event") as mock_broadcast,
         ):
             mock_rm.is_connected = True
             mock_rm.meshcore = mock_mc
@@ -206,17 +200,11 @@ class TestMessagesEndpoint:
         mock_mc.commands.set_channel = AsyncMock(return_value=ok_result)
         mock_mc.commands.send_chan_msg = AsyncMock(return_value=ok_result)
 
-        def _capture_task(coro):
-            coro.close()
-            return MagicMock()
-
         radio_manager._meshcore = mock_mc
         with (
             patch("app.dependencies.radio_manager") as mock_rm,
             patch("app.decoder.calculate_channel_hash", return_value="abcd"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
-            patch("app.routers.messages.asyncio.create_task", side_effect=_capture_task),
-            patch("app.routers.messages.broadcast_event", create=True) as mock_broadcast,
+            patch("app.routers.messages.broadcast_event") as mock_broadcast,
         ):
             mock_rm.is_connected = True
             mock_rm.meshcore = mock_mc

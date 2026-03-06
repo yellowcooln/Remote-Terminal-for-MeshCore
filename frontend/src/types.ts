@@ -255,7 +255,6 @@ export interface AppSettingsUpdate {
   auto_decrypt_dm_on_advert?: boolean;
   sidebar_sort_order?: 'recent' | 'alpha';
   advert_interval?: number;
-  bots?: BotConfig[];
   flood_scope?: string;
   blocked_keys?: string[];
   blocked_names?: string[];

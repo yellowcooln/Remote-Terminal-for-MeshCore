@@ -745,69 +745,49 @@ class TestMultipleBots:
 
 
 class TestBotCodeValidation:
-    """Test bot code syntax validation on save."""
+    """Test bot code syntax validation via fanout router."""
 
     def test_valid_code_passes(self):
         """Valid Python code passes validation."""
-        from app.routers.settings import validate_bot_code
+        from app.routers.fanout import _validate_bot_config
 
         # Should not raise
-        validate_bot_code("def bot(): return 'hello'")
+        _validate_bot_config({"code": "def bot(): return 'hello'"})
 
     def test_syntax_error_raises(self):
         """Syntax error in code raises HTTPException."""
         from fastapi import HTTPException
 
-        from app.routers.settings import validate_bot_code
+        from app.routers.fanout import _validate_bot_config
 
         with pytest.raises(HTTPException) as exc_info:
-            validate_bot_code("def bot(:\n    return 'broken'")
+            _validate_bot_config({"code": "def bot(:\n    return 'broken'"})
 
         assert exc_info.value.status_code == 400
         assert "syntax error" in exc_info.value.detail.lower()
 
-    def test_syntax_error_includes_bot_name(self):
-        """Syntax error message includes bot name when provided."""
+    def test_empty_code_raises(self):
+        """Empty code raises HTTPException."""
         from fastapi import HTTPException
 
-        from app.routers.settings import validate_bot_code
+        from app.routers.fanout import _validate_bot_config
 
         with pytest.raises(HTTPException) as exc_info:
-            validate_bot_code("def bot(:\n    return 'broken'", bot_name="My Test Bot")
+            _validate_bot_config({"code": ""})
 
         assert exc_info.value.status_code == 400
-        assert "My Test Bot" in exc_info.value.detail
+        assert "empty" in exc_info.value.detail.lower()
 
-    def test_empty_code_passes(self):
-        """Empty code passes validation (disables bot)."""
-        from app.routers.settings import validate_bot_code
-
-        # Should not raise
-        validate_bot_code("")
-        validate_bot_code("   ")
-
-    def test_validate_all_bots(self):
-        """validate_all_bots validates all bots' code."""
+    def test_missing_code_raises(self):
+        """Missing code key raises HTTPException."""
         from fastapi import HTTPException
 
-        from app.routers.settings import validate_all_bots
+        from app.routers.fanout import _validate_bot_config
 
-        # Valid bots should pass
-        valid_bots = [
-            BotConfig(id="1", name="Bot 1", enabled=True, code="def bot(): return 'hi'"),
-            BotConfig(id="2", name="Bot 2", enabled=False, code="def bot(): return 'hello'"),
-        ]
-        validate_all_bots(valid_bots)  # Should not raise
-
-        # Invalid code should raise with bot name
-        invalid_bots = [
-            BotConfig(id="1", name="Good Bot", enabled=True, code="def bot(): return 'hi'"),
-            BotConfig(id="2", name="Bad Bot", enabled=True, code="def bot(:"),
-        ]
         with pytest.raises(HTTPException) as exc_info:
-            validate_all_bots(invalid_bots)
+            _validate_bot_config({})
 
-        assert "Bad Bot" in exc_info.value.detail
+        assert exc_info.value.status_code == 400
 
 
 class TestBotMessageRateLimiting:

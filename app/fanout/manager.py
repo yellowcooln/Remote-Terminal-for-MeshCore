@@ -17,11 +17,13 @@ def _register_module_types() -> None:
     """Lazily populate the type registry to avoid circular imports."""
     if _MODULE_TYPES:
         return
+    from app.fanout.bot import BotModule
     from app.fanout.mqtt_community import MqttCommunityModule
     from app.fanout.mqtt_private import MqttPrivateModule
 
     _MODULE_TYPES["mqtt_private"] = MqttPrivateModule
     _MODULE_TYPES["mqtt_community"] = MqttCommunityModule
+    _MODULE_TYPES["bot"] = BotModule
 
 
 def _scope_matches_message(scope: dict, data: dict) -> bool:
@@ -80,13 +82,24 @@ class FanoutManager:
         config_blob = cfg["config"]
         scope = cfg["scope"]
 
+        # Skip bot modules when bots are disabled server-wide
+        if config_type == "bot":
+            from app.config import settings as server_settings
+
+            if server_settings.disable_bots:
+                logger.info("Skipping bot module %s (bots disabled by server config)", config_id)
+                return
+
         cls = _MODULE_TYPES.get(config_type)
         if cls is None:
             logger.warning("Unknown fanout type %r for config %s, skipping", config_type, config_id)
             return
 
         try:
-            module = cls(config_id, config_blob)
+            if config_type == "bot":
+                module = cls(config_id, config_blob, name=cfg.get("name", "Bot"))
+            else:
+                module = cls(config_id, config_blob)
             await module.start()
             self._modules[config_id] = (module, scope)
             logger.info(

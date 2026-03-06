@@ -3,9 +3,8 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import HTTPException
 
-from app.models import AppSettings, BotConfig
+from app.models import AppSettings
 from app.repository import AppSettingsRepository
 from app.routers.settings import (
     AppSettingsUpdate,
@@ -52,21 +51,6 @@ class TestUpdateSettings:
         # Should return default settings without error
         assert isinstance(result, AppSettings)
         assert result.max_radio_contacts == 200  # default
-
-    @pytest.mark.asyncio
-    async def test_invalid_bot_syntax_returns_400(self):
-        bad_bot = BotConfig(
-            id="bot-1",
-            name="BadBot",
-            enabled=True,
-            code="def bot(:\n    return 'x'\n",
-        )
-
-        with pytest.raises(HTTPException) as exc:
-            await update_settings(AppSettingsUpdate(bots=[bad_bot]))
-
-        assert exc.value.status_code == 400
-        assert "syntax error" in exc.value.detail.lower()
 
     @pytest.mark.asyncio
     async def test_flood_scope_round_trip(self, test_db):

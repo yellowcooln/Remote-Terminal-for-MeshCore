@@ -1,4 +1,4 @@
-"""Tests for bot triggering on outgoing messages sent via the messages router."""
+"""Tests for outgoing message sending via the messages router."""
 
 import asyncio
 import time
@@ -76,77 +76,36 @@ async def _insert_contact(public_key, name="Alice"):
     )
 
 
-class TestOutgoingDMBotTrigger:
-    """Test that sending a DM triggers bots with is_outgoing=True."""
+class TestOutgoingDMBroadcast:
+    """Test that outgoing DMs are broadcast via broadcast_event for fanout dispatch."""
 
     @pytest.mark.asyncio
-    async def test_send_dm_triggers_bot(self, test_db):
-        """Sending a DM creates a background task to run bots."""
+    async def test_send_dm_broadcasts_outgoing(self, test_db):
+        """Sending a DM broadcasts the message with outgoing=True for fanout dispatch."""
         mc = _make_mc()
         pub_key = "ab" * 32
         await _insert_contact(pub_key, "Alice")
 
+        broadcasts = []
+
+        def capture_broadcast(event_type, data):
+            broadcasts.append({"type": event_type, "data": data})
+
         with (
             patch("app.routers.messages.require_connected", return_value=mc),
             patch.object(radio_manager, "_meshcore", mc),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()) as mock_bot,
+            patch("app.routers.messages.broadcast_event", side_effect=capture_broadcast),
         ):
             request = SendDirectMessageRequest(destination=pub_key, text="!lasttime Alice")
             await send_direct_message(request)
 
-            # Let the background task run
-            await asyncio.sleep(0)
-
-            mock_bot.assert_called_once()
-            call_kwargs = mock_bot.call_args[1]
-            assert call_kwargs["message_text"] == "!lasttime Alice"
-            assert call_kwargs["is_dm"] is True
-            assert call_kwargs["is_outgoing"] is True
-            assert call_kwargs["sender_key"] == pub_key
-            assert call_kwargs["channel_key"] is None
-
-    @pytest.mark.asyncio
-    async def test_send_dm_bot_does_not_block_response(self, test_db):
-        """Bot trigger runs in background and doesn't delay the message response."""
-        mc = _make_mc()
-        pub_key = "ab" * 32
-        await _insert_contact(pub_key, "Alice")
-
-        # Bot that would take a long time
-        async def _slow(**kw):
-            await asyncio.sleep(10)
-
-        slow_bot = AsyncMock(side_effect=_slow)
-
-        with (
-            patch("app.routers.messages.require_connected", return_value=mc),
-            patch.object(radio_manager, "_meshcore", mc),
-            patch("app.bot.run_bot_for_message", new=slow_bot),
-        ):
-            request = SendDirectMessageRequest(destination=pub_key, text="Hello")
-            # This should return immediately, not wait 10 seconds
-            message = await send_direct_message(request)
-            assert message.text == "Hello"
-            assert message.outgoing is True
-
-    @pytest.mark.asyncio
-    async def test_send_dm_passes_no_sender_name(self, test_db):
-        """Outgoing DMs pass sender_name=None (we are the sender)."""
-        mc = _make_mc()
-        pub_key = "cd" * 32
-        await _insert_contact(pub_key, "Bob")
-
-        with (
-            patch("app.routers.messages.require_connected", return_value=mc),
-            patch.object(radio_manager, "_meshcore", mc),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()) as mock_bot,
-        ):
-            request = SendDirectMessageRequest(destination=pub_key, text="test")
-            await send_direct_message(request)
-            await asyncio.sleep(0)
-
-            call_kwargs = mock_bot.call_args[1]
-            assert call_kwargs["sender_name"] is None
+        msg_broadcasts = [b for b in broadcasts if b["type"] == "message"]
+        assert len(msg_broadcasts) == 1
+        data = msg_broadcasts[0]["data"]
+        assert data["text"] == "!lasttime Alice"
+        assert data["outgoing"] is True
+        assert data["type"] == "PRIV"
+        assert data["conversation_key"] == pub_key
 
     @pytest.mark.asyncio
     async def test_send_dm_ambiguous_prefix_returns_409(self, test_db):
@@ -167,77 +126,37 @@ class TestOutgoingDMBotTrigger:
         assert "ambiguous" in exc_info.value.detail.lower()
 
 
-class TestOutgoingChannelBotTrigger:
-    """Test that sending a channel message triggers bots with is_outgoing=True."""
+class TestOutgoingChannelBroadcast:
+    """Test that outgoing channel messages are broadcast via broadcast_event for fanout dispatch."""
 
     @pytest.mark.asyncio
-    async def test_send_channel_msg_triggers_bot(self, test_db):
-        """Sending a channel message creates a background task to run bots."""
+    async def test_send_channel_msg_broadcasts_outgoing(self, test_db):
+        """Sending a channel message broadcasts with outgoing=True for fanout dispatch."""
         mc = _make_mc(name="MyNode")
         chan_key = "aa" * 16
         await ChannelRepository.upsert(key=chan_key, name="#general")
 
+        broadcasts = []
+
+        def capture_broadcast(event_type, data):
+            broadcasts.append({"type": event_type, "data": data})
+
         with (
             patch("app.routers.messages.require_connected", return_value=mc),
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.decoder.calculate_channel_hash", return_value="abcd"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()) as mock_bot,
+            patch("app.routers.messages.broadcast_event", side_effect=capture_broadcast),
         ):
             request = SendChannelMessageRequest(channel_key=chan_key, text="!lasttime5 someone")
             await send_channel_message(request)
-            await asyncio.sleep(0)
 
-            mock_bot.assert_called_once()
-            call_kwargs = mock_bot.call_args[1]
-            assert call_kwargs["message_text"] == "!lasttime5 someone"
-            assert call_kwargs["is_dm"] is False
-            assert call_kwargs["is_outgoing"] is True
-            assert call_kwargs["channel_key"] == chan_key.upper()
-            assert call_kwargs["channel_name"] == "#general"
-            assert call_kwargs["sender_name"] == "MyNode"
-            assert call_kwargs["sender_key"] is None
-
-    @pytest.mark.asyncio
-    async def test_send_channel_msg_no_radio_name(self, test_db):
-        """When radio has no name, sender_name is None."""
-        mc = _make_mc(name="")
-        chan_key = "bb" * 16
-        await ChannelRepository.upsert(key=chan_key, name="#test")
-
-        with (
-            patch("app.routers.messages.require_connected", return_value=mc),
-            patch.object(radio_manager, "_meshcore", mc),
-            patch("app.decoder.calculate_channel_hash", return_value="abcd"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()) as mock_bot,
-        ):
-            request = SendChannelMessageRequest(channel_key=chan_key, text="hello")
-            await send_channel_message(request)
-            await asyncio.sleep(0)
-
-            call_kwargs = mock_bot.call_args[1]
-            assert call_kwargs["sender_name"] is None
-
-    @pytest.mark.asyncio
-    async def test_send_channel_msg_bot_does_not_block_response(self, test_db):
-        """Bot trigger runs in background and doesn't delay the message response."""
-        mc = _make_mc(name="MyNode")
-        chan_key = "cc" * 16
-        await ChannelRepository.upsert(key=chan_key, name="#slow")
-
-        async def _slow(**kw):
-            await asyncio.sleep(10)
-
-        slow_bot = AsyncMock(side_effect=_slow)
-
-        with (
-            patch("app.routers.messages.require_connected", return_value=mc),
-            patch.object(radio_manager, "_meshcore", mc),
-            patch("app.decoder.calculate_channel_hash", return_value="abcd"),
-            patch("app.bot.run_bot_for_message", new=slow_bot),
-        ):
-            request = SendChannelMessageRequest(channel_key=chan_key, text="test")
-            message = await send_channel_message(request)
-            assert message.outgoing is True
+        msg_broadcasts = [b for b in broadcasts if b["type"] == "message"]
+        assert len(msg_broadcasts) == 1
+        data = msg_broadcasts[0]["data"]
+        assert data["outgoing"] is True
+        assert data["type"] == "CHAN"
+        assert data["conversation_key"] == chan_key.upper()
+        assert data["sender_name"] == "MyNode"
 
     @pytest.mark.asyncio
     async def test_send_channel_msg_response_includes_current_ack_count(self, test_db):
@@ -250,7 +169,7 @@ class TestOutgoingChannelBotTrigger:
             patch("app.routers.messages.require_connected", return_value=mc),
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.decoder.calculate_channel_hash", return_value="abcd"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
+            patch("app.routers.messages.broadcast_event"),
         ):
             request = SendChannelMessageRequest(channel_key=chan_key, text="acked now")
             message = await send_channel_message(request)
@@ -277,7 +196,6 @@ class TestOutgoingChannelBotTrigger:
             patch("app.routers.messages.require_connected", return_value=mc),
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.decoder.calculate_channel_hash", return_value="abcd"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
             patch("app.routers.messages.broadcast_event", side_effect=capture_broadcast),
         ):
             request = SendChannelMessageRequest(channel_key=chan_key, text="hello")

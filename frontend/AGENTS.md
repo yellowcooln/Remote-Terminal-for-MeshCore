@@ -84,9 +84,8 @@ frontend/src/
 │   │   ├── settingsConstants.ts          # Settings section type, ordering, labels
 │   │   ├── SettingsRadioSection.tsx      # Name, keys, advert interval, max contacts, radio preset, freq/bw/sf/cr, txPower, lat/lon, reboot
 │   │   ├── SettingsLocalSection.tsx      # Browser-local settings: theme, local label, reopen last conversation
-│   │   ├── SettingsMqttSection.tsx       # MQTT broker config, TLS, publish toggles
+│   │   ├── SettingsFanoutSection.tsx     # Fanout integrations: MQTT, bots, config CRUD
 │   │   ├── SettingsDatabaseSection.tsx   # DB size, cleanup, auto-decrypt, local label
-│   │   ├── SettingsBotSection.tsx        # Bot list, code editor, add/delete/reset
 │   │   ├── SettingsStatisticsSection.tsx # Read-only mesh network stats
 │   │   ├── SettingsAboutSection.tsx     # Version, author, license, links
 │   │   └── ThemeSelector.tsx           # Color theme picker

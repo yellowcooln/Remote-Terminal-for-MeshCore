@@ -195,7 +195,7 @@ async def create_message_from_decrypted(
     # Use "is not None" to include empty string (direct/0-hop messages)
     paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
-    # Broadcast new message to connected clients
+    # Broadcast new message to connected clients (and fanout modules when realtime)
     broadcast_event(
         "message",
         Message(
@@ -211,24 +211,6 @@ async def create_message_from_decrypted(
         ).model_dump(),
         realtime=trigger_bot,
     )
-
-    # Run bot if enabled (for incoming channel messages, not historical decryption)
-    if trigger_bot:
-        from app.bot import run_bot_for_message
-
-        asyncio.create_task(
-            run_bot_for_message(
-                sender_name=sender,
-                sender_key=None,  # Channel messages don't have a sender public key
-                message_text=message_text,
-                is_dm=False,
-                channel_key=channel_key_normalized,
-                channel_name=channel_name,
-                sender_timestamp=timestamp,
-                path=path,
-                is_outgoing=False,
-            )
-        )
 
     return msg_id
 
@@ -318,7 +300,7 @@ async def create_dm_message_from_decrypted(
     # Build paths array for broadcast
     paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
-    # Broadcast new message to connected clients
+    # Broadcast new message to connected clients (and fanout modules when realtime)
     broadcast_event(
         "message",
         Message(
@@ -338,24 +320,6 @@ async def create_dm_message_from_decrypted(
 
     # Update contact's last_contacted timestamp (for sorting)
     await ContactRepository.update_last_contacted(conversation_key, received)
-
-    # Run bot if enabled (for all real-time DMs, including our own outgoing messages)
-    if trigger_bot:
-        from app.bot import run_bot_for_message
-
-        asyncio.create_task(
-            run_bot_for_message(
-                sender_name=contact.name if contact else None,
-                sender_key=their_public_key,
-                message_text=decrypted.message,
-                is_dm=True,
-                channel_key=None,
-                channel_name=None,
-                sender_timestamp=decrypted.timestamp,
-                path=path,
-                is_outgoing=outgoing,
-            )
-        )
 
     return msg_id
 

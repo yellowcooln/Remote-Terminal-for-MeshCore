@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
@@ -8,15 +8,59 @@ import { cn } from '@/lib/utils';
 import { api } from '../../api';
 import type { FanoutConfig, HealthStatus } from '../../types';
 
+const BotCodeEditor = lazy(() =>
+  import('../BotCodeEditor').then((m) => ({ default: m.BotCodeEditor }))
+);
+
 const TYPE_LABELS: Record<string, string> = {
   mqtt_private: 'Private MQTT',
   mqtt_community: 'Community MQTT',
+  bot: 'Bot',
 };
 
 const TYPE_OPTIONS = [
   { value: 'mqtt_private', label: 'Private MQTT' },
   { value: 'mqtt_community', label: 'Community MQTT' },
+  { value: 'bot', label: 'Bot' },
 ];
+
+const DEFAULT_BOT_CODE = `def bot(
+    sender_name: str | None,
+    sender_key: str | None,
+    message_text: str,
+    is_dm: bool,
+    channel_key: str | None,
+    channel_name: str | None,
+    sender_timestamp: int | None,
+    path: str | None,
+    is_outgoing: bool = False,
+) -> str | list[str] | None:
+    """
+    Process messages and optionally return a reply.
+
+    Args:
+        sender_name: Display name of sender (may be None)
+        sender_key: 64-char hex public key (None for channel msgs)
+        message_text: The message content
+        is_dm: True for direct messages, False for channel
+        channel_key: 32-char hex key for channels, None for DMs
+        channel_name: Channel name with hash (e.g. "#bot"), None for DMs
+        sender_timestamp: Sender's timestamp (unix seconds, may be None)
+        path: Hex-encoded routing path (may be None)
+        is_outgoing: True if this is our own outgoing message
+
+    Returns:
+        None for no reply, a string for a single reply,
+        or a list of strings to send multiple messages in order
+    """
+    # Don't reply to our own outgoing messages
+    if is_outgoing:
+        return None
+
+    # Example: Only respond in #bot channel to "!pling" command
+    if channel_name == "#bot" and "!pling" in message_text.lower():
+        return "[BOT] Plong!"
+    return None`;
 
 function getStatusColor(status: string | undefined) {
   if (status === 'connected')
@@ -24,8 +68,8 @@ function getStatusColor(status: string | undefined) {
   return 'bg-muted-foreground';
 }
 
-function getStatusLabel(status: string | undefined) {
-  if (status === 'connected') return 'Connected';
+function getStatusLabel(status: string | undefined, type?: string) {
+  if (status === 'connected') return type === 'bot' ? 'Active' : 'Connected';
   if (status === 'disconnected') return 'Disconnected';
   return 'Inactive';
 }
@@ -46,6 +90,11 @@ function MqttPrivateConfigEditor({
       <p className="text-xs text-muted-foreground">
         Forward mesh data to your own MQTT broker for home automation, logging, or alerting.
       </p>
+
+      <div className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-warning">
+        Outgoing messages (DMs and group messages) will be reported to private MQTT brokers in
+        decrypted/plaintext form.
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -234,11 +283,88 @@ function MqttCommunityConfigEditor({
   );
 }
 
+function BotConfigEditor({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  const code = (config.code as string) || '';
+  return (
+    <div className="space-y-3">
+      <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+        <p className="text-sm text-destructive">
+          <strong>Experimental:</strong> This is an alpha feature and introduces automated message
+          sending to your radio; unexpected behavior may occur. Use with caution, and please report
+          any bugs!
+        </p>
+      </div>
+
+      <div className="p-3 bg-warning/10 border border-warning/30 rounded-md">
+        <p className="text-sm text-warning">
+          <strong>Security Warning:</strong> This feature executes arbitrary Python code on the
+          server. Only run trusted code, and be cautious of arbitrary usage of message parameters.
+        </p>
+      </div>
+
+      <div className="p-3 bg-warning/10 border border-warning/30 rounded-md">
+        <p className="text-sm text-warning">
+          <strong>Don&apos;t wreck the mesh!</strong> Bots process ALL messages, including their
+          own. Be careful of creating infinite loops!
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Define a <code className="bg-muted px-1 rounded">bot()</code> function that receives
+          message data and optionally returns a reply.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onChange({ ...config, code: DEFAULT_BOT_CODE })}
+        >
+          Reset to Example
+        </Button>
+      </div>
+
+      <Suspense
+        fallback={
+          <div className="h-64 md:h-96 rounded-md border border-input bg-code-editor-bg flex items-center justify-center text-muted-foreground">
+            Loading editor...
+          </div>
+        }
+      >
+        <BotCodeEditor value={code} onChange={(c) => onChange({ ...config, code: c })} />
+      </Suspense>
+
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p>
+          <strong>Available:</strong> Standard Python libraries and any modules installed in the
+          server environment.
+        </p>
+        <p>
+          <strong>Limits:</strong> 10 second timeout per bot.
+        </p>
+        <p>
+          <strong>Note:</strong> Bots respond to all messages, including your own. For channel
+          messages, <code>sender_key</code> is <code>None</code>. Multiple enabled bots run
+          serially, with a two-second delay between messages to prevent repeater collision.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsFanoutSection({
   health,
+  onHealthRefresh,
   className,
 }: {
   health: HealthStatus | null;
+  onHealthRefresh?: () => Promise<void>;
   className?: string;
 }) {
   const [configs, setConfigs] = useState<FanoutConfig[]>([]);
@@ -266,6 +392,7 @@ export function SettingsFanoutSection({
     try {
       await api.updateFanoutConfig(cfg.id, { enabled: !cfg.enabled });
       await loadConfigs();
+      if (onHealthRefresh) await onHealthRefresh();
       toast.success(cfg.enabled ? 'Integration disabled' : 'Integration enabled');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update');
@@ -332,10 +459,14 @@ export function SettingsFanoutSection({
         iata: '',
         email: '',
       },
+      bot: {
+        code: DEFAULT_BOT_CODE,
+      },
     };
     const defaultScopes: Record<string, Record<string, unknown>> = {
       mqtt_private: { messages: 'all', raw_packets: 'all' },
       mqtt_community: { messages: 'none', raw_packets: 'all' },
+      bot: { messages: 'all', raw_packets: 'none' },
     };
 
     try {
@@ -398,6 +529,10 @@ export function SettingsFanoutSection({
           <MqttCommunityConfigEditor config={editConfig} onChange={setEditConfig} />
         )}
 
+        {editingConfig.type === 'bot' && (
+          <BotConfigEditor config={editConfig} onChange={setEditConfig} />
+        )}
+
         <Separator />
 
         <div className="flex gap-2">
@@ -416,8 +551,7 @@ export function SettingsFanoutSection({
   return (
     <div className={cn('space-y-4', className)}>
       <div className="rounded-md border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-warning">
-        MQTT support is an experimental feature in open beta. All publishing uses QoS 0
-        (at-most-once delivery).
+        Integrations are an experimental feature in open beta.
       </div>
 
       {configs.length === 0 ? (
@@ -453,11 +587,11 @@ export function SettingsFanoutSection({
 
                   <div
                     className={cn('w-2 h-2 rounded-full transition-colors', getStatusColor(status))}
-                    title={getStatusLabel(status)}
+                    title={getStatusLabel(status, cfg.type)}
                     aria-hidden="true"
                   />
                   <span className="text-xs text-muted-foreground hidden sm:inline">
-                    {cfg.enabled ? getStatusLabel(status) : 'Disabled'}
+                    {cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
                   </span>
 
                   <Button
@@ -480,16 +614,18 @@ export function SettingsFanoutSection({
         <div className="border border-input rounded-md p-3 space-y-2">
           <Label>Select integration type:</Label>
           <div className="flex flex-wrap gap-2">
-            {TYPE_OPTIONS.map((opt) => (
-              <Button
-                key={opt.value}
-                variant={addingType === opt.value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleAddCreate(opt.value)}
-              >
-                {opt.label}
-              </Button>
-            ))}
+            {TYPE_OPTIONS.filter((opt) => opt.value !== 'bot' || !health?.bots_disabled).map(
+              (opt) => (
+                <Button
+                  key={opt.value}
+                  variant={addingType === opt.value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleAddCreate(opt.value)}
+                >
+                  {opt.label}
+                </Button>
+              )
+            )}
           </div>
           <Button variant="ghost" size="sm" onClick={() => setAddingType(null)}>
             Cancel

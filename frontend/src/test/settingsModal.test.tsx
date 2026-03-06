@@ -236,10 +236,9 @@ describe('SettingsModal', () => {
   it('renders selected section from external sidebar nav on desktop mode', async () => {
     renderModal({
       externalSidebarNav: true,
-      desktopSection: 'bot',
+      desktopSection: 'fanout',
     });
 
-    expect(screen.getByText('No bots configured')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Local Configuration/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Preset')).not.toBeInTheDocument();
   });
@@ -278,7 +277,7 @@ describe('SettingsModal', () => {
       <SettingsModal
         open
         externalSidebarNav
-        desktopSection="bot"
+        desktopSection="fanout"
         config={baseConfig}
         health={baseHealth}
         appSettings={baseSettings}
