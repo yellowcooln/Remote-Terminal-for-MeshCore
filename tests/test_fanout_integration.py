@@ -197,6 +197,54 @@ class TestFanoutMqttIntegration:
         assert "beta/dm:pk1" in topics
 
     @pytest.mark.asyncio
+    async def test_private_mqtt_preserves_full_message_payload(self, mqtt_broker, integration_db):
+        """Private MQTT publishes the full message payload without dropping fields."""
+        from unittest.mock import patch
+
+        cfg = await FanoutConfigRepository.create(
+            config_type="mqtt_private",
+            name="Full Payload",
+            config=_private_config(mqtt_broker.port, "mesh"),
+            scope={"messages": "all", "raw_packets": "all"},
+            enabled=True,
+        )
+
+        payload = {
+            "type": "CHAN",
+            "conversation_key": "ch1",
+            "channel_name": "#general",
+            "text": "Alice: hello mqtt",
+            "sender_name": "Alice",
+            "sender_key": "ab" * 32,
+            "sender_timestamp": 1700000000,
+            "received_at": 1700000001,
+            "paths": [{"path": "aabb", "received_at": 1700000001}],
+            "outgoing": False,
+            "acked": 2,
+        }
+
+        manager = FanoutManager()
+        with (
+            patch("app.fanout.mqtt_base._broadcast_health"),
+            patch("app.websocket.broadcast_success"),
+            patch("app.websocket.broadcast_error"),
+            patch("app.websocket.broadcast_health"),
+        ):
+            try:
+                await manager.load_from_db()
+                await _wait_connected(manager, cfg["id"])
+
+                await manager.broadcast_message(payload)
+                messages = await mqtt_broker.wait_for(1)
+            finally:
+                await manager.stop_all()
+
+        assert len(messages) == 1
+        topic, body = messages[0]
+        assert topic == "mesh/gm:ch1"
+        assert body == payload
+
+    @pytest.mark.asyncio
     async def test_one_disabled_only_enabled_receives(self, mqtt_broker, integration_db):
         """Disabled integration must not publish any messages."""
         from unittest.mock import patch
@@ -564,6 +612,44 @@ class TestFanoutWebhookIntegration:
 
         assert len(results) == 1
         assert results[0]["headers"].get("x-custom") == "my-value"
+
+    @pytest.mark.asyncio
+    async def test_webhook_preserves_full_message_payload(self, webhook_server, integration_db):
+        """Webhook delivers the full message payload body without dropping fields."""
+        cfg = await FanoutConfigRepository.create(
+            config_type="webhook",
+            name="Full Payload Hook",
+            config=_webhook_config(webhook_server.port),
+            scope={"messages": "all", "raw_packets": "none"},
+            enabled=True,
+        )
+
+        payload = {
+            "type": "CHAN",
+            "conversation_key": "ch1",
+            "channel_name": "#general",
+            "text": "Alice: hello webhook",
+            "sender_name": "Alice",
+            "sender_key": "ab" * 32,
+            "sender_timestamp": 1700000000,
+            "received_at": 1700000001,
+            "paths": [{"path": "aabb", "received_at": 1700000001}],
+            "outgoing": False,
+            "acked": 2,
+        }
+
+        manager = FanoutManager()
+        try:
+            await manager.load_from_db()
+            await _wait_connected(manager, cfg["id"])
+
+            await manager.broadcast_message(payload)
+            results = await webhook_server.wait_for(1)
+        finally:
+            await manager.stop_all()
+
+        assert len(results) == 1
+        assert results[0]["body"] == payload
 
     @pytest.mark.asyncio
     async def test_webhook_hmac_signature(self, webhook_server, integration_db):

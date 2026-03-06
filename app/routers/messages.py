@@ -296,6 +296,7 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
                 acked=0,
                 sender_name=radio_name or None,
                 sender_key=our_public_key,
+                channel_name=db_channel.name,
             ).model_dump(),
         )
 
@@ -316,6 +317,7 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
         paths=paths,
         sender_name=radio_name or None,
         sender_key=our_public_key,
+        channel_name=db_channel.name,
     )
 
     return message
@@ -444,6 +446,7 @@ async def resend_channel_message(
                 acked=0,
                 sender_name=radio_name or None,
                 sender_key=resend_public_key,
+                channel_name=db_channel.name,
             ).model_dump(),
         )
 

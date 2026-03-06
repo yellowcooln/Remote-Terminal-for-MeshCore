@@ -157,6 +157,7 @@ class TestOutgoingChannelBroadcast:
         assert data["type"] == "CHAN"
         assert data["conversation_key"] == chan_key.upper()
         assert data["sender_name"] == "MyNode"
+        assert data["channel_name"] == "#general"
 
     @pytest.mark.asyncio
     async def test_send_channel_msg_response_includes_current_ack_count(self, test_db):
@@ -177,6 +178,7 @@ class TestOutgoingChannelBroadcast:
         # Fresh message has acked=0
         assert message.id is not None
         assert message.acked == 0
+        assert message.channel_name == "#acked"
 
     @pytest.mark.asyncio
     async def test_send_channel_msg_includes_sender_key(self, test_db):
@@ -498,6 +500,7 @@ class TestResendChannelMessage:
         assert event_type == "message"
         assert event_data["id"] == result["message_id"]
         assert event_data["outgoing"] is True
+        assert event_data["channel_name"] == "#broadcast"
 
     @pytest.mark.asyncio
     async def test_resend_byte_perfect_still_enforces_window(self, test_db):

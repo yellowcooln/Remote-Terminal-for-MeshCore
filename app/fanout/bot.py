@@ -56,7 +56,7 @@ class BotModule(FanoutModule):
         # Extract bot parameters from broadcast data
         if is_dm:
             conversation_key = data.get("conversation_key", "")
-            sender_key = conversation_key
+            sender_key = data.get("sender_key") or conversation_key
             is_outgoing = data.get("outgoing", False)
             message_text = data.get("text", "")
             channel_key = None
@@ -66,10 +66,12 @@ class BotModule(FanoutModule):
             if is_outgoing:
                 sender_name = None
             else:
-                from app.repository import ContactRepository
+                sender_name = data.get("sender_name")
+                if sender_name is None:
+                    from app.repository import ContactRepository
 
-                contact = await ContactRepository.get_by_key(conversation_key)
-                sender_name = contact.name if contact else None
+                    contact = await ContactRepository.get_by_key(conversation_key)
+                    sender_name = contact.name if contact else None
         else:
             conversation_key = data.get("conversation_key", "")
             sender_key = None
@@ -77,11 +79,12 @@ class BotModule(FanoutModule):
             sender_name = data.get("sender_name")
             channel_key = conversation_key
 
-            # Look up channel name
-            from app.repository import ChannelRepository
+            channel_name = data.get("channel_name")
+            if channel_name is None:
+                from app.repository import ChannelRepository
 
-            channel = await ChannelRepository.get_by_key(conversation_key)
-            channel_name = channel.name if channel else None
+                channel = await ChannelRepository.get_by_key(conversation_key)
+                channel_name = channel.name if channel else None
 
             # Strip "sender: " prefix from channel message text
             text = data.get("text", "")

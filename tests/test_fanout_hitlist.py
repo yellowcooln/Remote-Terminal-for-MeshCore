@@ -203,6 +203,101 @@ class TestBotModuleParameterExtraction:
         assert captured["message_text"] == "the actual message"
         assert captured["sender_name"] == "Alice"
 
+    @pytest.mark.asyncio
+    async def test_channel_name_uses_payload_before_db_lookup(self):
+        """Channel fanout payload channel_name is preserved even if the DB lookup misses."""
+        from app.fanout.bot import BotModule
+
+        captured = {}
+
+        def fake_execute(
+            code,
+            sender_name,
+            sender_key,
+            message_text,
+            is_dm,
+            channel_key,
+            channel_name,
+            sender_timestamp,
+            path,
+            is_outgoing,
+        ):
+            captured["channel_name"] = channel_name
+            return None
+
+        mod = BotModule("test", {"code": "def bot(**k): pass"}, name="Test")
+
+        with (
+            patch("app.fanout.bot_exec.execute_bot_code", side_effect=fake_execute),
+            patch(
+                "app.fanout.bot_exec._bot_semaphore",
+                MagicMock(__aenter__=AsyncMock(), __aexit__=AsyncMock()),
+            ),
+            patch("app.fanout.bot.asyncio.sleep", new_callable=AsyncMock),
+            patch("app.repository.ChannelRepository") as mock_chan,
+        ):
+            mock_chan.get_by_key = AsyncMock(return_value=None)
+            await mod._run_for_message(
+                {
+                    "type": "CHAN",
+                    "conversation_key": "ch1",
+                    "channel_name": "#payload",
+                    "text": "Alice: hello",
+                    "sender_name": "Alice",
+                }
+            )
+
+        assert captured["channel_name"] == "#payload"
+
+    @pytest.mark.asyncio
+    async def test_dm_sender_name_uses_payload_before_db_lookup(self):
+        """Incoming DM sender_name from the message payload should be preserved."""
+        from app.fanout.bot import BotModule
+
+        captured = {}
+
+        def fake_execute(
+            code,
+            sender_name,
+            sender_key,
+            message_text,
+            is_dm,
+            channel_key,
+            channel_name,
+            sender_timestamp,
+            path,
+            is_outgoing,
+        ):
+            captured["sender_name"] = sender_name
+            captured["sender_key"] = sender_key
+            return None
+
+        mod = BotModule("test", {"code": "def bot(**k): pass"}, name="Test")
+
+        with (
+            patch("app.fanout.bot_exec.execute_bot_code", side_effect=fake_execute),
+            patch(
+                "app.fanout.bot_exec._bot_semaphore",
+                MagicMock(__aenter__=AsyncMock(), __aexit__=AsyncMock()),
+            ),
+            patch("app.fanout.bot.asyncio.sleep", new_callable=AsyncMock),
+            patch("app.repository.ContactRepository") as mock_contact,
+        ):
+            mock_contact.get_by_key = AsyncMock(return_value=None)
+            await mod._run_for_message(
+                {
+                    "type": "PRIV",
+                    "conversation_key": "pk1",
+                    "sender_name": "PayloadAlice",
+                    "sender_key": "pk1",
+                    "text": "hello",
+                    "outgoing": False,
+                }
+            )
+
+        assert captured["sender_name"] == "PayloadAlice"
+        assert captured["sender_key"] == "pk1"
+
 
 # ---------------------------------------------------------------------------
 # T2: Migration 036, 037, 038 tests
