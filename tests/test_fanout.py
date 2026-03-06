@@ -749,3 +749,137 @@ class TestWebhookValidation:
         )
         assert scope["raw_packets"] == "none"
         assert scope["messages"] == {"channels": ["ch1"], "contacts": "none"}
+
+
+# ---------------------------------------------------------------------------
+# Apprise module unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestAppriseModule:
+    @pytest.mark.asyncio
+    async def test_status_disconnected_when_no_urls(self):
+        from app.fanout.apprise_mod import AppriseModule
+
+        mod = AppriseModule("test", {"urls": ""})
+        assert mod.status == "disconnected"
+
+    @pytest.mark.asyncio
+    async def test_status_connected_with_urls(self):
+        from app.fanout.apprise_mod import AppriseModule
+
+        mod = AppriseModule("test", {"urls": "json://localhost"})
+        assert mod.status == "connected"
+
+    @pytest.mark.asyncio
+    async def test_skips_outgoing_messages(self):
+        from unittest.mock import patch as _patch
+
+        from app.fanout.apprise_mod import AppriseModule
+
+        mod = AppriseModule("test", {"urls": "json://localhost"})
+        with _patch("app.fanout.apprise_mod._send_sync") as mock_send:
+            await mod.on_message({"type": "PRIV", "text": "hi", "outgoing": True})
+            mock_send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sends_for_incoming_messages(self):
+        from unittest.mock import patch as _patch
+
+        from app.fanout.apprise_mod import AppriseModule
+
+        mod = AppriseModule("test", {"urls": "json://localhost"})
+        with _patch("app.fanout.apprise_mod._send_sync", return_value=True) as mock_send:
+            await mod.on_message(
+                {"type": "PRIV", "text": "hello", "outgoing": False, "sender_name": "Alice"}
+            )
+            mock_send.assert_called_once()
+            body = mock_send.call_args[0][1]
+            assert "Alice" in body
+            assert "hello" in body
+
+
+class TestAppriseFormatBody:
+    def test_dm_format(self):
+        from app.fanout.apprise_mod import _format_body
+
+        body = _format_body(
+            {"type": "PRIV", "text": "hi", "sender_name": "Alice"}, include_path=False
+        )
+        assert body == "**DM:** Alice: hi"
+
+    def test_channel_format(self):
+        from app.fanout.apprise_mod import _format_body
+
+        body = _format_body(
+            {"type": "CHAN", "text": "hi", "sender_name": "Bob", "channel_name": "#general"},
+            include_path=False,
+        )
+        assert body == "**#general:** Bob: hi"
+
+    def test_dm_with_path(self):
+        from app.fanout.apprise_mod import _format_body
+
+        body = _format_body(
+            {
+                "type": "PRIV",
+                "text": "hi",
+                "sender_name": "Alice",
+                "paths": [{"path": "2027"}],
+            },
+            include_path=True,
+        )
+        assert "**via:**" in body
+        assert "`20`" in body
+        assert "`27`" in body
+
+    def test_dm_no_path_shows_direct(self):
+        from app.fanout.apprise_mod import _format_body
+
+        body = _format_body(
+            {"type": "PRIV", "text": "hi", "sender_name": "Alice"},
+            include_path=True,
+        )
+        assert "`direct`" in body
+
+
+class TestAppriseNormalizeDiscordUrl:
+    def test_discord_scheme(self):
+        from app.fanout.apprise_mod import _normalize_discord_url
+
+        assert _normalize_discord_url("discord://123/abc") == "discord://123/abc?avatar=no"
+
+    def test_discord_https(self):
+        from app.fanout.apprise_mod import _normalize_discord_url
+
+        result = _normalize_discord_url("https://discord.com/api/webhooks/123/abc")
+        assert "avatar=no" in result
+
+    def test_non_discord_unchanged(self):
+        from app.fanout.apprise_mod import _normalize_discord_url
+
+        url = "slack://token_a/token_b/token_c"
+        assert _normalize_discord_url(url) == url
+
+
+class TestAppriseValidation:
+    def test_validate_apprise_config_requires_urls(self):
+        from fastapi import HTTPException
+
+        from app.routers.fanout import _validate_apprise_config
+
+        with pytest.raises(HTTPException) as exc_info:
+            _validate_apprise_config({"urls": ""})
+        assert exc_info.value.status_code == 400
+
+    def test_validate_apprise_config_accepts_valid(self):
+        from app.routers.fanout import _validate_apprise_config
+
+        _validate_apprise_config({"urls": "discord://123/abc"})
+
+    def test_enforce_scope_apprise_strips_raw_packets(self):
+        from app.routers.fanout import _enforce_scope
+
+        scope = _enforce_scope("apprise", {"messages": "all", "raw_packets": "all"})
+        assert scope["raw_packets"] == "none"
+        assert scope["messages"] == "all"
