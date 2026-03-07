@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { SettingsFanoutSection } from '../components/settings/SettingsFanoutSection';
 import type { HealthStatus, FanoutConfig } from '../types';
@@ -68,35 +68,36 @@ function renderSectionWithRefresh(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
   mockedApi.getFanoutConfigs.mockResolvedValue([]);
   mockedApi.getChannels.mockResolvedValue([]);
   mockedApi.getContacts.mockResolvedValue([]);
 });
 
 describe('SettingsFanoutSection', () => {
-  it('shows add buttons for all integration types', async () => {
+  it('shows add integration menu with all integration types', async () => {
     renderSection();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Private MQTT' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Community MQTT/mesh2mqtt' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Webhook' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Apprise' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Bot' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add Integration' })).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Private MQTT' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Community MQTT/mesh2mqtt' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Webhook' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Apprise' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Bot' })).toBeInTheDocument();
   });
 
-  it('shows updated add label phrasing', async () => {
+  it('shows bot option in add integration menu when bots are enabled', async () => {
     renderSection();
     await waitFor(() => {
-      expect(screen.getByText('Add a new entry:')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add Integration' })).toBeInTheDocument();
     });
-  });
 
-  it('hides bot add button when bots_disabled', async () => {
-    renderSection({ health: { ...baseHealth, bots_disabled: true } });
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Bot' })).not.toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+    expect(screen.getByRole('menuitem', { name: 'Bot' })).toBeInTheDocument();
   });
 
   it('shows bots disabled banner when bots_disabled', async () => {
@@ -104,6 +105,16 @@ describe('SettingsFanoutSection', () => {
     await waitFor(() => {
       expect(screen.getByText(/Bot system is disabled/)).toBeInTheDocument();
     });
+  });
+
+  it('hides bot option from add integration menu when bots_disabled', async () => {
+    renderSection({ health: { ...baseHealth, bots_disabled: true } });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Add Integration' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+    expect(screen.queryByRole('menuitem', { name: 'Bot' })).not.toBeInTheDocument();
   });
 
   it('lists existing configs after load', async () => {
@@ -277,31 +288,156 @@ describe('SettingsFanoutSection', () => {
   });
 
   it('navigates to create view when clicking add button', async () => {
+    renderSection();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Add Integration' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Webhook' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('← Back to list')).toBeInTheDocument();
+      expect(screen.getByLabelText('Name')).toHaveValue('Webhook #1');
+      // Should show the URL input for webhook type
+      expect(screen.getByLabelText(/URL/)).toBeInTheDocument();
+    });
+
+    expect(mockedApi.createFanoutConfig).not.toHaveBeenCalled();
+  });
+
+  it('backing out of a new draft does not create an integration', async () => {
+    renderSection();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Add Integration' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Webhook' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('← Back to list'));
+
+    await waitFor(() => expect(screen.queryByText('← Back to list')).not.toBeInTheDocument());
+    expect(mockedApi.createFanoutConfig).not.toHaveBeenCalled();
+  });
+
+  it('back to list asks for confirmation before leaving', async () => {
+    mockedApi.getFanoutConfigs.mockResolvedValue([webhookConfig]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('← Back to list'));
+
+    expect(window.confirm).toHaveBeenCalledWith('Leave without saving?');
+    await waitFor(() => expect(screen.queryByText('← Back to list')).not.toBeInTheDocument());
+  });
+
+  it('back to list stays on the edit screen when confirmation is cancelled', async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    mockedApi.getFanoutConfigs.mockResolvedValue([webhookConfig]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('← Back to list'));
+
+    expect(window.confirm).toHaveBeenCalledWith('Leave without saving?');
+    expect(screen.getByText('← Back to list')).toBeInTheDocument();
+  });
+
+  it('saving a new draft creates the integration on demand', async () => {
     const createdWebhook: FanoutConfig = {
       id: 'wh-new',
       type: 'webhook',
-      name: 'Webhook',
+      name: 'Webhook #1',
       enabled: false,
-      config: { url: '', method: 'POST', headers: {} },
+      config: { url: '', method: 'POST', headers: {}, hmac_secret: '', hmac_header: '' },
       scope: { messages: 'all', raw_packets: 'none' },
       sort_order: 0,
       created_at: 2000,
     };
     mockedApi.createFanoutConfig.mockResolvedValue(createdWebhook);
-    // After creation, getFanoutConfigs returns the new config
     mockedApi.getFanoutConfigs.mockResolvedValueOnce([]).mockResolvedValueOnce([createdWebhook]);
 
     renderSection();
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Webhook' })).toBeInTheDocument();
-    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add Integration' })).toBeInTheDocument()
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Webhook' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Webhook' }));
+    await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText('← Back to list')).toBeInTheDocument();
-      // Should show the URL input for webhook type
-      expect(screen.getByLabelText(/URL/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save as Disabled' }));
+
+    await waitFor(() =>
+      expect(mockedApi.createFanoutConfig).toHaveBeenCalledWith({
+        type: 'webhook',
+        name: 'Webhook #1',
+        config: { url: '', method: 'POST', headers: {}, hmac_secret: '', hmac_header: '' },
+        scope: { messages: 'all', raw_packets: 'none' },
+        enabled: false,
+      })
+    );
+  });
+
+  it('new draft names increment within the integration type', async () => {
+    mockedApi.getFanoutConfigs.mockResolvedValue([
+      webhookConfig,
+      {
+        ...webhookConfig,
+        id: 'wh-2',
+        name: 'Another Hook',
+      },
+    ]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Integration' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Webhook' }));
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('Webhook #3'));
+  });
+
+  it('clicking a list name allows inline rename and saves on blur', async () => {
+    const renamedWebhook = { ...webhookConfig, name: 'Renamed Hook' };
+    mockedApi.getFanoutConfigs
+      .mockResolvedValueOnce([webhookConfig])
+      .mockResolvedValueOnce([renamedWebhook]);
+    mockedApi.updateFanoutConfig.mockResolvedValue(renamedWebhook);
+
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test Hook' }));
+    const inlineInput = screen.getByLabelText('Edit name for Test Hook');
+    fireEvent.change(inlineInput, { target: { value: 'Renamed Hook' } });
+    fireEvent.blur(inlineInput);
+
+    await waitFor(() =>
+      expect(mockedApi.updateFanoutConfig).toHaveBeenCalledWith('wh-1', { name: 'Renamed Hook' })
+    );
+    await waitFor(() => expect(screen.getByText('Renamed Hook')).toBeInTheDocument());
+  });
+
+  it('escape cancels inline rename without saving', async () => {
+    mockedApi.getFanoutConfigs.mockResolvedValue([webhookConfig]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test Hook' }));
+    const inlineInput = screen.getByLabelText('Edit name for Test Hook');
+    fireEvent.change(inlineInput, { target: { value: 'Cancelled Hook' } });
+    fireEvent.keyDown(inlineInput, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.getByText('Test Hook')).toBeInTheDocument());
+    expect(mockedApi.updateFanoutConfig).not.toHaveBeenCalledWith('wh-1', {
+      name: 'Cancelled Hook',
     });
   });
 
@@ -309,7 +445,7 @@ describe('SettingsFanoutSection', () => {
     const communityConfig: FanoutConfig = {
       id: 'comm-1',
       type: 'mqtt_community',
-      name: 'Community MQTT/mesh2mqtt',
+      name: 'Community Feed',
       enabled: false,
       config: {
         broker_host: 'mqtt-us-v1.letsmesh.net',
@@ -329,7 +465,7 @@ describe('SettingsFanoutSection', () => {
     };
     mockedApi.getFanoutConfigs.mockResolvedValue([communityConfig]);
     renderSection();
-    await waitFor(() => expect(screen.getByText('Community MQTT/mesh2mqtt')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Community Feed')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
@@ -379,7 +515,7 @@ describe('SettingsFanoutSection', () => {
     const communityConfig: FanoutConfig = {
       id: 'comm-1',
       type: 'mqtt_community',
-      name: 'Community MQTT/mesh2mqtt',
+      name: 'Community Feed',
       enabled: false,
       config: {
         broker_host: 'mqtt-us-v1.letsmesh.net',
@@ -399,7 +535,7 @@ describe('SettingsFanoutSection', () => {
     };
     mockedApi.getFanoutConfigs.mockResolvedValue([communityConfig]);
     renderSection();
-    await waitFor(() => expect(screen.getByText('Community MQTT/mesh2mqtt')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Community Feed')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
@@ -414,7 +550,7 @@ describe('SettingsFanoutSection', () => {
     const communityConfig: FanoutConfig = {
       id: 'comm-1',
       type: 'mqtt_community',
-      name: 'Community MQTT/mesh2mqtt',
+      name: 'Community Feed',
       enabled: false,
       config: {
         broker_host: 'meshrank.net',
@@ -432,7 +568,7 @@ describe('SettingsFanoutSection', () => {
     };
     mockedApi.getFanoutConfigs.mockResolvedValue([communityConfig]);
     renderSection();
-    await waitFor(() => expect(screen.getByText('Community MQTT/mesh2mqtt')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Community Feed')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await waitFor(() => expect(screen.getByText('← Back to list')).toBeInTheDocument());
@@ -445,7 +581,7 @@ describe('SettingsFanoutSection', () => {
     const communityConfig: FanoutConfig = {
       id: 'comm-1',
       type: 'mqtt_community',
-      name: 'Community MQTT/mesh2mqtt',
+      name: 'Community Feed',
       enabled: false,
       config: {
         broker_host: 'mqtt-us-v1.letsmesh.net',
@@ -477,7 +613,7 @@ describe('SettingsFanoutSection', () => {
     const privateConfig: FanoutConfig = {
       id: 'mqtt-1',
       type: 'mqtt_private',
-      name: 'Private MQTT',
+      name: 'Private Broker',
       enabled: true,
       config: { broker_host: 'broker.local', broker_port: 1883, topic_prefix: 'meshcore' },
       scope: { messages: 'all', raw_packets: 'all' },
@@ -497,7 +633,7 @@ describe('SettingsFanoutSection', () => {
     const config: FanoutConfig = {
       id: 'wh-1',
       type: 'webhook',
-      name: 'Webhook',
+      name: 'Webhook Feed',
       enabled: true,
       config: { url: 'https://example.com/hook', method: 'POST', headers: {} },
       scope: { messages: 'all', raw_packets: 'none' },
@@ -514,7 +650,7 @@ describe('SettingsFanoutSection', () => {
     const config: FanoutConfig = {
       id: 'ap-1',
       type: 'apprise',
-      name: 'Apprise',
+      name: 'Apprise Feed',
       enabled: true,
       config: {
         urls: 'discord://abc\nmailto://one@example.com\nmailto://two@example.com',
@@ -531,5 +667,45 @@ describe('SettingsFanoutSection', () => {
     await waitFor(() =>
       expect(screen.getByText(/discord:\/\/abc, mailto:\/\/one@example.com/)).toBeInTheDocument()
     );
+  });
+
+  it('groups integrations by type and sorts entries alphabetically within each group', async () => {
+    mockedApi.getFanoutConfigs.mockResolvedValue([
+      {
+        ...webhookConfig,
+        id: 'wh-b',
+        name: 'Zulu Hook',
+      },
+      {
+        ...webhookConfig,
+        id: 'wh-a',
+        name: 'Alpha Hook',
+      },
+      {
+        id: 'ap-1',
+        type: 'apprise',
+        name: 'Bravo Alerts',
+        enabled: true,
+        config: { urls: 'discord://abc', preserve_identity: true, include_path: true },
+        scope: { messages: 'all', raw_packets: 'none' },
+        sort_order: 0,
+        created_at: 1000,
+      },
+    ]);
+    renderSection();
+
+    const webhookGroup = await screen.findByRole('region', { name: 'Webhook integrations' });
+    const appriseGroup = screen.getByRole('region', { name: 'Apprise integrations' });
+
+    expect(
+      screen.queryByRole('region', { name: 'Private MQTT integrations' })
+    ).not.toBeInTheDocument();
+    expect(within(webhookGroup).getByText('Alpha Hook')).toBeInTheDocument();
+    expect(within(webhookGroup).getByText('Zulu Hook')).toBeInTheDocument();
+    expect(within(appriseGroup).getByText('Bravo Alerts')).toBeInTheDocument();
+
+    const alpha = within(webhookGroup).getByText('Alpha Hook');
+    const zulu = within(webhookGroup).getByText('Zulu Hook');
+    expect(alpha.compareDocumentPosition(zulu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

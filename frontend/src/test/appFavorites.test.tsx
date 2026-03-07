@@ -185,6 +185,9 @@ const baseSettings = {
   preferences_migrated: false,
   advert_interval: 0,
   last_advert_time: 0,
+  flood_scope: '',
+  blocked_keys: [],
+  blocked_names: [],
 };
 
 const publicChannel = {

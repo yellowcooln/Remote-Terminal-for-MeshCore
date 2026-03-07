@@ -126,8 +126,8 @@ export function SettingsModal(props: SettingsModalProps) {
   const sectionWrapperClass = 'overflow-hidden';
 
   const sectionContentClass = externalDesktopSidebarMode
-    ? 'space-y-4 p-4'
-    : 'space-y-4 p-4 border-t border-input';
+    ? 'mx-auto w-full max-w-[800px] space-y-4 p-4'
+    : 'mx-auto w-full max-w-[800px] space-y-4 border-t border-input p-4';
 
   const settingsContainerClass = externalDesktopSidebarMode
     ? 'w-full h-full overflow-y-auto'

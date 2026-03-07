@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
@@ -58,6 +58,12 @@ function formatAppriseTargets(urls: string | undefined, maxLength = 80) {
   const joined = targets.join(', ');
   if (joined.length <= maxLength) return joined;
   return `${joined.slice(0, maxLength - 3)}...`;
+}
+
+function getDefaultIntegrationName(type: string, configs: FanoutConfig[]) {
+  const label = TYPE_LABELS[type] || type;
+  const nextIndex = configs.filter((cfg) => cfg.type === type).length + 1;
+  return `${label} #${nextIndex}`;
 }
 
 const DEFAULT_BOT_CODE = `def bot(
@@ -1003,10 +1009,15 @@ export function SettingsFanoutSection({
 }) {
   const [configs, setConfigs] = useState<FanoutConfig[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftType, setDraftType] = useState<string | null>(null);
   const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
   const [editScope, setEditScope] = useState<Record<string, unknown>>({});
   const [editName, setEditName] = useState('');
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const [inlineEditName, setInlineEditName] = useState('');
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement | null>(null);
 
   const loadConfigs = useCallback(async () => {
     try {
@@ -1021,6 +1032,19 @@ export function SettingsFanoutSection({
     loadConfigs();
   }, [loadConfigs]);
 
+  useEffect(() => {
+    if (!addMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!addMenuRef.current?.contains(event.target as Node)) {
+        setAddMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [addMenuOpen]);
+
   const handleToggleEnabled = async (cfg: FanoutConfig) => {
     try {
       await api.updateFanoutConfig(cfg.id, { enabled: !cfg.enabled });
@@ -1033,23 +1057,86 @@ export function SettingsFanoutSection({
   };
 
   const handleEdit = (cfg: FanoutConfig) => {
+    setAddMenuOpen(false);
+    setInlineEditingId(null);
+    setInlineEditName('');
+    setDraftType(null);
     setEditingId(cfg.id);
     setEditConfig(cfg.config);
     setEditScope(cfg.scope);
     setEditName(cfg.name);
   };
 
+  const handleStartInlineEdit = (cfg: FanoutConfig) => {
+    setAddMenuOpen(false);
+    setInlineEditingId(cfg.id);
+    setInlineEditName(cfg.name);
+  };
+
+  const handleCancelInlineEdit = () => {
+    setInlineEditingId(null);
+    setInlineEditName('');
+  };
+
+  const handleBackToList = () => {
+    if (!confirm('Leave without saving?')) return;
+    setEditingId(null);
+    setDraftType(null);
+  };
+
+  const handleInlineNameSave = async (cfg: FanoutConfig) => {
+    const nextName = inlineEditName.trim();
+    if (inlineEditingId !== cfg.id) return;
+    if (!nextName) {
+      toast.error('Name cannot be empty');
+      handleCancelInlineEdit();
+      return;
+    }
+    if (nextName === cfg.name) {
+      handleCancelInlineEdit();
+      return;
+    }
+    try {
+      await api.updateFanoutConfig(cfg.id, { name: nextName });
+      if (editingId === cfg.id) {
+        setEditName(nextName);
+      }
+      await loadConfigs();
+      toast.success('Name updated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update name');
+    } finally {
+      handleCancelInlineEdit();
+    }
+  };
+
   const handleSave = async (enabled?: boolean) => {
-    if (!editingId) return;
+    const currentDraftType = draftType;
+    const currentEditingId = editingId;
+    if (!currentEditingId && !currentDraftType) return;
     setBusy(true);
     try {
-      const update: Record<string, unknown> = {
-        name: editName,
-        config: editConfig,
-        scope: editScope,
-      };
-      if (enabled !== undefined) update.enabled = enabled;
-      await api.updateFanoutConfig(editingId, update);
+      if (currentDraftType) {
+        await api.createFanoutConfig({
+          type: currentDraftType,
+          name: editName,
+          config: editConfig,
+          scope: editScope,
+          enabled: enabled ?? true,
+        });
+      } else {
+        if (!currentEditingId) {
+          throw new Error('Missing fanout config id for update');
+        }
+        const update: Record<string, unknown> = {
+          name: editName,
+          config: editConfig,
+          scope: editScope,
+        };
+        if (enabled !== undefined) update.enabled = enabled;
+        await api.updateFanoutConfig(currentEditingId, update);
+      }
+      setDraftType(null);
       setEditingId(null);
       await loadConfigs();
       if (onHealthRefresh) {
@@ -1129,33 +1216,33 @@ export function SettingsFanoutSection({
       webhook: { messages: 'all', raw_packets: 'none' },
       apprise: { messages: 'all', raw_packets: 'none' },
     };
-
-    try {
-      const created = await api.createFanoutConfig({
-        type,
-        name: TYPE_LABELS[type] || type,
-        config: defaults[type] || {},
-        scope: defaultScopes[type] || {},
-        enabled: false,
-      });
-      await loadConfigs();
-      handleEdit(created);
-      toast.success('Integration created');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create');
-    }
+    setAddMenuOpen(false);
+    setEditingId(null);
+    setDraftType(type);
+    setEditName(getDefaultIntegrationName(type, configs));
+    setEditConfig(defaults[type] || {});
+    setEditScope(defaultScopes[type] || {});
   };
 
   const editingConfig = editingId ? configs.find((c) => c.id === editingId) : null;
+  const detailType = draftType ?? editingConfig?.type ?? null;
+  const isDraft = draftType !== null;
+  const configGroups = TYPE_OPTIONS.map((opt) => ({
+    type: opt.value,
+    label: opt.label,
+    configs: configs
+      .filter((cfg) => cfg.type === opt.value)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+  })).filter((group) => group.configs.length > 0);
 
   // Detail view
-  if (editingConfig) {
+  if (detailType) {
     return (
-      <div className={cn('space-y-4', className)}>
+      <div className={cn('mx-auto w-full max-w-[800px] space-y-4', className)}>
         <button
           type="button"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          onClick={() => setEditingId(null)}
+          className="inline-flex items-center rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning transition-colors hover:bg-warning/20"
+          onClick={handleBackToList}
         >
           &larr; Back to list
         </button>
@@ -1171,12 +1258,12 @@ export function SettingsFanoutSection({
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Type: {TYPE_LABELS[editingConfig.type] || editingConfig.type}
+          Type: {TYPE_LABELS[detailType] || detailType}
         </div>
 
         <Separator />
 
-        {editingConfig.type === 'mqtt_private' && (
+        {detailType === 'mqtt_private' && (
           <MqttPrivateConfigEditor
             config={editConfig}
             scope={editScope}
@@ -1185,15 +1272,13 @@ export function SettingsFanoutSection({
           />
         )}
 
-        {editingConfig.type === 'mqtt_community' && (
+        {detailType === 'mqtt_community' && (
           <MqttCommunityConfigEditor config={editConfig} onChange={setEditConfig} />
         )}
 
-        {editingConfig.type === 'bot' && (
-          <BotConfigEditor config={editConfig} onChange={setEditConfig} />
-        )}
+        {detailType === 'bot' && <BotConfigEditor config={editConfig} onChange={setEditConfig} />}
 
-        {editingConfig.type === 'apprise' && (
+        {detailType === 'apprise' && (
           <AppriseConfigEditor
             config={editConfig}
             scope={editScope}
@@ -1202,7 +1287,7 @@ export function SettingsFanoutSection({
           />
         )}
 
-        {editingConfig.type === 'webhook' && (
+        {detailType === 'webhook' && (
           <WebhookConfigEditor
             config={editConfig}
             scope={editScope}
@@ -1229,9 +1314,11 @@ export function SettingsFanoutSection({
           >
             {busy ? 'Saving...' : 'Save as Disabled'}
           </Button>
-          <Button variant="destructive" onClick={() => handleDelete(editingConfig.id)}>
-            Delete
-          </Button>
+          {!isDraft && editingConfig && (
+            <Button variant="destructive" onClick={() => handleDelete(editingConfig.id)}>
+              Delete
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -1239,7 +1326,7 @@ export function SettingsFanoutSection({
 
   // List view
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('mx-auto w-full max-w-[800px] space-y-4', className)}>
       <div className="rounded-md border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-warning">
         Integrations are an experimental feature in open beta.
       </div>
@@ -1251,134 +1338,194 @@ export function SettingsFanoutSection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">Add a new entry:</span>
-        {TYPE_OPTIONS.filter((opt) => opt.value !== 'bot' || !health?.bots_disabled).map((opt) => (
-          <Button
-            key={opt.value}
-            variant="outline"
-            size="sm"
-            onClick={() => handleAddCreate(opt.value)}
+      <div className="relative inline-block" ref={addMenuRef}>
+        <Button
+          type="button"
+          size="sm"
+          aria-haspopup="menu"
+          aria-expanded={addMenuOpen}
+          onClick={() => setAddMenuOpen((open) => !open)}
+        >
+          Add Integration
+        </Button>
+        {addMenuOpen && (
+          <div
+            role="menu"
+            className="absolute left-0 top-full z-10 mt-2 min-w-56 rounded-md border border-input bg-background p-1 shadow-md"
           >
-            {opt.label}
-          </Button>
-        ))}
+            {TYPE_OPTIONS.filter((opt) => opt.value !== 'bot' || !health?.bots_disabled).map(
+              (opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => handleAddCreate(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              )
+            )}
+          </div>
+        )}
       </div>
 
-      {configs.length > 0 && (
-        <div className="space-y-2">
-          {configs.map((cfg) => {
-            const statusEntry = health?.fanout_statuses?.[cfg.id];
-            const status = cfg.enabled ? statusEntry?.status : undefined;
-            const communityConfig = cfg.config as Record<string, unknown>;
-            return (
-              <div key={cfg.id} className="border border-input rounded-md overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50">
-                  <label
-                    className="flex items-center cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={cfg.enabled}
-                      onChange={() => handleToggleEnabled(cfg)}
-                      className="w-4 h-4 rounded border-input accent-primary"
-                      aria-label={`Enable ${cfg.name}`}
-                    />
-                  </label>
+      {configGroups.length > 0 && (
+        <div className="columns-1 gap-4 md:columns-2">
+          {configGroups.map((group) => (
+            <section
+              key={group.type}
+              className="mb-4 inline-block w-full break-inside-avoid space-y-2"
+              aria-label={`${group.label} integrations`}
+            >
+              <div className="px-1 text-sm font-medium text-muted-foreground">{group.label}</div>
+              <div className="space-y-2">
+                {group.configs.map((cfg) => {
+                  const statusEntry = health?.fanout_statuses?.[cfg.id];
+                  const status = cfg.enabled ? statusEntry?.status : undefined;
+                  const communityConfig = cfg.config as Record<string, unknown>;
+                  return (
+                    <div
+                      key={cfg.id}
+                      role="group"
+                      aria-label={`Integration ${cfg.name}`}
+                      className="border border-input rounded-md overflow-hidden"
+                    >
+                      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50">
+                        <label
+                          className="flex items-center cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={cfg.enabled}
+                            onChange={() => handleToggleEnabled(cfg)}
+                            className="w-4 h-4 rounded border-input accent-primary"
+                            aria-label={`Enable ${cfg.name}`}
+                          />
+                        </label>
 
-                  <span className="text-sm font-medium flex-1">{cfg.name}</span>
+                        <div className="flex-1 min-w-0">
+                          {inlineEditingId === cfg.id ? (
+                            <Input
+                              value={inlineEditName}
+                              autoFocus
+                              onChange={(e) => setInlineEditName(e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onBlur={() => void handleInlineNameSave(cfg)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  e.currentTarget.blur();
+                                }
+                                if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  handleCancelInlineEdit();
+                                }
+                              }}
+                              aria-label={`Edit name for ${cfg.name}`}
+                              className="h-8"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className="block max-w-full cursor-text truncate text-left text-sm font-medium hover:text-foreground/80"
+                              onClick={() => handleStartInlineEdit(cfg)}
+                            >
+                              {cfg.name}
+                            </button>
+                          )}
+                        </div>
 
-                  <span className="text-xs text-muted-foreground">
-                    {TYPE_LABELS[cfg.type] || cfg.type}
-                  </span>
+                        <div
+                          className={cn(
+                            'w-2 h-2 rounded-full transition-colors',
+                            getStatusColor(status, cfg.enabled)
+                          )}
+                          title={cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
+                          aria-hidden="true"
+                        />
+                        <span className="text-xs text-muted-foreground hidden sm:inline">
+                          {cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
+                        </span>
 
-                  <div
-                    className={cn(
-                      'w-2 h-2 rounded-full transition-colors',
-                      getStatusColor(status, cfg.enabled)
-                    )}
-                    title={cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
-                    aria-hidden="true"
-                  />
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    {cfg.enabled ? getStatusLabel(status, cfg.type) : 'Disabled'}
-                  </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => handleEdit(cfg)}
+                        >
+                          Edit
+                        </Button>
+                      </div>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleEdit(cfg)}
-                  >
-                    Edit
-                  </Button>
-                </div>
+                      {cfg.type === 'mqtt_community' && (
+                        <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
+                          <div>
+                            Broker:{' '}
+                            {formatBrokerSummary(communityConfig, {
+                              host: DEFAULT_COMMUNITY_BROKER_HOST,
+                              port: DEFAULT_COMMUNITY_BROKER_PORT,
+                            })}
+                          </div>
+                          <div className="break-all">
+                            Topic:{' '}
+                            <code>
+                              {(communityConfig.topic_template as string) ||
+                                DEFAULT_COMMUNITY_PACKET_TOPIC_TEMPLATE}
+                            </code>
+                          </div>
+                        </div>
+                      )}
 
-                {cfg.type === 'mqtt_community' && (
-                  <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
-                    <div>
-                      Broker:{' '}
-                      {formatBrokerSummary(communityConfig, {
-                        host: DEFAULT_COMMUNITY_BROKER_HOST,
-                        port: DEFAULT_COMMUNITY_BROKER_PORT,
-                      })}
+                      {cfg.type === 'mqtt_private' && (
+                        <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
+                          <div>
+                            Broker:{' '}
+                            {formatBrokerSummary(cfg.config as Record<string, unknown>, {
+                              host: '',
+                              port: 1883,
+                            })}
+                          </div>
+                          <div className="break-all">
+                            Topics:{' '}
+                            <code>
+                              {formatPrivateTopicSummary(cfg.config as Record<string, unknown>)}
+                            </code>
+                          </div>
+                        </div>
+                      )}
+
+                      {cfg.type === 'webhook' && (
+                        <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
+                          <div className="break-all">
+                            URL:{' '}
+                            <code>
+                              {((cfg.config as Record<string, unknown>).url as string) || 'Not set'}
+                            </code>
+                          </div>
+                        </div>
+                      )}
+
+                      {cfg.type === 'apprise' && (
+                        <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
+                          <div className="break-all">
+                            Targets:{' '}
+                            <code>
+                              {formatAppriseTargets(
+                                (cfg.config as Record<string, unknown>).urls as string | undefined
+                              )}
+                            </code>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="break-all">
-                      Topic:{' '}
-                      <code>
-                        {(communityConfig.topic_template as string) ||
-                          DEFAULT_COMMUNITY_PACKET_TOPIC_TEMPLATE}
-                      </code>
-                    </div>
-                  </div>
-                )}
-
-                {cfg.type === 'mqtt_private' && (
-                  <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
-                    <div>
-                      Broker:{' '}
-                      {formatBrokerSummary(cfg.config as Record<string, unknown>, {
-                        host: '',
-                        port: 1883,
-                      })}
-                    </div>
-                    <div className="break-all">
-                      Topics:{' '}
-                      <code>
-                        {formatPrivateTopicSummary(cfg.config as Record<string, unknown>)}
-                      </code>
-                    </div>
-                  </div>
-                )}
-
-                {cfg.type === 'webhook' && (
-                  <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
-                    <div className="break-all">
-                      URL:{' '}
-                      <code>
-                        {((cfg.config as Record<string, unknown>).url as string) || 'Not set'}
-                      </code>
-                    </div>
-                  </div>
-                )}
-
-                {cfg.type === 'apprise' && (
-                  <div className="space-y-1 border-t border-input px-3 py-2 text-xs text-muted-foreground">
-                    <div className="break-all">
-                      Targets:{' '}
-                      <code>
-                        {formatAppriseTargets(
-                          (cfg.config as Record<string, unknown>).urls as string | undefined
-                        )}
-                      </code>
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            );
-          })}
+            </section>
+          ))}
         </div>
       )}
     </div>

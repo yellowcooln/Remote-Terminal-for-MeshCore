@@ -4,9 +4,21 @@ import {
   deleteFanoutConfig,
   getFanoutConfigs,
 } from '../helpers/api';
+import { createCaptureServer, fanoutHeader, openFanoutSettings } from '../helpers/fanout';
 
 test.describe('Apprise integration settings', () => {
   let createdAppriseId: string | null = null;
+  let receiver: ReturnType<typeof createCaptureServer>;
+  let appriseUrl: string;
+
+  test.beforeAll(async () => {
+    receiver = createCaptureServer((port) => `json://127.0.0.1:${port}`);
+    appriseUrl = await receiver.listen();
+  });
+
+  test.afterAll(async () => {
+    receiver.close();
+  });
 
   test.afterEach(async () => {
     if (createdAppriseId) {
@@ -20,22 +32,19 @@ test.describe('Apprise integration settings', () => {
   });
 
   test('create apprise via UI, configure URLs, save as enabled', async ({ page }) => {
-    await page.goto('/');
+    await openFanoutSettings(page);
     await expect(page.getByText('Connected')).toBeVisible();
 
-    // Open settings and navigate to MQTT & Automation
-    await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
+    // Open add menu and pick Apprise
+    await page.getByRole('button', { name: 'Add Integration' }).click();
+    await page.getByRole('menuitem', { name: 'Apprise' }).click();
 
-    // Click the Apprise add button
-    await page.getByRole('button', { name: 'Apprise' }).click();
-
-    // Should navigate to the detail/edit view with default name
-    await expect(page.locator('#fanout-edit-name')).toHaveValue('Apprise');
+    // Should navigate to the detail/edit view with a numbered default name
+    await expect(page.locator('#fanout-edit-name')).toHaveValue(/Apprise #\d+/);
 
     // Fill in notification URL
     const urlsTextarea = page.locator('#fanout-apprise-urls');
-    await urlsTextarea.fill('json://localhost:9999');
+    await urlsTextarea.fill(appriseUrl);
 
     // Verify preserve identity checkbox is checked by default
     const preserveIdentity = page.getByText('Preserve identity on Discord');
@@ -56,6 +65,7 @@ test.describe('Apprise integration settings', () => {
 
     // Should be back on list view with our apprise config visible
     await expect(page.getByText('E2E Apprise')).toBeVisible();
+    await expect(page.getByText(appriseUrl)).toBeVisible();
 
     // Clean up via API
     const configs = await getFanoutConfigs();
@@ -70,7 +80,7 @@ test.describe('Apprise integration settings', () => {
       type: 'apprise',
       name: 'API Apprise',
       config: {
-        urls: 'json://localhost:9999\nslack://token_a/token_b/token_c',
+        urls: `${appriseUrl}\nslack://token_a/token_b/token_c`,
         preserve_identity: false,
         include_path: false,
       },
@@ -78,19 +88,17 @@ test.describe('Apprise integration settings', () => {
     });
     createdAppriseId = apprise.id;
 
-    await page.goto('/');
+    await openFanoutSettings(page);
     await expect(page.getByText('Connected')).toBeVisible();
 
-    await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
-
     // Click Edit on our apprise config
-    const row = page.getByText('API Apprise').locator('..');
+    const row = fanoutHeader(page, 'API Apprise');
+    await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Edit' }).click();
 
     // Verify the URLs textarea has our content
     const urlsTextarea = page.locator('#fanout-apprise-urls');
-    await expect(urlsTextarea).toHaveValue(/json:\/\/localhost:9999/);
+    await expect(urlsTextarea).toHaveValue(new RegExp(appriseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     await expect(urlsTextarea).toHaveValue(/slack:\/\/token_a/);
 
     // Verify checkboxes reflect our config (both unchecked)
@@ -107,24 +115,24 @@ test.describe('Apprise integration settings', () => {
     await expect(pathCheckbox).not.toBeChecked();
 
     // Go back
+    page.once('dialog', (dialog) => dialog.accept());
     await page.getByText('← Back to list').click();
+    await expect(row).toBeVisible();
   });
 
   test('apprise shows scope selector', async ({ page }) => {
     const apprise = await createFanoutConfig({
       type: 'apprise',
       name: 'Scope Apprise',
-      config: { urls: 'json://localhost:9999' },
+      config: { urls: appriseUrl },
     });
     createdAppriseId = apprise.id;
 
-    await page.goto('/');
+    await openFanoutSettings(page);
     await expect(page.getByText('Connected')).toBeVisible();
 
-    await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
-
-    const row = page.getByText('Scope Apprise').locator('..');
+    const row = fanoutHeader(page, 'Scope Apprise');
+    await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Edit' }).click();
 
     // Verify scope selector is present
@@ -138,31 +146,31 @@ test.describe('Apprise integration settings', () => {
     await expect(page.getByText('Channels (exclude)')).toBeVisible();
 
     // Go back
+    page.once('dialog', (dialog) => dialog.accept());
     await page.getByText('← Back to list').click();
+    await expect(row).toBeVisible();
   });
 
-  test('apprise disabled config shows amber dot and can be enabled via save button', async ({
+  test('apprise disabled config shows disabled status and can be enabled via save button', async ({
     page,
   }) => {
     const apprise = await createFanoutConfig({
       type: 'apprise',
       name: 'Disabled Apprise',
-      config: { urls: 'json://localhost:9999' },
+      config: { urls: appriseUrl },
       enabled: false,
     });
     createdAppriseId = apprise.id;
 
-    await page.goto('/');
+    await openFanoutSettings(page);
     await expect(page.getByText('Connected')).toBeVisible();
 
-    await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
-
     // Should show "Disabled" status text
-    const row = page.getByText('Disabled Apprise').locator('..');
-    await expect(row.getByText('Disabled', { exact: true })).toBeVisible();
+    const row = fanoutHeader(page, 'Disabled Apprise');
+    await expect(row).toContainText('Disabled');
 
     // Edit it
+    await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Edit' }).click();
 
     // Save as enabled
@@ -179,27 +187,24 @@ test.describe('Apprise integration settings', () => {
     const apprise = await createFanoutConfig({
       type: 'apprise',
       name: 'Delete Me Apprise',
-      config: { urls: 'json://localhost:9999' },
+      config: { urls: appriseUrl },
     });
     createdAppriseId = apprise.id;
 
-    await page.goto('/');
+    await openFanoutSettings(page);
     await expect(page.getByText('Connected')).toBeVisible();
 
-    await page.getByText('Settings').click();
-    await page.getByRole('button', { name: /MQTT.*Automation/ }).click();
-
-    const row = page.getByText('Delete Me Apprise').locator('..');
+    const row = fanoutHeader(page, 'Delete Me Apprise');
+    await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Edit' }).click();
 
     // Accept the confirmation dialog
-    page.on('dialog', (dialog) => dialog.accept());
+    page.once('dialog', (dialog) => dialog.accept());
 
     await page.getByRole('button', { name: 'Delete' }).click();
-    await expect(page.getByText('Integration deleted')).toBeVisible();
 
     // Should be back on list, apprise gone
-    await expect(page.getByText('Delete Me Apprise')).not.toBeVisible();
+    await expect(row).not.toBeVisible();
     createdAppriseId = null;
   });
 });

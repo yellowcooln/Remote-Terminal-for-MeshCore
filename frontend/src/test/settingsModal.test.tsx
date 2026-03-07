@@ -228,6 +228,16 @@ describe('SettingsModal', () => {
     expect(screen.queryByLabelText('Preset')).not.toBeInTheDocument();
   });
 
+  it('applies the centered 800px column layout to non-fanout settings content', () => {
+    renderModal({
+      externalSidebarNav: true,
+      desktopSection: 'local',
+    });
+
+    const localSettingsText = screen.getByText('These settings apply only to this device/browser.');
+    expect(localSettingsText.closest('div')).toHaveClass('mx-auto', 'w-full', 'max-w-[800px]');
+  });
+
   it('toggles sections in mobile accordion mode', () => {
     renderModal({ mobile: true });
     const localToggle = screen.getAllByRole('button', { name: /Local Configuration/i })[0];
