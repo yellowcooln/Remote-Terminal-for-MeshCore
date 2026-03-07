@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING
@@ -154,23 +153,6 @@ async def on_contact_message(event: "Event") -> None:
     # Update contact last_contacted (contact was already fetched above)
     if contact:
         await ContactRepository.update_last_contacted(sender_pubkey, received_at)
-
-    # Run bot if enabled
-    from app.bot import run_bot_for_message
-
-    asyncio.create_task(
-        run_bot_for_message(
-            sender_name=contact.name if contact else None,
-            sender_key=sender_pubkey,
-            message_text=payload.get("text", ""),
-            is_dm=True,
-            channel_key=None,
-            channel_name=None,
-            sender_timestamp=payload.get("sender_timestamp"),
-            path=payload.get("path"),
-            is_outgoing=False,
-        )
-    )
 
 
 async def on_rx_log_data(event: "Event") -> None:

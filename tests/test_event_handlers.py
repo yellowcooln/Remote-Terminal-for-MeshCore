@@ -5,7 +5,7 @@ delivery confirmation, contact message handling, and event registration.
 """
 
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -218,42 +218,11 @@ class TestContactMessageCLIFiltering:
             assert len(messages) == 0
 
     @pytest.mark.asyncio
-    async def test_normal_message_schedules_bot_in_background(self, test_db):
-        """Normal messages should schedule bot execution without blocking."""
-        from app.event_handlers import on_contact_message
-
-        def _capture_task(coro):
-            coro.close()
-            return MagicMock()
-
-        with (
-            patch("app.event_handlers.broadcast_event"),
-            patch("app.event_handlers.asyncio.create_task", side_effect=_capture_task) as mock_task,
-            patch("app.bot.run_bot_for_message", new_callable=AsyncMock) as mock_bot,
-        ):
-
-            class MockEvent:
-                payload = {
-                    "pubkey_prefix": "abc123def456",
-                    "text": "Hello, bot",
-                    "txt_type": 0,
-                    "sender_timestamp": 1700000000,
-                }
-
-            await on_contact_message(MockEvent())
-
-            mock_task.assert_called_once()
-            mock_bot.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_normal_message_still_processed(self, test_db):
         """Normal messages (txt_type=0) are still processed normally."""
         from app.event_handlers import on_contact_message
 
-        with (
-            patch("app.event_handlers.broadcast_event") as mock_broadcast,
-            patch("app.bot.run_bot_for_message", new_callable=AsyncMock),
-        ):
+        with patch("app.event_handlers.broadcast_event") as mock_broadcast:
 
             class MockEvent:
                 payload = {
@@ -278,10 +247,7 @@ class TestContactMessageCLIFiltering:
         """Broadcast payload should have acked as integer 0, not boolean False."""
         from app.event_handlers import on_contact_message
 
-        with (
-            patch("app.event_handlers.broadcast_event") as mock_broadcast,
-            patch("app.bot.run_bot_for_message", new_callable=AsyncMock),
-        ):
+        with patch("app.event_handlers.broadcast_event") as mock_broadcast:
 
             class MockEvent:
                 payload = {
@@ -324,12 +290,10 @@ class TestContactMessageCLIFiltering:
             "outgoing",
             "acked",
             "sender_name",
+            "channel_name",
         }
 
-        with (
-            patch("app.event_handlers.broadcast_event") as mock_broadcast,
-            patch("app.bot.run_bot_for_message", new_callable=AsyncMock),
-        ):
+        with patch("app.event_handlers.broadcast_event") as mock_broadcast:
 
             class MockEvent:
                 payload = {
@@ -380,10 +344,7 @@ class TestContactMessageCLIFiltering:
         """Messages without txt_type field are treated as normal (not filtered)."""
         from app.event_handlers import on_contact_message
 
-        with (
-            patch("app.event_handlers.broadcast_event"),
-            patch("app.bot.run_bot_for_message", new_callable=AsyncMock),
-        ):
+        with patch("app.event_handlers.broadcast_event"):
 
             class MockEvent:
                 payload = {
@@ -422,10 +383,7 @@ class TestContactMessageCLIFiltering:
             }
         )
 
-        with (
-            patch("app.event_handlers.broadcast_event") as mock_broadcast,
-            patch("app.bot.run_bot_for_message", new_callable=AsyncMock),
-        ):
+        with patch("app.event_handlers.broadcast_event") as mock_broadcast:
 
             class MockEvent:
                 payload = {

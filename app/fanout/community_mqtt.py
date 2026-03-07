@@ -15,17 +15,15 @@ import hashlib
 import importlib.metadata
 import json
 import logging
-import re
 import ssl
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 import aiomqtt
 import nacl.bindings
 
-from app.models import AppSettings
-from app.mqtt_base import BaseMqttPublisher
+from app.fanout.mqtt_base import BaseMqttPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +41,19 @@ _STATS_MIN_CACHE_SECS = 60  # Don't re-fetch stats within 60s
 
 # Ed25519 group order
 _L = 2**252 + 27742317777372353535851937790883648493
-_IATA_RE = re.compile(r"^[A-Z]{3}$")
 
 # Route type mapping: bottom 2 bits of first byte
 _ROUTE_MAP = {0: "F", 1: "F", 2: "D", 3: "T"}
+
+
+class CommunityMqttSettings(Protocol):
+    """Attributes expected on the settings object for the community MQTT publisher."""
+
+    community_mqtt_enabled: bool
+    community_mqtt_broker_host: str
+    community_mqtt_broker_port: int
+    community_mqtt_iata: str
+    community_mqtt_email: str
 
 
 def _base64url_encode(data: bytes) -> str:
@@ -258,7 +265,7 @@ def _format_raw_packet(data: dict[str, Any], device_name: str, public_key_hex: s
     return packet
 
 
-def _build_status_topic(settings: AppSettings, pubkey_hex: str) -> str:
+def _build_status_topic(settings: CommunityMqttSettings, pubkey_hex: str) -> str:
     """Build the ``meshcore/{IATA}/{PUBKEY}/status`` topic string."""
     iata = settings.community_mqtt_iata.upper().strip()
     return f"meshcore/{iata}/{pubkey_hex}/status"
@@ -310,7 +317,7 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         self._last_stats_fetch: float = 0.0
         self._last_status_publish: float = 0.0
 
-    async def start(self, settings: AppSettings) -> None:
+    async def start(self, settings: object) -> None:
         self._key_unavailable_warned = False
         self._cached_device_info = None
         self._cached_stats = None
@@ -323,12 +330,8 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         from app.keystore import has_private_key
         from app.websocket import broadcast_error
 
-        if (
-            self._settings
-            and self._settings.community_mqtt_enabled
-            and not has_private_key()
-            and not self._key_unavailable_warned
-        ):
+        s: CommunityMqttSettings | None = self._settings
+        if s and not has_private_key() and not self._key_unavailable_warned:
             broadcast_error(
                 "Community MQTT unavailable",
                 "Radio firmware does not support private key export.",
@@ -339,9 +342,11 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         """Check if community MQTT is enabled and keys are available."""
         from app.keystore import has_private_key
 
-        return bool(self._settings and self._settings.community_mqtt_enabled and has_private_key())
+        s: CommunityMqttSettings | None = self._settings
+        return bool(s and s.community_mqtt_enabled and has_private_key())
 
-    def _build_client_kwargs(self, settings: AppSettings) -> dict[str, Any]:
+    def _build_client_kwargs(self, settings: object) -> dict[str, Any]:
+        s: CommunityMqttSettings = settings  # type: ignore[assignment]
         from app.keystore import get_private_key, get_public_key
         from app.radio import radio_manager
 
@@ -350,13 +355,13 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         assert private_key is not None and public_key is not None  # guaranteed by _pre_connect
 
         pubkey_hex = public_key.hex().upper()
-        broker_host = settings.community_mqtt_broker_host or _DEFAULT_BROKER
-        broker_port = settings.community_mqtt_broker_port or _DEFAULT_PORT
+        broker_host = s.community_mqtt_broker_host or _DEFAULT_BROKER
+        broker_port = s.community_mqtt_broker_port or _DEFAULT_PORT
         jwt_token = _generate_jwt_token(
             private_key,
             public_key,
             audience=broker_host,
-            email=settings.community_mqtt_email or "",
+            email=s.community_mqtt_email or "",
         )
 
         tls_context = ssl.create_default_context()
@@ -365,7 +370,7 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         if radio_manager.meshcore and radio_manager.meshcore.self_info:
             device_name = radio_manager.meshcore.self_info.get("name", "")
 
-        status_topic = _build_status_topic(settings, pubkey_hex)
+        status_topic = _build_status_topic(s, pubkey_hex)
         offline_payload = json.dumps(
             {
                 "status": "offline",
@@ -386,9 +391,10 @@ class CommunityMqttPublisher(BaseMqttPublisher):
             "will": aiomqtt.Will(status_topic, offline_payload, retain=True),
         }
 
-    def _on_connected(self, settings: AppSettings) -> tuple[str, str]:
-        broker_host = settings.community_mqtt_broker_host or _DEFAULT_BROKER
-        broker_port = settings.community_mqtt_broker_port or _DEFAULT_PORT
+    def _on_connected(self, settings: object) -> tuple[str, str]:
+        s: CommunityMqttSettings = settings  # type: ignore[assignment]
+        broker_host = s.community_mqtt_broker_host or _DEFAULT_BROKER
+        broker_port = s.community_mqtt_broker_port or _DEFAULT_PORT
         return ("Community MQTT connected", f"{broker_host}:{broker_port}")
 
     async def _fetch_device_info(self) -> dict[str, str]:
@@ -479,7 +485,9 @@ class CommunityMqttPublisher(BaseMqttPublisher):
 
         return self._cached_stats
 
-    async def _publish_status(self, settings: AppSettings, *, refresh_stats: bool = True) -> None:
+    async def _publish_status(
+        self, settings: CommunityMqttSettings, *, refresh_stats: bool = True
+    ) -> None:
         """Build and publish the enriched retained status message."""
         from app.keystore import get_public_key
         from app.radio import radio_manager
@@ -514,9 +522,9 @@ class CommunityMqttPublisher(BaseMqttPublisher):
         await self.publish(status_topic, payload, retain=True)
         self._last_status_publish = time.monotonic()
 
-    async def _on_connected_async(self, settings: AppSettings) -> None:
+    async def _on_connected_async(self, settings: object) -> None:
         """Publish a retained online status message after connecting."""
-        await self._publish_status(settings)
+        await self._publish_status(settings)  # type: ignore[arg-type]
 
     async def _on_periodic_wake(self, elapsed: float) -> None:
         if not self._settings:
@@ -540,7 +548,7 @@ class CommunityMqttPublisher(BaseMqttPublisher):
             return True
         return False
 
-    async def _pre_connect(self, settings: AppSettings) -> bool:
+    async def _pre_connect(self, settings: object) -> bool:
         from app.keystore import get_private_key, get_public_key
 
         private_key = get_private_key()
@@ -555,50 +563,3 @@ class CommunityMqttPublisher(BaseMqttPublisher):
                 pass
             return False
         return True
-
-
-# Module-level singleton
-community_publisher = CommunityMqttPublisher()
-
-
-def community_mqtt_broadcast(event_type: str, data: dict[str, Any]) -> None:
-    """Fire-and-forget community MQTT publish for raw packets only."""
-    if event_type != "raw_packet":
-        return
-    if not community_publisher.connected or community_publisher._settings is None:
-        return
-    asyncio.create_task(_community_maybe_publish(data))
-
-
-async def _community_maybe_publish(data: dict[str, Any]) -> None:
-    """Format and publish a raw packet to the community broker."""
-    settings = community_publisher._settings
-    if settings is None or not settings.community_mqtt_enabled:
-        return
-
-    try:
-        from app.keystore import get_public_key
-        from app.radio import radio_manager
-
-        public_key = get_public_key()
-        if public_key is None:
-            return
-
-        pubkey_hex = public_key.hex().upper()
-
-        # Get device name from radio
-        device_name = ""
-        if radio_manager.meshcore and radio_manager.meshcore.self_info:
-            device_name = radio_manager.meshcore.self_info.get("name", "")
-
-        packet = _format_raw_packet(data, device_name, pubkey_hex)
-        iata = settings.community_mqtt_iata.upper().strip()
-        if not _IATA_RE.fullmatch(iata):
-            logger.debug("Community MQTT: skipping publish — no valid IATA code configured")
-            return
-        topic = f"meshcore/{iata}/{pubkey_hex}/packets"
-
-        await community_publisher.publish(topic, packet)
-
-    except Exception as e:
-        logger.warning("Community MQTT broadcast error: %s", e)

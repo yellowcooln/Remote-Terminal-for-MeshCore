@@ -11,9 +11,8 @@ import { SETTINGS_SECTION_LABELS, type SettingsSection } from './settings/settin
 
 import { SettingsRadioSection } from './settings/SettingsRadioSection';
 import { SettingsLocalSection } from './settings/SettingsLocalSection';
-import { SettingsMqttSection } from './settings/SettingsMqttSection';
+import { SettingsFanoutSection } from './settings/SettingsFanoutSection';
 import { SettingsDatabaseSection } from './settings/SettingsDatabaseSection';
-import { SettingsBotSection } from './settings/SettingsBotSection';
 import { SettingsStatisticsSection } from './settings/SettingsStatisticsSection';
 import { SettingsAboutSection } from './settings/SettingsAboutSection';
 
@@ -78,9 +77,8 @@ export function SettingsModal(props: SettingsModalProps) {
   const [expandedSections, setExpandedSections] = useState<Record<SettingsSection, boolean>>({
     radio: false,
     local: false,
-    mqtt: false,
+    fanout: false,
     database: false,
-    bot: false,
     statistics: false,
     about: false,
   });
@@ -217,29 +215,13 @@ export function SettingsModal(props: SettingsModalProps) {
         </section>
       )}
 
-      {shouldRenderSection('bot') && (
+      {shouldRenderSection('fanout') && (
         <section className={sectionWrapperClass}>
-          {renderSectionHeader('bot')}
-          {isSectionVisible('bot') && appSettings && (
-            <SettingsBotSection
-              appSettings={appSettings}
+          {renderSectionHeader('fanout')}
+          {isSectionVisible('fanout') && (
+            <SettingsFanoutSection
               health={health}
-              isMobileLayout={isMobileLayout}
-              onSaveAppSettings={onSaveAppSettings}
-              className={sectionContentClass}
-            />
-          )}
-        </section>
-      )}
-
-      {shouldRenderSection('mqtt') && (
-        <section className={sectionWrapperClass}>
-          {renderSectionHeader('mqtt')}
-          {isSectionVisible('mqtt') && appSettings && (
-            <SettingsMqttSection
-              appSettings={appSettings}
-              health={health}
-              onSaveAppSettings={onSaveAppSettings}
+              onHealthRefresh={onHealthRefresh}
               className={sectionContentClass}
             />
           )}

@@ -79,7 +79,6 @@ class TestDMAckTrackingWiring:
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.routers.messages.track_pending_ack") as mock_track,
             patch("app.routers.messages.broadcast_event"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
         ):
             request = SendDirectMessageRequest(destination=pub_key, text="Hello")
             message = await send_direct_message(request)
@@ -112,7 +111,6 @@ class TestDMAckTrackingWiring:
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.routers.messages.track_pending_ack") as mock_track,
             patch("app.routers.messages.broadcast_event"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
         ):
             request = SendDirectMessageRequest(destination=pub_key, text="Hello")
             message = await send_direct_message(request)
@@ -142,7 +140,6 @@ class TestDMAckTrackingWiring:
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.routers.messages.track_pending_ack") as mock_track,
             patch("app.routers.messages.broadcast_event"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
         ):
             request = SendDirectMessageRequest(destination=pub_key, text="Hello")
             await send_direct_message(request)
@@ -171,7 +168,6 @@ class TestDMAckTrackingWiring:
             patch.object(radio_manager, "_meshcore", mc),
             patch("app.routers.messages.track_pending_ack") as mock_track,
             patch("app.routers.messages.broadcast_event"),
-            patch("app.bot.run_bot_for_message", new=AsyncMock()),
         ):
             request = SendDirectMessageRequest(destination=pub_key, text="Hello")
             message = await send_direct_message(request)

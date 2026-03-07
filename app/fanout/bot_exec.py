@@ -19,8 +19,6 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from app.config import settings as server_settings
-
 logger = logging.getLogger(__name__)
 
 # Limit concurrent bot executions to prevent resource exhaustion
@@ -259,97 +257,3 @@ async def _send_single_bot_message(
 
         # Update last send time after successful send
         _last_bot_send_time = time.monotonic()
-
-
-async def run_bot_for_message(
-    sender_name: str | None,
-    sender_key: str | None,
-    message_text: str,
-    is_dm: bool,
-    channel_key: str | None,
-    channel_name: str | None = None,
-    sender_timestamp: int | None = None,
-    path: str | None = None,
-    is_outgoing: bool = False,
-) -> None:
-    """
-    Run all enabled bots for a message (incoming or outgoing).
-
-    This is the main entry point called by message handlers after
-    a message is successfully decrypted and stored. Bots run serially,
-    and errors in one bot don't prevent others from running.
-
-    Args:
-        sender_name: Display name of the sender
-        sender_key: 64-char hex public key of sender (DMs only, None for channels)
-        message_text: The message content
-        is_dm: True for direct messages, False for channel messages
-        channel_key: Channel key for channel messages
-        channel_name: Channel name (e.g. "#general"), None for DMs
-        sender_timestamp: Sender's timestamp from the message
-        path: Hex-encoded routing path
-        is_outgoing: Whether this is our own outgoing message
-    """
-    if server_settings.disable_bots:
-        return
-
-    # Early check if any bots are enabled (will re-check after sleep)
-    from app.repository import AppSettingsRepository
-
-    settings = await AppSettingsRepository.get()
-    enabled_bots = [b for b in settings.bots if b.enabled and b.code.strip()]
-    if not enabled_bots:
-        return
-
-    async with _bot_semaphore:
-        logger.debug(
-            "Running %d bot(s) for message from %s (is_dm=%s)",
-            len(enabled_bots),
-            sender_name or (sender_key[:12] if sender_key else "unknown"),
-            is_dm,
-        )
-
-        # Wait for the initiating message's retransmissions to propagate through the mesh
-        await asyncio.sleep(2)
-
-        # Re-check settings after sleep (user may have changed bot config)
-        settings = await AppSettingsRepository.get()
-        enabled_bots = [b for b in settings.bots if b.enabled and b.code.strip()]
-        if not enabled_bots:
-            logger.debug("All bots disabled during wait, skipping")
-            return
-
-        # Run each enabled bot serially
-        loop = asyncio.get_event_loop()
-        for bot in enabled_bots:
-            logger.debug("Executing bot '%s'", bot.name)
-            try:
-                response = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        _bot_executor,
-                        execute_bot_code,
-                        bot.code,
-                        sender_name,
-                        sender_key,
-                        message_text,
-                        is_dm,
-                        channel_key,
-                        channel_name,
-                        sender_timestamp,
-                        path,
-                        is_outgoing,
-                    ),
-                    timeout=BOT_EXECUTION_TIMEOUT,
-                )
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Bot '%s' execution timed out after %ds", bot.name, BOT_EXECUTION_TIMEOUT
-                )
-                continue  # Continue to next bot
-            except Exception as e:
-                logger.warning("Bot '%s' execution error: %s", bot.name, e)
-                continue  # Continue to next bot
-
-            # Send response if any
-            if response:
-                await process_bot_response(response, is_dm, sender_key or "", channel_key)

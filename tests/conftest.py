@@ -29,11 +29,12 @@ def cleanup_test_db_dir():
 async def test_db():
     """Create an in-memory test database with schema + migrations."""
     from app.repository import channels, contacts, messages, raw_packets, settings
+    from app.repository import fanout as fanout_repo
 
     db = Database(":memory:")
     await db.connect()
 
-    submodules = [contacts, channels, messages, raw_packets, settings]
+    submodules = [contacts, channels, messages, raw_packets, settings, fanout_repo]
     originals = [(mod, mod.db) for mod in submodules]
 
     for mod in submodules:
@@ -68,7 +69,7 @@ def captured_broadcasts():
     """Capture WebSocket broadcasts for verification."""
     broadcasts = []
 
-    def mock_broadcast(event_type: str, data: dict):
+    def mock_broadcast(event_type: str, data: dict, **kwargs):
         broadcasts.append({"type": event_type, "data": data})
 
     return broadcasts, mock_broadcast

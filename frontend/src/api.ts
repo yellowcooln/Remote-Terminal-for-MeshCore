@@ -8,6 +8,7 @@ import type {
   ContactAdvertPath,
   ContactAdvertPathSummary,
   ContactDetail,
+  FanoutConfig,
   Favorite,
   HealthStatus,
   MaintenanceResult,
@@ -278,6 +279,37 @@ export const api = {
     fetchJson<MigratePreferencesResponse>('/settings/migrate', {
       method: 'POST',
       body: JSON.stringify(request),
+    }),
+
+  // Fanout
+  getFanoutConfigs: () => fetchJson<FanoutConfig[]>('/fanout'),
+  createFanoutConfig: (config: {
+    type: string;
+    name: string;
+    config: Record<string, unknown>;
+    scope: Record<string, unknown>;
+    enabled?: boolean;
+  }) =>
+    fetchJson<FanoutConfig>('/fanout', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+  updateFanoutConfig: (
+    id: string,
+    update: {
+      name?: string;
+      config?: Record<string, unknown>;
+      scope?: Record<string, unknown>;
+      enabled?: boolean;
+    }
+  ) =>
+    fetchJson<FanoutConfig>(`/fanout/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(update),
+    }),
+  deleteFanoutConfig: (id: string) =>
+    fetchJson<{ deleted: boolean }>(`/fanout/${id}`, {
+      method: 'DELETE',
     }),
 
   // Statistics
