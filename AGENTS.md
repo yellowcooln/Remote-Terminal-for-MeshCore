@@ -251,7 +251,7 @@ npm run test:run
 
 ### Before Completing Changes
 
-**Always run `./scripts/all_quality.sh` before finishing any changes.** This runs all linting, formatting, type checking, tests, and builds sequentially, catching type mismatches, breaking changes, and compilation errors.
+**Always run `./scripts/all_quality.sh` before finishing any changes that have modified code or tests.** This runs all linting, formatting, type checking, tests, and builds sequentially, catching type mismatches, breaking changes, and compilation errors. This is not necessary for docs-only changes.
 
 ## API Summary
 
