@@ -206,45 +206,42 @@ class TestWebSocketConnectionManagement:
 
 
 class TestBroadcastEventFanout:
-    """Test that broadcast_event dispatches to WS, private MQTT, and community MQTT."""
+    """Test that broadcast_event dispatches to WS and fanout manager."""
 
     @pytest.mark.asyncio
-    async def test_broadcast_event_dispatches_to_all_three_sinks(self):
-        """broadcast_event creates a WS task, calls mqtt_broadcast, and
-        calls community_mqtt_broadcast."""
+    async def test_broadcast_event_dispatches_to_ws_and_fanout(self):
+        """broadcast_event creates a WS task and dispatches to fanout manager."""
         from app.websocket import broadcast_event
 
         with (
             patch("app.websocket.ws_manager") as mock_ws,
-            patch("app.mqtt.mqtt_broadcast") as mock_mqtt,
-            patch("app.community_mqtt.community_mqtt_broadcast") as mock_community,
+            patch("app.fanout.manager.fanout_manager") as mock_fm,
         ):
             mock_ws.broadcast = AsyncMock()
+            mock_fm.broadcast_message = AsyncMock()
 
             broadcast_event("message", {"id": 1, "text": "hello"})
 
-            # Let the asyncio task (ws_manager.broadcast) run
+            # Let the asyncio tasks run
             await asyncio.sleep(0)
 
             mock_ws.broadcast.assert_called_once_with("message", {"id": 1, "text": "hello"})
-            mock_mqtt.assert_called_once_with("message", {"id": 1, "text": "hello"})
-            mock_community.assert_called_once_with("message", {"id": 1, "text": "hello"})
+            mock_fm.broadcast_message.assert_called_once_with({"id": 1, "text": "hello"})
 
     @pytest.mark.asyncio
-    async def test_broadcast_event_passes_event_type_to_mqtt_filters(self):
-        """MQTT sinks receive the event_type so they can filter by message vs raw_packet."""
+    async def test_broadcast_event_raw_packet_dispatches_to_fanout(self):
+        """broadcast_event for raw_packet dispatches to fanout broadcast_raw."""
         from app.websocket import broadcast_event
 
         with (
             patch("app.websocket.ws_manager") as mock_ws,
-            patch("app.mqtt.mqtt_broadcast") as mock_mqtt,
-            patch("app.community_mqtt.community_mqtt_broadcast") as mock_community,
+            patch("app.fanout.manager.fanout_manager") as mock_fm,
         ):
             mock_ws.broadcast = AsyncMock()
+            mock_fm.broadcast_raw = AsyncMock()
 
             broadcast_event("raw_packet", {"data": "ff00"})
             await asyncio.sleep(0)
 
-            # Both MQTT sinks receive the event type for filtering
-            assert mock_mqtt.call_args.args[0] == "raw_packet"
-            assert mock_community.call_args.args[0] == "raw_packet"
+            mock_ws.broadcast.assert_called_once()
+            mock_fm.broadcast_raw.assert_called_once_with({"data": "ff00"})

@@ -100,8 +100,8 @@ class TestMigration001:
             # Run migrations
             applied = await run_migrations(conn)
 
-            assert applied == 35  # All migrations run
-            assert await get_version(conn) == 35
+            assert applied == 38  # All migrations run
+            assert await get_version(conn) == 38
 
             # Verify columns exist by inserting and selecting
             await conn.execute(
@@ -183,9 +183,9 @@ class TestMigration001:
             applied1 = await run_migrations(conn)
             applied2 = await run_migrations(conn)
 
-            assert applied1 == 35  # All migrations run
+            assert applied1 == 38  # All migrations run
             assert applied2 == 0  # No migrations on second run
-            assert await get_version(conn) == 35
+            assert await get_version(conn) == 38
         finally:
             await conn.close()
 
@@ -246,8 +246,8 @@ class TestMigration001:
             applied = await run_migrations(conn)
 
             # All migrations applied (version incremented) but no error
-            assert applied == 35
-            assert await get_version(conn) == 35
+            assert applied == 38
+            assert await get_version(conn) == 38
         finally:
             await conn.close()
 
@@ -374,28 +374,27 @@ class TestMigration013:
             )
             await conn.commit()
 
-            # Run migration 13 (plus 14-34 which also run)
+            # Run migration 13 (plus 14-38 which also run)
             applied = await run_migrations(conn)
-            assert applied == 23
-            assert await get_version(conn) == 35
+            assert applied == 26
+            assert await get_version(conn) == 38
 
-            # Verify bots array was created with migrated data
-            cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
+            # Bots were migrated from app_settings to fanout_configs (migration 37)
+            # and the bots column was dropped (migration 38)
+            cursor = await conn.execute("SELECT * FROM fanout_configs WHERE type = 'bot'")
             row = await cursor.fetchone()
-            bots = json.loads(row["bots"])
+            assert row is not None
 
-            assert len(bots) == 1
-            assert bots[0]["name"] == "Bot 1"
-            assert bots[0]["enabled"] is True
-            assert bots[0]["code"] == 'def bot(): return "hello"'
-            assert "id" in bots[0]  # Should have a UUID
+            config = json.loads(row["config"])
+            assert config["code"] == 'def bot(): return "hello"'
+            assert row["name"] == "Bot 1"
+            assert bool(row["enabled"])
         finally:
             await conn.close()
 
     @pytest.mark.asyncio
     async def test_migration_creates_empty_array_when_no_bot(self):
         """Migration creates empty bots array when no existing bot data."""
-        import json
 
         conn = await aiosqlite.connect(":memory:")
         conn.row_factory = aiosqlite.Row
@@ -424,11 +423,10 @@ class TestMigration013:
 
             await run_migrations(conn)
 
-            cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
+            # Bots column was dropped by migration 38; verify no bots in fanout_configs
+            cursor = await conn.execute("SELECT COUNT(*) FROM fanout_configs WHERE type = 'bot'")
             row = await cursor.fetchone()
-            bots = json.loads(row["bots"])
-
-            assert bots == []
+            assert row[0] == 0
         finally:
             await conn.close()
 
@@ -497,7 +495,7 @@ class TestMigration018:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 35
+            assert await get_version(conn) == 38
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -575,8 +573,8 @@ class TestMigration018:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 18  # Migrations 18-35 run (18+19 skip internally)
-            assert await get_version(conn) == 35
+            assert applied == 21  # Migrations 18-38 run (18+19 skip internally)
+            assert await get_version(conn) == 38
         finally:
             await conn.close()
 
@@ -648,7 +646,7 @@ class TestMigration019:
             assert await cursor.fetchone() is not None
 
             await run_migrations(conn)
-            assert await get_version(conn) == 35
+            assert await get_version(conn) == 38
 
             # Verify autoindex is gone
             cursor = await conn.execute(
@@ -714,8 +712,8 @@ class TestMigration020:
             assert (await cursor.fetchone())[0] == "delete"
 
             applied = await run_migrations(conn)
-            assert applied == 16  # Migrations 20-35
-            assert await get_version(conn) == 35
+            assert applied == 19  # Migrations 20-38
+            assert await get_version(conn) == 38
 
             # Verify WAL mode
             cursor = await conn.execute("PRAGMA journal_mode")
@@ -745,7 +743,7 @@ class TestMigration020:
             await set_version(conn, 20)
 
             applied = await run_migrations(conn)
-            assert applied == 15  # Migrations 21-35 still run
+            assert applied == 18  # Migrations 21-38 still run
 
             # Still WAL + INCREMENTAL
             cursor = await conn.execute("PRAGMA journal_mode")
@@ -803,8 +801,8 @@ class TestMigration028:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 8
-            assert await get_version(conn) == 35
+            assert applied == 11
+            assert await get_version(conn) == 38
 
             # Verify payload_hash column is now BLOB
             cursor = await conn.execute("PRAGMA table_info(raw_packets)")
@@ -873,8 +871,8 @@ class TestMigration028:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 8  # Version still bumped
-            assert await get_version(conn) == 35
+            assert applied == 11  # Version still bumped
+            assert await get_version(conn) == 38
 
             # Verify data unchanged
             cursor = await conn.execute("SELECT payload_hash FROM raw_packets")
@@ -923,22 +921,16 @@ class TestMigration032:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 4
-            assert await get_version(conn) == 35
+            assert applied == 7
+            assert await get_version(conn) == 38
 
-            # Verify all columns exist with correct defaults
+            # Community MQTT columns were added by migration 32 and dropped by migration 38.
+            # Verify community settings were NOT migrated (no community config existed).
             cursor = await conn.execute(
-                """SELECT community_mqtt_enabled, community_mqtt_iata,
-                          community_mqtt_broker_host, community_mqtt_broker_port,
-                          community_mqtt_email
-                   FROM app_settings WHERE id = 1"""
+                "SELECT COUNT(*) FROM fanout_configs WHERE type = 'mqtt_community'"
             )
             row = await cursor.fetchone()
-            assert row["community_mqtt_enabled"] == 0
-            assert row["community_mqtt_iata"] == ""
-            assert row["community_mqtt_broker_host"] == "mqtt-us-v1.letsmesh.net"
-            assert row["community_mqtt_broker_port"] == 443
-            assert row["community_mqtt_email"] == ""
+            assert row[0] == 0
         finally:
             await conn.close()
 
@@ -996,8 +988,8 @@ class TestMigration034:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 2
-            assert await get_version(conn) == 35
+            assert applied == 5
+            assert await get_version(conn) == 38
 
             # Verify column exists with correct default
             cursor = await conn.execute("SELECT flood_scope FROM app_settings WHERE id = 1")
@@ -1039,8 +1031,8 @@ class TestMigration033:
             await conn.commit()
 
             applied = await run_migrations(conn)
-            assert applied == 3
-            assert await get_version(conn) == 35
+            assert applied == 6
+            assert await get_version(conn) == 38
 
             cursor = await conn.execute(
                 "SELECT key, name, is_hashtag, on_radio FROM channels WHERE key = ?",

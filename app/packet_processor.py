@@ -129,7 +129,7 @@ async def create_message_from_decrypted(
     received_at: int | None = None,
     path: str | None = None,
     channel_name: str | None = None,
-    trigger_bot: bool = True,
+    realtime: bool = True,
 ) -> int | None:
     """Create a message record from decrypted channel packet content.
 
@@ -145,7 +145,7 @@ async def create_message_from_decrypted(
         timestamp: Sender timestamp from the packet
         received_at: When the packet was received (defaults to now)
         path: Hex-encoded routing path
-        trigger_bot: Whether to trigger bot response (False for historical decryption)
+        realtime: If False, skip fanout dispatch (used for historical decryption)
 
     Returns the message ID if created, None if duplicate.
     """
@@ -195,7 +195,7 @@ async def create_message_from_decrypted(
     # Use "is not None" to include empty string (direct/0-hop messages)
     paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
-    # Broadcast new message to connected clients
+    # Broadcast new message to connected clients (and fanout modules when realtime)
     broadcast_event(
         "message",
         Message(
@@ -208,26 +208,10 @@ async def create_message_from_decrypted(
             paths=paths,
             sender_name=sender,
             sender_key=resolved_sender_key,
+            channel_name=channel_name,
         ).model_dump(),
+        realtime=realtime,
     )
-
-    # Run bot if enabled (for incoming channel messages, not historical decryption)
-    if trigger_bot:
-        from app.bot import run_bot_for_message
-
-        asyncio.create_task(
-            run_bot_for_message(
-                sender_name=sender,
-                sender_key=None,  # Channel messages don't have a sender public key
-                message_text=message_text,
-                is_dm=False,
-                channel_key=channel_key_normalized,
-                channel_name=channel_name,
-                sender_timestamp=timestamp,
-                path=path,
-                is_outgoing=False,
-            )
-        )
 
     return msg_id
 
@@ -240,7 +224,7 @@ async def create_dm_message_from_decrypted(
     received_at: int | None = None,
     path: str | None = None,
     outgoing: bool = False,
-    trigger_bot: bool = True,
+    realtime: bool = True,
 ) -> int | None:
     """Create a message record from decrypted direct message packet content.
 
@@ -255,7 +239,7 @@ async def create_dm_message_from_decrypted(
         received_at: When the packet was received (defaults to now)
         path: Hex-encoded routing path
         outgoing: Whether this is an outgoing message (we sent it)
-        trigger_bot: Whether to trigger bot response (False for historical decryption)
+        realtime: If False, skip fanout dispatch (used for historical decryption)
 
     Returns the message ID if created, None if duplicate.
     """
@@ -317,7 +301,8 @@ async def create_dm_message_from_decrypted(
     # Build paths array for broadcast
     paths = [MessagePath(path=path or "", received_at=received)] if path is not None else None
 
-    # Broadcast new message to connected clients
+    # Broadcast new message to connected clients (and fanout modules when realtime)
+    sender_name = contact.name if contact and not outgoing else None
     broadcast_event(
         "message",
         Message(
@@ -332,28 +317,11 @@ async def create_dm_message_from_decrypted(
             sender_name=sender_name,
             sender_key=conversation_key if not outgoing else None,
         ).model_dump(),
+        realtime=realtime,
     )
 
     # Update contact's last_contacted timestamp (for sorting)
     await ContactRepository.update_last_contacted(conversation_key, received)
-
-    # Run bot if enabled (for all real-time DMs, including our own outgoing messages)
-    if trigger_bot:
-        from app.bot import run_bot_for_message
-
-        asyncio.create_task(
-            run_bot_for_message(
-                sender_name=contact.name if contact else None,
-                sender_key=their_public_key,
-                message_text=decrypted.message,
-                is_dm=True,
-                channel_key=None,
-                channel_name=None,
-                sender_timestamp=decrypted.timestamp,
-                path=path,
-                is_outgoing=outgoing,
-            )
-        )
 
     return msg_id
 
@@ -424,7 +392,7 @@ async def run_historical_dm_decryption(
                 received_at=packet_timestamp,
                 path=path_hex,
                 outgoing=outgoing,
-                trigger_bot=False,  # Historical decryption should not trigger bot
+                realtime=False,  # Historical decryption should not trigger fanout
             )
 
             if msg_id is not None:
@@ -903,7 +871,7 @@ async def _process_direct_message(
                 their_public_key=contact.public_key,
                 our_public_key=our_public_key.hex(),
                 received_at=timestamp,
-                path=packet_info.path.hex() if packet_info.path else None,
+                path=packet_info.path.hex() if packet_info else None,
                 outgoing=is_outgoing,
             )
 

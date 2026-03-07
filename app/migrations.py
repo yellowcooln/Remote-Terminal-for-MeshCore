@@ -282,6 +282,27 @@ async def run_migrations(conn: aiosqlite.Connection) -> int:
         await set_version(conn, 35)
         applied += 1
 
+    # Migration 36: Create fanout_configs table and migrate existing MQTT settings
+    if version < 36:
+        logger.info("Applying migration 36: create fanout_configs and migrate MQTT settings")
+        await _migrate_036_create_fanout_configs(conn)
+        await set_version(conn, 36)
+        applied += 1
+
+    # Migration 37: Migrate bots from app_settings to fanout_configs
+    if version < 37:
+        logger.info("Applying migration 37: migrate bots to fanout_configs")
+        await _migrate_037_bots_to_fanout(conn)
+        await set_version(conn, 37)
+        applied += 1
+
+    # Migration 38: Drop legacy MQTT, community MQTT, and bots columns from app_settings
+    if version < 38:
+        logger.info("Applying migration 38: drop legacy MQTT/bot columns from app_settings")
+        await _migrate_038_drop_legacy_columns(conn)
+        await set_version(conn, 38)
+        applied += 1
+
     if applied > 0:
         logger.info(
             "Applied %d migration(s), schema now at version %d", applied, await get_version(conn)
@@ -2012,5 +2033,250 @@ async def _migrate_035_add_block_lists(conn: aiosqlite.Connection) -> None:
             logger.debug("app_settings table not ready, skipping blocked_names migration")
         else:
             raise
+
+    await conn.commit()
+
+
+async def _migrate_036_create_fanout_configs(conn: aiosqlite.Connection) -> None:
+    """Create fanout_configs table and migrate existing MQTT settings.
+
+    Reads existing MQTT settings from app_settings and creates corresponding
+    fanout_configs rows. Old columns are NOT dropped (rollback safety).
+    """
+    import json
+    import uuid
+
+    # 1. Create fanout_configs table
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fanout_configs (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            enabled INTEGER DEFAULT 0,
+            config TEXT NOT NULL DEFAULT '{}',
+            scope TEXT NOT NULL DEFAULT '{}',
+            sort_order INTEGER DEFAULT 0,
+            created_at INTEGER NOT NULL
+        )
+        """
+    )
+
+    # 2. Read existing MQTT settings
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT mqtt_broker_host, mqtt_broker_port, mqtt_username, mqtt_password,
+                   mqtt_use_tls, mqtt_tls_insecure, mqtt_topic_prefix,
+                   mqtt_publish_messages, mqtt_publish_raw_packets,
+                   community_mqtt_enabled, community_mqtt_iata,
+                   community_mqtt_broker_host, community_mqtt_broker_port,
+                   community_mqtt_email
+            FROM app_settings WHERE id = 1
+            """
+        )
+        row = await cursor.fetchone()
+    except Exception:
+        row = None
+
+    if row is None:
+        await conn.commit()
+        return
+
+    import time
+
+    now = int(time.time())
+    sort_order = 0
+
+    # 3. Migrate private MQTT if configured
+    broker_host = row["mqtt_broker_host"] or ""
+    if broker_host:
+        publish_messages = bool(row["mqtt_publish_messages"])
+        publish_raw = bool(row["mqtt_publish_raw_packets"])
+        enabled = publish_messages or publish_raw
+
+        config = {
+            "broker_host": broker_host,
+            "broker_port": row["mqtt_broker_port"] or 1883,
+            "username": row["mqtt_username"] or "",
+            "password": row["mqtt_password"] or "",
+            "use_tls": bool(row["mqtt_use_tls"]),
+            "tls_insecure": bool(row["mqtt_tls_insecure"]),
+            "topic_prefix": row["mqtt_topic_prefix"] or "meshcore",
+        }
+
+        scope = {
+            "messages": "all" if publish_messages else "none",
+            "raw_packets": "all" if publish_raw else "none",
+        }
+
+        await conn.execute(
+            """
+            INSERT INTO fanout_configs (id, type, name, enabled, config, scope, sort_order, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                "mqtt_private",
+                "Private MQTT",
+                1 if enabled else 0,
+                json.dumps(config),
+                json.dumps(scope),
+                sort_order,
+                now,
+            ),
+        )
+        sort_order += 1
+        logger.info("Migrated private MQTT settings to fanout_configs (enabled=%s)", enabled)
+
+    # 4. Migrate community MQTT if enabled OR configured (preserve disabled-but-configured)
+    community_enabled = bool(row["community_mqtt_enabled"])
+    community_iata = row["community_mqtt_iata"] or ""
+    community_host = row["community_mqtt_broker_host"] or ""
+    community_email = row["community_mqtt_email"] or ""
+    community_has_config = bool(
+        community_iata
+        or community_email
+        or (community_host and community_host != "mqtt-us-v1.letsmesh.net")
+    )
+    if community_enabled or community_has_config:
+        config = {
+            "broker_host": community_host or "mqtt-us-v1.letsmesh.net",
+            "broker_port": row["community_mqtt_broker_port"] or 443,
+            "iata": community_iata,
+            "email": community_email,
+        }
+
+        scope = {
+            "messages": "none",
+            "raw_packets": "all",
+        }
+
+        await conn.execute(
+            """
+            INSERT INTO fanout_configs (id, type, name, enabled, config, scope, sort_order, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                "mqtt_community",
+                "Community MQTT",
+                1 if community_enabled else 0,
+                json.dumps(config),
+                json.dumps(scope),
+                sort_order,
+                now,
+            ),
+        )
+        logger.info(
+            "Migrated community MQTT settings to fanout_configs (enabled=%s)", community_enabled
+        )
+
+    await conn.commit()
+
+
+async def _migrate_037_bots_to_fanout(conn: aiosqlite.Connection) -> None:
+    """Migrate bots from app_settings.bots JSON to fanout_configs rows."""
+    import json
+    import uuid
+
+    try:
+        cursor = await conn.execute("SELECT bots FROM app_settings WHERE id = 1")
+        row = await cursor.fetchone()
+    except Exception:
+        row = None
+
+    if row is None:
+        await conn.commit()
+        return
+
+    bots_json = row["bots"] or "[]"
+    try:
+        bots = json.loads(bots_json)
+    except (json.JSONDecodeError, TypeError):
+        bots = []
+
+    if not bots:
+        await conn.commit()
+        return
+
+    import time
+
+    now = int(time.time())
+
+    # Use sort_order starting at 200 to place bots after MQTT configs (0-99)
+    for i, bot in enumerate(bots):
+        bot_name = bot.get("name") or f"Bot {i + 1}"
+        bot_enabled = bool(bot.get("enabled", False))
+        bot_code = bot.get("code", "")
+
+        config_blob = json.dumps({"code": bot_code})
+        scope = json.dumps({"messages": "all", "raw_packets": "none"})
+
+        await conn.execute(
+            """
+            INSERT INTO fanout_configs (id, type, name, enabled, config, scope, sort_order, created_at)
+            VALUES (?, 'bot', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                bot_name,
+                1 if bot_enabled else 0,
+                config_blob,
+                scope,
+                200 + i,
+                now,
+            ),
+        )
+        logger.info("Migrated bot '%s' to fanout_configs (enabled=%s)", bot_name, bot_enabled)
+
+    await conn.commit()
+
+
+async def _migrate_038_drop_legacy_columns(conn: aiosqlite.Connection) -> None:
+    """Drop legacy MQTT, community MQTT, and bots columns from app_settings.
+
+    These columns were migrated to fanout_configs in migrations 36 and 37.
+    SQLite 3.35.0+ supports ALTER TABLE DROP COLUMN. For older versions,
+    the columns remain but are harmless (no longer read or written).
+    """
+    # Check if app_settings table exists (some test DBs may not have it)
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+    )
+    if await cursor.fetchone() is None:
+        await conn.commit()
+        return
+
+    columns_to_drop = [
+        "bots",
+        "mqtt_broker_host",
+        "mqtt_broker_port",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_use_tls",
+        "mqtt_tls_insecure",
+        "mqtt_topic_prefix",
+        "mqtt_publish_messages",
+        "mqtt_publish_raw_packets",
+        "community_mqtt_enabled",
+        "community_mqtt_iata",
+        "community_mqtt_broker_host",
+        "community_mqtt_broker_port",
+        "community_mqtt_email",
+    ]
+
+    for column in columns_to_drop:
+        try:
+            await conn.execute(f"ALTER TABLE app_settings DROP COLUMN {column}")
+            logger.debug("Dropped %s from app_settings", column)
+        except aiosqlite.OperationalError as e:
+            error_msg = str(e).lower()
+            if "no such column" in error_msg:
+                logger.debug("app_settings.%s already dropped, skipping", column)
+            elif "syntax error" in error_msg or "drop column" in error_msg:
+                logger.debug("SQLite doesn't support DROP COLUMN, %s column will remain", column)
+            else:
+                raise
 
     await conn.commit()

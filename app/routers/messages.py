@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 
@@ -176,24 +175,8 @@ async def send_direct_message(request: SendDirectMessageRequest) -> Message:
     )
 
     # Broadcast so all connected clients (not just sender) see the outgoing message immediately.
+    # Fanout modules (including bots) are triggered via broadcast_event's realtime dispatch.
     broadcast_event("message", message.model_dump())
-
-    # Trigger bots for outgoing DMs (runs in background, doesn't block response)
-    from app.bot import run_bot_for_message
-
-    asyncio.create_task(
-        run_bot_for_message(
-            sender_name=None,
-            sender_key=db_contact.public_key.lower(),
-            message_text=request.text,
-            is_dm=True,
-            channel_key=None,
-            channel_name=None,
-            sender_timestamp=now,
-            path=None,
-            is_outgoing=True,
-        )
-    )
 
     return message
 
@@ -313,6 +296,7 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
                 acked=0,
                 sender_name=radio_name or None,
                 sender_key=our_public_key,
+                channel_name=db_channel.name,
             ).model_dump(),
         )
 
@@ -333,23 +317,7 @@ async def send_channel_message(request: SendChannelMessageRequest) -> Message:
         paths=paths,
         sender_name=radio_name or None,
         sender_key=our_public_key,
-    )
-
-    # Trigger bots for outgoing channel messages (runs in background, doesn't block response)
-    from app.bot import run_bot_for_message
-
-    asyncio.create_task(
-        run_bot_for_message(
-            sender_name=radio_name or None,
-            sender_key=None,
-            message_text=request.text,
-            is_dm=False,
-            channel_key=channel_key_upper,
-            channel_name=db_channel.name,
-            sender_timestamp=now,
-            path=None,
-            is_outgoing=True,
-        )
+        channel_name=db_channel.name,
     )
 
     return message
@@ -478,6 +446,7 @@ async def resend_channel_message(
                 acked=0,
                 sender_name=radio_name or None,
                 sender_key=resend_public_key,
+                channel_name=db_channel.name,
             ).model_dump(),
         )
 

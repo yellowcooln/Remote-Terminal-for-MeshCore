@@ -92,21 +92,26 @@ class WebSocketManager:
 ws_manager = WebSocketManager()
 
 
-def broadcast_event(event_type: str, data: dict) -> None:
+def broadcast_event(event_type: str, data: dict, *, realtime: bool = True) -> None:
     """Schedule a broadcast without blocking.
 
     Convenience function that creates an asyncio task to broadcast
-    an event to all connected WebSocket clients and forward to MQTT.
+    an event to all connected WebSocket clients and forward to fanout modules.
+
+    Args:
+        event_type: Event type string (e.g. "message", "raw_packet")
+        data: Event payload dict
+        realtime: If False, skip fanout dispatch (used for historical decryption)
     """
     asyncio.create_task(ws_manager.broadcast(event_type, data))
 
-    from app.mqtt import mqtt_broadcast
+    if realtime:
+        from app.fanout.manager import fanout_manager
 
-    mqtt_broadcast(event_type, data)
-
-    from app.community_mqtt import community_mqtt_broadcast
-
-    community_mqtt_broadcast(event_type, data)
+        if event_type == "message":
+            asyncio.create_task(fanout_manager.broadcast_message(data))
+        elif event_type == "raw_packet":
+            asyncio.create_task(fanout_manager.broadcast_raw(data))
 
 
 def broadcast_error(message: str, details: str | None = None) -> None:

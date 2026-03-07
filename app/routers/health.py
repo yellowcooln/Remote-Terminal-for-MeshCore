@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -16,8 +17,7 @@ class HealthResponse(BaseModel):
     connection_info: str | None
     database_size_mb: float
     oldest_undecrypted_timestamp: int | None
-    mqtt_status: str | None = None
-    community_mqtt_status: str | None = None
+    fanout_statuses: dict[str, dict[str, str]] = {}
     bots_disabled: bool = False
 
 
@@ -36,27 +36,12 @@ async def build_health_data(radio_connected: bool, connection_info: str | None) 
     except RuntimeError:
         pass  # Database not connected
 
-    # MQTT status
-    mqtt_status: str | None = None
+    # Fanout module statuses
+    fanout_statuses: dict[str, Any] = {}
     try:
-        from app.mqtt import mqtt_publisher
+        from app.fanout.manager import fanout_manager
 
-        if mqtt_publisher._is_configured():
-            mqtt_status = "connected" if mqtt_publisher.connected else "disconnected"
-        else:
-            mqtt_status = "disabled"
-    except Exception:
-        pass
-
-    # Community MQTT status
-    community_mqtt_status: str | None = None
-    try:
-        from app.community_mqtt import community_publisher
-
-        if community_publisher._is_configured():
-            community_mqtt_status = "connected" if community_publisher.connected else "disconnected"
-        else:
-            community_mqtt_status = "disabled"
+        fanout_statuses = fanout_manager.get_statuses()
     except Exception:
         pass
 
@@ -66,8 +51,7 @@ async def build_health_data(radio_connected: bool, connection_info: str | None) 
         "connection_info": connection_info,
         "database_size_mb": db_size_mb,
         "oldest_undecrypted_timestamp": oldest_ts,
-        "mqtt_status": mqtt_status,
-        "community_mqtt_status": community_mqtt_status,
+        "fanout_statuses": fanout_statuses,
         "bots_disabled": settings.disable_bots,
     }
 

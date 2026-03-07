@@ -18,6 +18,7 @@ from app.radio_sync import (
 from app.routers import (
     channels,
     contacts,
+    fanout,
     health,
     messages,
     packets,
@@ -56,23 +57,18 @@ async def lifespan(app: FastAPI):
     # Always start connection monitor (even if initial connection failed)
     await radio_manager.start_connection_monitor()
 
-    # Start MQTT publishers if configured
-    from app.community_mqtt import community_publisher
-    from app.mqtt import mqtt_publisher
-    from app.repository import AppSettingsRepository
+    # Start fanout modules (MQTT, etc.) from database configs
+    from app.fanout.manager import fanout_manager
 
     try:
-        mqtt_settings = await AppSettingsRepository.get()
-        await mqtt_publisher.start(mqtt_settings)
-        await community_publisher.start(mqtt_settings)
+        await fanout_manager.load_from_db()
     except Exception as e:
-        logger.warning("Failed to start MQTT publisher(s): %s", e)
+        logger.warning("Failed to start fanout modules: %s", e)
 
     yield
 
     logger.info("Shutting down")
-    await community_publisher.stop()
-    await mqtt_publisher.stop()
+    await fanout_manager.stop_all()
     await radio_manager.stop_connection_monitor()
     await stop_message_polling()
     await stop_periodic_advert()
@@ -119,6 +115,7 @@ async def radio_disconnected_handler(request: Request, exc: RadioDisconnectedErr
 
 # API routes - all prefixed with /api for production compatibility
 app.include_router(health.router, prefix="/api")
+app.include_router(fanout.router, prefix="/api")
 app.include_router(radio.router, prefix="/api")
 app.include_router(contacts.router, prefix="/api")
 app.include_router(repeaters.router, prefix="/api")

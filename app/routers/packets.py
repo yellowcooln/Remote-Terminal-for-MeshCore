@@ -71,7 +71,7 @@ async def _run_historical_channel_decryption(
                 timestamp=result.timestamp,
                 received_at=packet_timestamp,
                 path=path_hex,
-                trigger_bot=False,  # Historical decryption should not trigger bot
+                realtime=False,  # Historical decryption should not trigger fanout
             )
 
             if msg_id is not None:
